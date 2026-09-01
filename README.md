@@ -1,8 +1,11 @@
-# CASA — Application de production (Lot 0 : fondations & conception)
+# CASA — Application de production
 
 Monorepo de l'application de production CASA (sélection de bénéficiaires — CCI-CI / FADV / AICS), en cours d'industrialisation à partir de la maquette front-end `../App_maquette` (source de vérité fonctionnelle, **non modifiée**, lue uniquement pour spécifier ce dépôt).
 
-> **Périmètre de ce lot (Lot 0).** Squelette de dépôt, environnement Docker fonctionnel (4 services), conception MERISE (MCD/MLD) et UML (cas d'usage + séquences), décisions d'architecture. **Aucune logique métier, aucun endpoint fonctionnel, aucun écran React** — voir `docs/`.
+> **Avancement.**
+> - **Lot 0** — squelette de dépôt, Docker (4 services), conception MERISE/UML, ADR (`docs/`).
+> - **Lot 1** — schéma PostgreSQL réel (30 tables métier), seeders de référence (barème, filières, campagne, comptes démo), trigger append-only `journal_audit`.
+> - **Lot 2** — authentification Sanctum SPA (session-cookie), recâblage `User` → table `utilisateur`, rôles (middleware `role:` + Gates ADR-10). Toujours **aucun écran React, aucun endpoint métier** (seulement auth + routes de démonstration des rôles).
 
 ## Structure
 
@@ -36,15 +39,42 @@ docker compose up -d
 # 3. Si backend/.env vient d'être recréé depuis .env.example (APP_KEY vide) :
 docker compose exec backend php artisan key:generate --force
 
-# 4. Migrations (squelette Laravel/Sanctum par défaut — aucune table métier
-#    dans ce lot, cf. docs/mld.md pour le schéma prévu au lot suivant)
-docker compose exec backend php artisan migrate --force
+# 4. Schéma + données de référence (Lot 1)
+docker compose exec backend php artisan migrate:fresh --seed --force
 
 # 5. Vérification : les 4 conteneurs doivent être "healthy"
 docker compose ps
 ```
 
 **Point d'entrée unique** : http://localhost:8080 (frontend). API : http://localhost:8080/api/\*. Sonde de santé backend : http://localhost:8080/up.
+
+## Authentification (Lot 2)
+
+Sanctum en mode SPA (cookie de session same-origin, **jamais** de token Bearer — cf. `docs/ADR.md` ADR-01). Séquence côté client : `GET /sanctum/csrf-cookie` (dépose `XSRF-TOKEN`), puis toute requête mutante renvoie ce jeton dans l'en-tête `X-XSRF-TOKEN`.
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/sanctum/csrf-cookie` | public | Dépose le cookie CSRF. |
+| POST | `/api/login` | public (throttlé 5/min/email+IP) | `{email, password}` → ouvre la session, renvoie l'utilisateur (liste blanche, jamais `mot_de_passe_hash`). Échec 100 % générique (compte inexistant / mauvais mot de passe / compte désactivé : même `422`). |
+| POST | `/api/logout` | authentifié | Invalide la session. |
+| GET | `/api/me` | authentifié | Utilisateur courant + profil (`candidat` ou `membre_equipe`). |
+| GET | `/api/ping-candidat` | `candidat` | Démonstration du filtrage par rôle. |
+| GET | `/api/ping-evaluateur` | `evaluateur` **ou** `administrateur` (ADR-10) | idem. |
+| GET | `/api/ping-admin` | `administrateur` strict | idem. |
+
+**Comptes de démonstration** (seedés, mot de passe `Demo2026!`) : `candidat@casa-demo.ci`, `evaluateur@casa-demo.ci`, `admin@casa-demo.ci`.
+
+## Tests
+
+Le schéma est spécifique à PostgreSQL (trigger append-only, `CHECK`, `uuid`) : les tests tournent contre une **vraie base PostgreSQL** `casa_test`, pas SQLite.
+
+```bash
+# 1. Créer la base de test (reproductible ; --fresh pour la recréer)
+docker compose exec backend php artisan casa:test-db
+
+# 2. Lancer la suite (RefreshDatabase applique les migrations réelles)
+docker compose exec backend php artisan test
+```
 
 ### État vérifié à la livraison de ce lot
 

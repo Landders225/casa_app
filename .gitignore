@@ -1,0 +1,40 @@
+# CASA — .gitignore racine du monorepo.
+# Les fichiers .env.example RESTENT suivis (référence) ; aucun .env réel ne l'est.
+
+# --- Dépendances ---
+/backend/vendor/
+/frontend/node_modules/
+node_modules/
+
+# --- Environnement réel (jamais versionné) ---
+.env
+/.env
+/backend/.env
+/backend/.env.backup
+/backend/.env.production
+/frontend/.env
+*.env.local
+
+# --- Laravel : caches, clés, storage privé ---
+/backend/bootstrap/cache/*.php
+/backend/storage/*.key
+/backend/storage/app/private/*
+!/backend/storage/app/private/.gitignore
+/backend/storage/app/public/*
+!/backend/storage/app/public/.gitignore
+/backend/storage/framework/cache/data/*
+/backend/storage/framework/sessions/*
+/backend/storage/framework/testing/*
+/backend/storage/framework/views/*
+/backend/storage/logs/*
+/backend/.phpunit.result.cache
+/backend/.phpunit.cache
+
+# --- Build front ---
+/frontend/dist/
+/frontend/dist-ssr/
+
+# --- Logs & divers ---
+*.log
+.DS_Store
+Thumbs.db
