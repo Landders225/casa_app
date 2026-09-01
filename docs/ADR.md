@@ -88,9 +88,18 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 
 **Conséquence.** L'immuabilité ne repose plus sur la seule absence de chemin applicatif : un `UPDATE`/`DELETE`/`TRUNCATE` sur `journal_audit` échoue au niveau moteur, quel que soit le point d'entrée (route, `php artisan tinker`, `psql` direct, script de maintenance). Le `DROP TABLE` de `migrate:fresh` n'est pas concerné (DDL de gestion de schéma, pas une altération de ligne) ; un contournement resterait théoriquement possible pour un super-utilisateur PostgreSQL via `SET session_replication_role = replica`, ce qui n'est pas le rôle applicatif et sortirait de tout usage normal. Corollaire opérationnel : une ligne insérée par erreur ne peut pas être « nettoyée » — les tests du trigger s'exécutent donc en transaction annulée (`ROLLBACK`).
 
+## ADR-13 — Pas de parcours d'inscription dédié : la création de candidature le porte temporairement (Lot 3a)
+
+**Contexte.** Dans la maquette, `inscription.html` crée le couple `candidat` + `candidature` : il fixe la filière visée (`filiere_id`), génère le `numero_dossier`, initialise le classement des préférences et met `statut='brouillon'`. Aucun lot livré (0 à 3a) n'a produit d'endpoint d'inscription ; le Lot 2 se limite à l'authentification et à 3 comptes de démonstration seedés (le `candidat` de démo est créé par un seeder).
+**Décision.** Au Lot 3a, `POST /api/candidatures` **porte le geste d'inscription** : il prend `filiere_id` en entrée (filière ouverte pour la campagne en cours), génère le `numero_dossier` (`CASA-<année>-<6 chiffres>`), crée la ligne `reponse_formulaire` vide (1-1 strict) et pré-remplit `classement_filiere_preference` (filière visée en rang 1). L'édition des champs d'identité du `candidat` (`prenom`, `nom`, `date_naissance`, `cni`…) **n'est pas** couverte par ce lot.
+**Conséquence.** Un **lot inscription / profil réel reste à faire** : création de compte candidat en self-service, saisie/mise à jour de l'état civil, choix initial de la filière. Quand il existera, `POST /api/candidatures` sera réduit à « ouvrir la candidature de la campagne courante » (la filière proviendra du profil / de l'inscription) sans changer le contrat de lecture. En attendant, tester le Lot 3a nécessite un `candidat` pré-existant (seedé ou créé à la main).
+
 ---
 
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)
+
+- **Lot inscription / profil candidat** (self-service, état civil, choix de filière) — cf. ADR-13.
+- Règle « 1 expérience = 1 justificatif » : validée **à la soumission** (Lot 3c), pas au niveau colonne (`experience_professionnelle.piece_justificative_id` rendu nullable au Lot 3a, cf. `docs/mld.md`).
 
 - Détail des policies Laravel par endpoint (matrice complète rôle × action).
 - Stratégie de rate limiting / anti-bruteforce sur l'authentification.

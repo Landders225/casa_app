@@ -150,9 +150,15 @@ CREATE TABLE experience_professionnelle (      -- 🔴 (table entière)
   candidature_id    uuid NOT NULL REFERENCES candidature(id),
   domaine           varchar(20) NOT NULL CHECK (domaine IN ('hotellerie','restauration','commerce')),
   duree_categorie   varchar(10) NOT NULL CHECK (duree_categorie IN ('moins_6','6_12','plus_12')),
-  piece_justificative_id uuid NOT NULL UNIQUE REFERENCES piece_justificative(id), -- obligatoire ; créée après piece_justificative (pas de FK différée)
+  piece_justificative_id uuid UNIQUE REFERENCES piece_justificative(id), -- nullable depuis le Lot 3a (voir note)
   created_at timestamptz
 );
+-- Note (Lot 3a) : `piece_justificative_id` était NOT NULL au Lot 0. Rendu
+-- nullable (migration ..._make_experience_piece_justificative_nullable) : le
+-- brouillon de candidature permet de déclarer une expérience AVANT d'y attacher
+-- son justificatif (upload = Lot 3b). La règle « 1 expérience = 1 justificatif »
+-- (MCD) devient une VALIDATION À LA SOUMISSION (Lot 3c), pas une contrainte de
+-- colonne. L'index UNIQUE est conservé (une pièce ne sert qu'à une expérience).
 
 CREATE TABLE classement_filiere_preference (   -- 🟢 (préférence exprimée par le candidat lui-même)
   candidature_id  uuid NOT NULL REFERENCES candidature(id),

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * CASA — profil candidat, table `candidat` (docs/mld.md §1). 1-1 avec `utilisateur`.
@@ -52,5 +53,13 @@ class Candidat extends Model
     public function utilisateur(): BelongsTo
     {
         return $this->belongsTo(User::class, 'utilisateur_id');
+    }
+
+    /**
+     * @return HasMany<Candidature, $this>
+     */
+    public function candidatures(): HasMany
+    {
+        return $this->hasMany(Candidature::class, 'candidat_id');
     }
 }
