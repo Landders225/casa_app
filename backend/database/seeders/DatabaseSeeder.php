@@ -2,24 +2,22 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+/**
+ * CASA — Lot 1. Données de référence uniquement (schéma + référentiel), aucune
+ * donnée métier (candidatures, évaluations...). Ordre = dépendances FK.
+ */
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            TypeDocumentSeeder::class,
+            FiliereSeeder::class,
+            CampagneSeeder::class,
+            GrilleBaremeSeeder::class,
+            ComptesDemoSeeder::class,
         ]);
     }
 }

@@ -1,6 +1,8 @@
 # CASA — Modèle Logique de Données (MLD)
 
-Lot 0 — Conception, **pas des migrations réelles** (aucune n'est créée dans ce lot). Format DDL PostgreSQL "prêt à traduire" en migrations Laravel. Types génériques : `uuid` (PK, `gen_random_uuid()`), `timestamptz`, `numeric(p,s)` pour les scores.
+Conçu au Lot 0. Format DDL PostgreSQL "prêt à traduire" en migrations Laravel. Types génériques : `uuid` (PK, `gen_random_uuid()`), `timestamptz`, `numeric(p,s)` pour les scores.
+
+> **Lot 1 (fait).** Ce MLD est désormais traduit en migrations Laravel réelles (`backend/database/migrations/2026_09_02_1000*`), testées contre le conteneur PostgreSQL. Deux points ont été finalisés par rapport au Lot 0 : la contrainte d'exclusivité de `piece_justificative` (colonne discriminante `rattachement`, cf. §3) et l'immuabilité du `journal_audit` (triggers PostgreSQL, cf. §8 et ADR-12). Ce document reste la source de vérité : il est mis à jour en même temps que les migrations.
 
 Chaque colonne porte son marqueur de confidentialité (🟢/🟡/🔴, cf. `docs/dictionnaire-donnees.md`). **Aucune colonne 🔴 ne doit jamais apparaître dans une API Resource exposée au rôle `candidat`** — c'est la checklist à cocher au Lot d'implémentation des endpoints.
 
@@ -148,7 +150,7 @@ CREATE TABLE experience_professionnelle (      -- 🔴 (table entière)
   candidature_id    uuid NOT NULL REFERENCES candidature(id),
   domaine           varchar(20) NOT NULL CHECK (domaine IN ('hotellerie','restauration','commerce')),
   duree_categorie   varchar(10) NOT NULL CHECK (duree_categorie IN ('moins_6','6_12','plus_12')),
-  piece_justificative_id uuid NOT NULL REFERENCES piece_justificative(id), -- obligatoire (différée : FK ajoutée après création de piece_justificative)
+  piece_justificative_id uuid NOT NULL UNIQUE REFERENCES piece_justificative(id), -- obligatoire ; créée après piece_justificative (pas de FK différée)
   created_at timestamptz
 );
 
@@ -167,17 +169,22 @@ CREATE TABLE type_document (                   -- 🟢 référentiel
 
 CREATE TABLE piece_justificative (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  candidature_id      uuid REFERENCES candidature(id),       -- 🟢 nullable : rempli si pièce du dossier
-  type_document_code  varchar(20) REFERENCES type_document(code), -- 🟢 nullable si justificatif d'expérience (pas de "type" référentiel)
+  candidature_id      uuid REFERENCES candidature(id),       -- 🟢 nullable : renseigné SSI pièce du dossier
+  type_document_code  varchar(20) REFERENCES type_document(code), -- 🟢 nullable SSI justificatif d'expérience (pas de "type" référentiel)
+  rattachement        varchar(12) NOT NULL CHECK (rattachement IN ('dossier','experience')), -- 🟢 colonne discriminante (finalisation Lot 1)
   nom_original        varchar(255) NOT NULL,   -- 🟢
-  chemin_stockage     varchar(500) NOT NULL,   -- 🔴 hors webroot, cf. ADR
+  chemin_stockage     varchar(500) NOT NULL,   -- 🔴 hors webroot, cf. ADR-11
   taille_octets       integer NOT NULL,        -- 🟢
   depose_le           timestamptz NOT NULL DEFAULT now(), -- 🟢
-  CONSTRAINT piece_rattachee_dossier_xor_experience
-    CHECK (candidature_id IS NOT NULL OR id IN (SELECT piece_justificative_id FROM experience_professionnelle))
-  -- Contrainte d'exclusivité applicative complète (dossier XOR expérience) à
-  -- finaliser en migration réelle (trigger ou colonne discriminante) — la
-  -- syntaxe CHECK ci-dessus est indicative, pas exécutable telle quelle.
+  -- Exclusivité dossier XOR expérience, désormais exécutable (colonne
+  -- discriminante — option prévue par le MLD Lot 0, retenue au Lot 1) :
+  CONSTRAINT piece_rattachee_dossier_xor_experience CHECK (
+       (rattachement = 'dossier'    AND candidature_id IS NOT NULL AND type_document_code IS NOT NULL)
+    OR (rattachement = 'experience' AND candidature_id IS NULL     AND type_document_code IS NULL)
+  )
+  -- Le rattachement effectif d'une pièce 'experience' se fait via
+  -- experience_professionnelle.piece_justificative_id (NOT NULL + UNIQUE :
+  -- une pièce ne sert qu'à une seule expérience).
 );
 ```
 
@@ -364,9 +371,11 @@ CREATE TABLE journal_audit (                    -- 🔴 (table entière) — APP
   resultat         varchar(100) NOT NULL DEFAULT 'Succès',
   horodatage       timestamptz NOT NULL DEFAULT now()
 );
--- Aucune contrainte SQL ne peut à elle seule garantir l'immuabilité ; la
--- règle "jamais d'UPDATE/DELETE" est appliquée au niveau applicatif
--- (absence totale de route/policy de modification sur ce modèle) — cf. ADR.
+-- Immuabilité garantie à deux niveaux (cf. ADR-12) :
+--  1) applicatif : absence totale de route/policy de modification sur ce modèle ;
+--  2) PostgreSQL : triggers BEFORE UPDATE OR DELETE (par ligne) + BEFORE TRUNCATE
+--     (par instruction) qui lèvent RAISE EXCEPTION. Seul INSERT est permis.
+--     Migration dédiée : ..._add_journal_audit_append_only_trigger.
 ```
 
 ---

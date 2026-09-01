@@ -8,19 +8,17 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
+     *
+     * CASA — la table applicative des comptes est `utilisateur` (cf. docs/mld.md,
+     * ADR-10) : elle est créée par la migration métier
+     * `..._create_utilisateur_table`. La table `users` du squelette Laravel n'est
+     * donc PAS créée ici. On conserve `password_reset_tokens` et `sessions`, dont
+     * l'infrastructure Laravel/Sanctum SPA a besoin (SESSION_DRIVER=database,
+     * cf. docs/ADR.md ADR-01). Le recâblage du modèle `App\Models\User` sur la
+     * table `utilisateur` est traité au Lot 2 (authentification).
      */
     public function up(): void
     {
-        Schema::create('users', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
-            $table->rememberToken();
-            $table->timestamps();
-        });
-
         Schema::create('password_reset_tokens', function (Blueprint $table) {
             $table->string('email')->primary();
             $table->string('token');
@@ -42,7 +40,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('users');
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
     }

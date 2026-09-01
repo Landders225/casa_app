@@ -77,11 +77,16 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 **Décision.** `piece_justificative.chemin_stockage` pointe vers un espace de stockage Laravel non exposé par nginx (`storage/app/private`, volume Docker dédié `documents_data`, cf. `docker-compose.yml`). Tout accès passe par une route applicative authentifiée et autorisée (policy : le candidat propriétaire, ou un membre équipe affecté/admin), jamais par un lien statique.
 **Conséquence.** Un peu de latence supplémentaire (le fichier transite par PHP au lieu d'être servi directement par nginx) en échange d'un contrôle d'accès réel et audité.
 
-## ADR-12 — Journal d'audit immuable côté application
+## ADR-12 — Journal d'audit immuable : application **et** garantie PostgreSQL
 
-**Contexte.** Règle 5 : traçabilité persistante des actions sensibles.
-**Décision.** `journal_audit` est append-only : aucune route, policy ou contrôleur ne propose de mise à jour ou de suppression sur ce modèle. Chaque action sensible (correction exceptionnelle, remplacement, publication, modification de grille, activation/désactivation de filière, ouverture/clôture de campagne, affectation, élimination manuelle, motif de non-retenue) écrit une ligne, avec motif obligatoire quand la règle métier l'exige.
-**Conséquence.** L'immuabilité n'est pas garantie par une contrainte SQL (une contrainte `REVOKE UPDATE, DELETE` au niveau du rôle applicatif PostgreSQL est une amélioration possible, à trancher lors du lot base de données) mais par l'absence totale de chemin applicatif pour modifier une ligne existante.
+**Contexte.** Règle 5 : traçabilité persistante des actions sensibles. L'append-only strictement applicatif (absence de route de modification) protège contre le code métier normal, mais pas contre un accès direct à la base ni contre une future route mal écrite.
+**Décision.** `journal_audit` est append-only, garanti à **deux niveaux** :
+1. **Applicatif** — aucune route, policy ou contrôleur ne propose de mise à jour ou de suppression sur ce modèle. Chaque action sensible (correction exceptionnelle, remplacement, publication, modification de grille, activation/désactivation de filière, ouverture/clôture de campagne, affectation, élimination manuelle, motif de non-retenue) écrit une ligne, avec motif obligatoire quand la règle métier l'exige.
+2. **PostgreSQL (tranché au Lot 1)** — une migration dédiée (`..._add_journal_audit_append_only_trigger`) installe une fonction PL/pgSQL et deux triggers sur `journal_audit` : `BEFORE UPDATE OR DELETE` (par ligne) et `BEFORE TRUNCATE` (par instruction). Toute tentative lève `RAISE EXCEPTION` (`ERRCODE restrict_violation`) et est rejetée. Seul `INSERT` reste permis.
+
+*Trigger plutôt que `REVOKE UPDATE, DELETE`* : le trigger protège indépendamment du rôle SQL utilisé, y compris le propriétaire des tables dont se sert Laravel (qu'un `REVOKE` sur le rôle applicatif n'atteindrait pas).
+
+**Conséquence.** L'immuabilité ne repose plus sur la seule absence de chemin applicatif : un `UPDATE`/`DELETE`/`TRUNCATE` sur `journal_audit` échoue au niveau moteur, quel que soit le point d'entrée (route, `php artisan tinker`, `psql` direct, script de maintenance). Le `DROP TABLE` de `migrate:fresh` n'est pas concerné (DDL de gestion de schéma, pas une altération de ligne) ; un contournement resterait théoriquement possible pour un super-utilisateur PostgreSQL via `SET session_replication_role = replica`, ce qui n'est pas le rôle applicatif et sortirait de tout usage normal. Corollaire opérationnel : une ligne insérée par erreur ne peut pas être « nettoyée » — les tests du trigger s'exécutent donc en transaction annulée (`ROLLBACK`).
 
 ---
 
