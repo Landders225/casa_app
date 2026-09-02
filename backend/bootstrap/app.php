@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureCandidatureModifiable;
 use App\Http\Middleware\EnsureUserHasRole;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -22,6 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // role:evaluateur,administrateur / role:administrateur
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
+            // Ferme l'édition d'une candidature soumise (Lot 3c) : 404 si pas
+            // propriétaire, 409 si plus en brouillon.
+            'candidature.modifiable' => EnsureCandidatureModifiable::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

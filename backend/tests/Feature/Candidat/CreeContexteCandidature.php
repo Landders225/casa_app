@@ -3,11 +3,14 @@
 namespace Tests\Feature\Candidat;
 
 use App\Models\Candidat;
+use App\Models\Candidature;
+use App\Models\PieceJustificative;
 use App\Models\User;
 use Database\Seeders\CampagneSeeder;
 use Database\Seeders\FiliereSeeder;
 use Database\Seeders\TypeDocumentSeeder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Str;
 
 /**
  * Contexte partagé des tests candidature Lot 3a/3b : référentiels seedés
@@ -103,5 +106,61 @@ trait CreeContexteCandidature
     protected function fichierJpeg(string $nom = 'photo.jpg'): UploadedFile
     {
         return $this->fichierReel($nom, base64_decode(self::JPG_1x1), 'image/jpeg');
+    }
+
+    // --- Candidature prête à soumettre (remplissage direct en base) ---
+
+    /**
+     * Jeu de réponses valide et ÉLIGIBLE (aucun critère de scoring.js déclenché).
+     *
+     * @return array<string, mixed>
+     */
+    protected function reponsesEligibles(): array
+    {
+        return [
+            'sc01_scolarise_actuellement' => 'non',
+            'sc02_derniere_classe' => 'terminale',
+            'sc03_document_justifiant_niveau' => 'oui',
+            'sc05_beneficiaire_formation_actuelle' => 'non',
+            'sc06_deja_beneficie_formation' => 'non',
+            'se02_orphelin' => 'non',
+            'se03_situation_emploi' => 'sans_emploi',
+            'se04_source_revenu' => 'aucune',
+            'se06_soutien_menage' => 'non',
+            'langue_ecrit' => 3, 'langue_parle' => 2, 'langue_comprehension' => 3,
+            'info_word' => 2, 'info_excel' => 1, 'info_internet' => 2,
+            'acces_plateau' => 'oui', 'acces_deux_plateaux_vallons' => 'non',
+            'mo04_lettre_motivation' => 'Je souhaite intégrer cette formation certifiante pour construire une carrière stable dans l’hôtellerie.',
+            'di01_disponible_lun_ven' => 'oui',
+            'di02_contraintes' => 'aucune',
+            'di03_engagement_complet' => 'oui',
+        ];
+    }
+
+    /**
+     * Rend la candidature complète (donc soumissible). `$reponses` écrase des
+     * champs pour tester (in)complétude / (non-)éligibilité.
+     *
+     * @param  array<string, mixed>  $reponses
+     */
+    protected function rendreCandidatureComplete(Candidature $candidature, array $reponses = []): Candidature
+    {
+        $candidature->reponseFormulaire->fill(array_merge($this->reponsesEligibles(), $reponses))->save();
+        $candidature->forceFill(['cqp_confirme' => true])->save();
+
+        foreach (['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo'] as $type) {
+            PieceJustificative::create([
+                'candidature_id' => $candidature->id,
+                'type_document_code' => $type,
+                'rattachement' => 'dossier',
+                'nom_original' => "{$type}.pdf",
+                'chemin_stockage' => $candidature->id.'/'.Str::uuid().'.pdf',
+                'taille_octets' => 1000,
+                'type_mime' => 'application/pdf',
+                'depose_le' => now(),
+            ]);
+        }
+
+        return $candidature->fresh();
     }
 }

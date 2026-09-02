@@ -5,7 +5,8 @@ Monorepo de l'application de production CASA (sélection de bénéficiaires — 
 > **Avancement.**
 > - **Lot 0** — squelette de dépôt, Docker (4 services), conception MERISE/UML, ADR (`docs/`).
 > - **Lot 1** — schéma PostgreSQL réel (30 tables métier), seeders de référence (barème, filières, campagne, comptes démo), trigger append-only `journal_audit`.
-> - **Lot 2** — authentification Sanctum SPA (session-cookie), recâblage `User` → table `utilisateur`, rôles (middleware `role:` + Gates ADR-10). Toujours **aucun écran React, aucun endpoint métier** (seulement auth + routes de démonstration des rôles).
+> - **Lot 2** — authentification Sanctum SPA (session-cookie), recâblage `User` → table `utilisateur`, rôles (middleware `role:` + Gates ADR-10).
+> - **Lot 3** — candidature (rôle candidat, backend seul) : **3a** formulaire & brouillon, **3b** upload sécurisé des pièces (hors webroot, ADR-11), **3c** soumission + éligibilité 100 % serveur avec communication différée (séquence a, ADR-03/06). Toujours **aucun écran React**.
 
 ## Structure
 

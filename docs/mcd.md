@@ -65,7 +65,7 @@ UTILISATEUR (1,1) ──possède── (0,1) MEMBRE_EQUIPE
 | est promue | CANDIDATURE (0,1) | REMPLACEMENT (0,N) | Rôle "candidature entrante" — deux pattes distinctes vers CANDIDATURE. |
 | effectue (remplacement) | MEMBRE_EQUIPE (1,1) | REMPLACEMENT (0,N) | |
 | affectée à | MEMBRE_EQUIPE (0,1) | CANDIDATURE (0,N) | `evaluateur_id`. |
-| génère | UTILISATEUR (1,1) | JOURNAL_AUDIT (0,N) | Auteur de l'action tracée — tout rôle confondu (admin, évaluateur ; un candidat ne déclenche pas d'entrée d'audit dans le périmètre actuel). |
+| génère | UTILISATEUR (1,1) | JOURNAL_AUDIT (0,N) | Auteur de l'action tracée — tout rôle confondu (admin, évaluateur). **Exception (Lot 3c)** : la *soumission de candidature* est tracée avec le candidat comme `auteur_id` (cf. `docs/uml-sequences.md` séquence a). La ligne reste 🔴 (évaluateur/admin) — aucune fuite candidat. Aucune autre action candidat ne génère d'entrée d'audit dans le périmètre actuel. |
 
 ## Diagramme (Mermaid `erDiagram`)
 

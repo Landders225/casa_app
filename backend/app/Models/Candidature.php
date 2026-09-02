@@ -113,4 +113,19 @@ class Candidature extends Model
     {
         return $this->hasMany(PieceJustificative::class, 'candidature_id');
     }
+
+    /**
+     * Critères éliminatoires déclenchés (🔴 — jamais exposés au candidat).
+     *
+     * @return HasMany<CritereEliminatoireDeclenche, $this>
+     */
+    public function criteresEliminatoires(): HasMany
+    {
+        return $this->hasMany(CritereEliminatoireDeclenche::class, 'candidature_id');
+    }
+
+    public function estBrouillon(): bool
+    {
+        return $this->statut_interne === 'brouillon';
+    }
 }

@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Candidat\JustificatifExperienceController;
 use App\Http\Controllers\Api\Candidat\PieceController;
 use App\Http\Controllers\Api\Candidat\PieceDossierController;
 use App\Http\Controllers\Api\Candidat\ReponseFormulaireController;
+use App\Http\Controllers\Api\Candidat\SoumissionController;
 use App\Http\Controllers\Api\PingController;
 use Illuminate\Support\Facades\Route;
 
@@ -62,27 +63,36 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/pieces/{piece}/download', [PieceController::class, 'download']);
 
         Route::prefix('candidatures/{candidature}')->scopeBindings()->group(function () {
+            // --- Lecture (toujours ouverte au propriétaire) ---
             Route::get('/', [CandidatureController::class, 'show']);
-            Route::patch('/reponses', [ReponseFormulaireController::class, 'update']);
-            Route::post('/confirmer-filiere', [CandidatureController::class, 'confirmerFiliere']);
-
-            Route::post('/experiences', [ExperienceController::class, 'store']);
-            Route::patch('/experiences/{experience}', [ExperienceController::class, 'update']);
-            Route::delete('/experiences/{experience}', [ExperienceController::class, 'destroy']);
-
-            Route::put('/classement', [ClassementController::class, 'update']);
-
-            // Lot 3b — pièces justificatives (upload sécurisé, hors webroot).
-            // POST pour l'upload (PHP ne parse les fichiers multipart que sur POST) ;
-            // l'opération reste un UPSERT (dépose OU remplace).
             Route::get('/pieces', [PieceController::class, 'index']);
-            Route::post('/pieces/{type}', [PieceDossierController::class, 'deposer'])
-                ->whereIn('type', ContraintesFichier::TYPES_DOSSIER);
-            Route::delete('/pieces/{type}', [PieceDossierController::class, 'destroy'])
-                ->whereIn('type', ContraintesFichier::TYPES_DOSSIER);
 
-            Route::post('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'deposer']);
-            Route::delete('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'destroy']);
+            // --- Soumission (Lot 3c) : brouillon -> soumis. Gère lui-même
+            //     le 409 "déjà soumise" (identique dans les deux branches). ---
+            Route::post('/soumettre', SoumissionController::class);
+
+            // --- Édition (3a/3b) : fermée en 409 dès que la candidature n'est
+            //     plus en brouillon (middleware candidature.modifiable). ---
+            Route::middleware('candidature.modifiable')->group(function () {
+                Route::patch('/reponses', [ReponseFormulaireController::class, 'update']);
+                Route::post('/confirmer-filiere', [CandidatureController::class, 'confirmerFiliere']);
+
+                Route::post('/experiences', [ExperienceController::class, 'store']);
+                Route::patch('/experiences/{experience}', [ExperienceController::class, 'update']);
+                Route::delete('/experiences/{experience}', [ExperienceController::class, 'destroy']);
+
+                Route::put('/classement', [ClassementController::class, 'update']);
+
+                // Pièces justificatives (upload sécurisé, hors webroot). POST pour
+                // l'upload (PHP ne parse le multipart que sur POST) ; UPSERT.
+                Route::post('/pieces/{type}', [PieceDossierController::class, 'deposer'])
+                    ->whereIn('type', ContraintesFichier::TYPES_DOSSIER);
+                Route::delete('/pieces/{type}', [PieceDossierController::class, 'destroy'])
+                    ->whereIn('type', ContraintesFichier::TYPES_DOSSIER);
+
+                Route::post('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'deposer']);
+                Route::delete('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'destroy']);
+            });
         });
     });
 });
