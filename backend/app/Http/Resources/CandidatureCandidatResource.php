@@ -11,10 +11,14 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  * N'expose JAMAIS (🔴, checklist dictionnaire-donnees.md + ADR-03) :
  * `statut_interne`, `statut_eligibilite_interne`, `dossier_verrouille*`,
- * `evaluateur_id`, `commentaire_evaluateur`, `date_evaluation`, ni rien issu de
- * `evaluation_dossier` / `verification_dossier` / `critere_eliminatoire_declenche`.
- * Le statut affichable est dérivé par StatutPublicResolver (seul autorisé à
- * lire `statut_interne` pour un candidat).
+ * `evaluateur_id`, `commentaire_evaluateur`, `date_evaluation`, le SCORE, le RANG,
+ * `motif_interne`, ni rien issu de `evaluation_dossier` / `verification_dossier` /
+ * `entretien` / `critere_eliminatoire_declenche` / le classement des autres.
+ *
+ * `statut_public` + `decision` + `motif_communicable` sont dérivés par
+ * StatutPublicResolver (seul autorisé à lire `statut_interne` /
+ * `decision_candidature` pour un candidat) : avant publication `decision` et
+ * `motif_communicable` valent `null` (Lot 5b, ADR-03, séquence (c)).
  *
  * @mixin \App\Models\Candidature
  */
@@ -25,10 +29,15 @@ class CandidatureCandidatResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $statut = app(StatutPublicResolver::class)->resoudre($this->resource);
+
         return [
             'id' => $this->id,
             'numero_dossier' => $this->numero_dossier,
-            'statut_public' => app(StatutPublicResolver::class)->resoudre($this->resource),
+            'statut_public' => $statut->statutPublic,
+            // 🟡 — null tant qu'aucune publication n'existe (ADR-03, Lot 5b).
+            'decision' => $statut->decision,
+            'motif_communicable' => $statut->motifCommunicable,
             'cqp_confirme' => (bool) $this->cqp_confirme,
             'date_soumission' => $this->date_soumission?->toIso8601String(),
 

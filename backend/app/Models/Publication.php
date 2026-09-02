@@ -43,4 +43,14 @@ class Publication extends Model
     {
         return $this->belongsTo(Campagne::class, 'campagne_id');
     }
+
+    /**
+     * Membre d'équipe (administrateur) qui a publié. 🔴.
+     *
+     * @return BelongsTo<MembreEquipe, $this>
+     */
+    public function publiePar(): BelongsTo
+    {
+        return $this->belongsTo(MembreEquipe::class, 'publiee_par');
+    }
 }

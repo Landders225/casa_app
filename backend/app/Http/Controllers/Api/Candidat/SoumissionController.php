@@ -94,7 +94,7 @@ class SoumissionController extends Controller
         return response()->json([
             'data' => [
                 'numero_dossier' => $candidature->numero_dossier,
-                'statut_public' => $this->statutPublic->resoudre($candidature),
+                'statut_public' => $this->statutPublic->resoudre($candidature)->statutPublic,
             ],
         ]);
     }

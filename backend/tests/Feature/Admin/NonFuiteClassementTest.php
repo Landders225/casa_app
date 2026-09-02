@@ -78,10 +78,16 @@ class NonFuiteClassementTest extends TestCase
             $this->actingAs($this->candidat)->getJson('/api/candidature'),
             $this->actingAs($this->candidat)->getJson("/api/candidatures/{$this->candidature->id}"),
         ] as $reponse) {
+            // Avant publication : `decision` / `motif_communicable` restent null
+            // (clés en liste blanche, Lot 5b) ; rien du classement ne transparaît.
+            $reponse->assertJsonPath('data.statut_public', 'en_cours_de_traitement')
+                ->assertJsonPath('data.decision', null)
+                ->assertJsonPath('data.motif_communicable', null);
+
             $body = $reponse->getContent();
             foreach ([
                 'decision_candidature', 'score_final', 'liste_attente', 'non_retenu', '"retenu"',
-                'motif_interne', 'motif_communicable', 'departage', 'vulnerabilite',
+                'motif_interne', 'departage', 'vulnerabilite',
                 'Note interne', 'Message qui ne doit pas', 'decision_publiee',
             ] as $interdit) {
                 $this->assertStringNotContainsString($interdit, $body, "« {$interdit} » ne doit pas fuir vers le candidat");

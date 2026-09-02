@@ -2,6 +2,7 @@
 
 use App\Domain\Piece\ContraintesFichier;
 use App\Http\Controllers\Api\Admin\ClassementController as AdminClassementController;
+use App\Http\Controllers\Api\Admin\PublicationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Candidat\CandidatureController;
 use App\Http\Controllers\Api\Candidat\ClassementController;
@@ -65,6 +66,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/campagnes/{campagne}/classement', [AdminClassementController::class, 'calculer']);
         Route::get('/campagnes/{campagne}/classement', [AdminClassementController::class, 'show']);
         Route::put('/candidatures/{candidature}/decision/motifs', [AdminClassementController::class, 'motifs']);
+
+        // Lot 5b — acte de publication (irréversible). Bascule StatutPublicResolver
+        // sur sa branche « publication existe » : le candidat voit sa décision.
+        Route::post('/campagnes/{campagne}/publier', [PublicationController::class, 'publier']);
     });
 
     /*
