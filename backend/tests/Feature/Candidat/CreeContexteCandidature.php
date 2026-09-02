@@ -43,15 +43,17 @@ trait CreeContexteCandidature
 
     /**
      * Compte candidat + profil `candidat` prêt à candidater.
+     *
+     * @param  array<string, mixed>  $profil  écrase des champs de `candidat` (ex. `sexe`)
      */
-    protected function creerCandidat(?string $email = null): User
+    protected function creerCandidat(?string $email = null, array $profil = []): User
     {
         $user = User::factory()->create([
             'role' => 'candidat',
             'email' => $email ?? fake()->unique()->safeEmail(),
         ]);
 
-        Candidat::create([
+        Candidat::create(array_merge([
             'utilisateur_id' => $user->id,
             'prenom' => 'Test',
             'nom' => 'Candidat',
@@ -61,7 +63,7 @@ trait CreeContexteCandidature
             'telephone' => '0700000000',
             'ville_residence' => 'Abidjan - Cocody',
             'residence_ci' => true,
-        ]);
+        ], $profil));
 
         return $user->fresh();
     }

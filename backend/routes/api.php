@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Piece\ContraintesFichier;
+use App\Http\Controllers\Api\Admin\ClassementController as AdminClassementController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Candidat\CandidatureController;
 use App\Http\Controllers\Api\Candidat\ClassementController;
@@ -50,6 +51,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/ping-admin', PingController::class)
         ->defaults('espace', 'administrateur')
         ->middleware('role:administrateur');
+
+    /*
+    |----------------------------------------------------------------------
+    | Lot 5a — Classement & décisions internes (administrateur strict)
+    |----------------------------------------------------------------------
+    | Calcul du score final /100, tri par filière (départage scoring.js +
+    | D-5a-1), attribution retenu / liste d'attente / non retenu. Persiste
+    | `decision_candidature` SANS publication -> le candidat ne voit toujours
+    | rien (StatutPublicResolver inchangé). Recalculable tant que non publié.
+    */
+    Route::middleware('role:administrateur')->prefix('admin')->group(function () {
+        Route::post('/campagnes/{campagne}/classement', [AdminClassementController::class, 'calculer']);
+        Route::get('/campagnes/{campagne}/classement', [AdminClassementController::class, 'show']);
+        Route::put('/candidatures/{candidature}/decision/motifs', [AdminClassementController::class, 'motifs']);
+    });
 
     /*
     |----------------------------------------------------------------------

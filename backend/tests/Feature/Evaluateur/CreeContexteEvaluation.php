@@ -94,13 +94,38 @@ trait CreeContexteEvaluation
      *
      * @param  array<string, mixed>  $reponses
      */
-    protected function candidatureAffectee(User $candidat, User $evaluateur, array $reponses = []): Candidature
+    protected function candidatureAffectee(User $candidat, User $evaluateur, array $reponses = [], string $filiereCode = 'cuisine'): Candidature
     {
         $id = $this->actingAs($candidat)
-            ->postJson('/api/candidatures', ['filiere_id' => $this->idFiliere('cuisine')])
+            ->postJson('/api/candidatures', ['filiere_id' => $this->idFiliere($filiereCode)])
             ->json('data.id');
 
         return $this->affecter(Candidature::findOrFail($id), $evaluateur, $reponses);
+    }
+
+    /**
+     * Fige l'entretien (état post-Lot 4c) : `entretien.statut = 'valide'` +
+     * snapshot `score_total`.
+     */
+    protected function verrouillerEntretien(
+        Candidature $candidature,
+        string $scoreTotal = '20.0',
+        string $presence = 'present',
+    ): Candidature {
+        $candidature->entretien()->create([
+            'statut' => 'valide',
+            'date' => '2026-07-06',
+            'heure' => '09:00',
+            'lieu' => 'Le Plateau',
+            'evaluateur_id' => $candidature->evaluateur_id,
+            'presence' => $presence,
+            'grille_id' => Grille::active()->id,
+            'score_total' => $scoreTotal,
+            'valide_le' => now(),
+            'valide_par' => $candidature->evaluateur_id,
+        ]);
+
+        return $candidature->fresh();
     }
 
     /**

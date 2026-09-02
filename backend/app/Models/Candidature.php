@@ -129,6 +129,18 @@ class Candidature extends Model
     }
 
     /**
+     * Décision interne (🔴 `rang`/`motif_interne`, 🟡 `decision`/`motif_communicable`).
+     * Écrite au Lot 5a (calcul du classement). Invisible du candidat tant
+     * qu'aucune `publication` n'existe (ADR-03).
+     *
+     * @return HasOne<DecisionCandidature, $this>
+     */
+    public function decisionCandidature(): HasOne
+    {
+        return $this->hasOne(DecisionCandidature::class, 'candidature_id');
+    }
+
+    /**
      * @return HasMany<ExperienceProfessionnelle, $this>
      */
     public function experiences(): HasMany

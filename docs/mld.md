@@ -351,7 +351,8 @@ CREATE TABLE publication (
 
 CREATE TABLE decision_candidature (
   candidature_id      uuid PRIMARY KEY REFERENCES candidature(id),
-  rang                integer NOT NULL,                        -- 🔴 jamais communiqué
+  rang                integer,                                 -- 🔴 jamais communiqué ; NULL pour un non-éligible
+                                                               --    (décision non_retenu explicite mais non classé, Lot 5a / D-5a-4)
   decision            varchar(20) NOT NULL                     -- 🟡 visible seulement si publication existe
       CHECK (decision IN ('retenu','liste_attente','non_retenu','indisponible')),
   motif_interne       text,                                    -- 🔴 jamais exposé
