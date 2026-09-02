@@ -178,9 +178,10 @@ CREATE TABLE piece_justificative (
   candidature_id      uuid REFERENCES candidature(id),       -- 🟢 nullable : renseigné SSI pièce du dossier
   type_document_code  varchar(20) REFERENCES type_document(code), -- 🟢 nullable SSI justificatif d'expérience (pas de "type" référentiel)
   rattachement        varchar(12) NOT NULL CHECK (rattachement IN ('dossier','experience')), -- 🟢 colonne discriminante (finalisation Lot 1)
-  nom_original        varchar(255) NOT NULL,   -- 🟢
-  chemin_stockage     varchar(500) NOT NULL,   -- 🔴 hors webroot, cf. ADR-11
+  nom_original        varchar(255) NOT NULL,   -- 🟢 nom client assaini (affichage seul, jamais un chemin)
+  chemin_stockage     varchar(500) NOT NULL,   -- 🔴 {candidature_id}/{uuid}.{ext} sur le disque privé `documents`, hors webroot (ADR-11)
   taille_octets       integer NOT NULL,        -- 🟢
+  type_mime           varchar(100) NOT NULL,   -- 🟢 MIME détecté par contenu à l'upload (Lot 3b) — sert le Content-Type au téléchargement
   depose_le           timestamptz NOT NULL DEFAULT now(), -- 🟢
   -- Exclusivité dossier XOR expérience, désormais exécutable (colonne
   -- discriminante — option prévue par le MLD Lot 0, retenue au Lot 1) :

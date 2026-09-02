@@ -48,6 +48,7 @@ class CandidatureCandidatResource extends JsonResource
             ),
             'experiences' => ExperienceResource::collection($this->whenLoaded('experiences')),
             'classement' => ClassementPreferenceResource::collection($this->whenLoaded('classement')),
+            'pieces_dossier' => PieceJustificativeResource::collection($this->whenLoaded('piecesDossier')),
         ];
     }
 }

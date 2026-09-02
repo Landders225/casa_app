@@ -33,8 +33,23 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // CASA (ADR-11) : aucune pièce/fichier ne doit être atteignable par
+            // une URL (même signée). On désactive la route /storage/{path} que
+            // Laravel enregistre quand serve=true. Tout accès passe par une
+            // route applicative authentifiée (cf. GET /api/pieces/{piece}/download).
+            'serve' => false,
             'throw' => false,
+            'report' => false,
+        ],
+
+        // Pièces justificatives — hors webroot, sur le volume Docker
+        // `documents_data` (docker-compose.yml). Jamais servi statiquement.
+        'documents' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/documents'),
+            'serve' => false,
+            'visibility' => 'private',
+            'throw' => true,
             'report' => false,
         ],
 

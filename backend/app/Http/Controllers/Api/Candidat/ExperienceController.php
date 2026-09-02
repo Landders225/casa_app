@@ -7,8 +7,10 @@ use App\Http\Requests\Candidat\ExperienceRequest;
 use App\Http\Resources\ExperienceResource;
 use App\Models\Candidature;
 use App\Models\ExperienceProfessionnelle;
+use App\Services\StockagePieces;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 class ExperienceController extends Controller
 {
@@ -43,12 +45,30 @@ class ExperienceController extends Controller
 
     /**
      * DELETE /api/candidatures/{candidature}/experiences/{experience}
+     *
+     * Amendé au Lot 3b : supprime aussi le justificatif rattaché (ligne
+     * `piece_justificative` + fichier sur le disque privé) — sinon pièce et
+     * fichier orphelins.
      */
     public function destroy(Candidature $candidature, ExperienceProfessionnelle $experience): Response
     {
         $this->authorize('update', $candidature);
 
-        $experience->delete();
+        $piece = $experience->pieceJustificative;
+        $chemin = $piece?->chemin_stockage;
+
+        DB::transaction(function () use ($experience, $piece) {
+            if ($piece !== null) {
+                $experience->piece_justificative_id = null;
+                $experience->save();
+                $piece->delete();
+            }
+            $experience->delete();
+        });
+
+        if ($chemin !== null) {
+            app(StockagePieces::class)->supprimer($chemin);
+        }
 
         return response()->noContent();
     }

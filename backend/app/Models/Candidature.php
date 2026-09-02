@@ -101,4 +101,16 @@ class Candidature extends Model
     {
         return $this->hasMany(ClassementFilierePreference::class, 'candidature_id');
     }
+
+    /**
+     * Pièces du dossier (rattachement='dossier'). Les justificatifs d'expérience
+     * (rattachement='experience') ont `candidature_id` NULL et sont accessibles
+     * via `experiences.pieceJustificative`.
+     *
+     * @return HasMany<PieceJustificative, $this>
+     */
+    public function piecesDossier(): HasMany
+    {
+        return $this->hasMany(PieceJustificative::class, 'candidature_id');
+    }
 }

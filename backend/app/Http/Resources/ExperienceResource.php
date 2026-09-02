@@ -7,7 +7,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Expérience professionnelle déclarée (liste blanche). `piece_justificative_id`
- * n'est pas exposé : gestion du justificatif au Lot 3b.
+ * brut n'est pas exposé ; `justificatif` porte les métadonnées de la pièce
+ * (Lot 3b) ou null.
  *
  * @mixin \App\Models\ExperienceProfessionnelle
  */
@@ -22,6 +23,12 @@ class ExperienceResource extends JsonResource
             'id' => $this->id,
             'domaine' => $this->domaine,
             'duree_categorie' => $this->duree_categorie,
+            'justificatif' => $this->whenLoaded(
+                'pieceJustificative',
+                fn () => $this->pieceJustificative
+                    ? new PieceJustificativeResource($this->pieceJustificative)
+                    : null,
+            ),
         ];
     }
 }

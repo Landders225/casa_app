@@ -1,9 +1,13 @@
 <?php
 
+use App\Domain\Piece\ContraintesFichier;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Candidat\CandidatureController;
 use App\Http\Controllers\Api\Candidat\ClassementController;
 use App\Http\Controllers\Api\Candidat\ExperienceController;
+use App\Http\Controllers\Api\Candidat\JustificatifExperienceController;
+use App\Http\Controllers\Api\Candidat\PieceController;
+use App\Http\Controllers\Api\Candidat\PieceDossierController;
 use App\Http\Controllers\Api\Candidat\ReponseFormulaireController;
 use App\Http\Controllers\Api\PingController;
 use Illuminate\Support\Facades\Route;
@@ -52,6 +56,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/candidature', [CandidatureController::class, 'courante']);
         Route::post('/candidatures', [CandidatureController::class, 'store']);
 
+        // Lot 3b — téléchargement d'une pièce (dossier ou justificatif d'expérience).
+        // Route à plat : l'id de pièce est global, la propriété est vérifiée par
+        // PieceJustificativePolicy (-> 404 si pas propriétaire).
+        Route::get('/pieces/{piece}/download', [PieceController::class, 'download']);
+
         Route::prefix('candidatures/{candidature}')->scopeBindings()->group(function () {
             Route::get('/', [CandidatureController::class, 'show']);
             Route::patch('/reponses', [ReponseFormulaireController::class, 'update']);
@@ -62,6 +71,18 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::delete('/experiences/{experience}', [ExperienceController::class, 'destroy']);
 
             Route::put('/classement', [ClassementController::class, 'update']);
+
+            // Lot 3b — pièces justificatives (upload sécurisé, hors webroot).
+            // POST pour l'upload (PHP ne parse les fichiers multipart que sur POST) ;
+            // l'opération reste un UPSERT (dépose OU remplace).
+            Route::get('/pieces', [PieceController::class, 'index']);
+            Route::post('/pieces/{type}', [PieceDossierController::class, 'deposer'])
+                ->whereIn('type', ContraintesFichier::TYPES_DOSSIER);
+            Route::delete('/pieces/{type}', [PieceDossierController::class, 'destroy'])
+                ->whereIn('type', ContraintesFichier::TYPES_DOSSIER);
+
+            Route::post('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'deposer']);
+            Route::delete('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'destroy']);
         });
     });
 });

@@ -74,8 +74,15 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 ## ADR-11 — Pièces justificatives stockées hors webroot
 
 **Contexte.** Documents personnels (CNI, diplôme...) — ne doivent jamais être accessibles par une URL publique directe.
-**Décision.** `piece_justificative.chemin_stockage` pointe vers un espace de stockage Laravel non exposé par nginx (`storage/app/private`, volume Docker dédié `documents_data`, cf. `docker-compose.yml`). Tout accès passe par une route applicative authentifiée et autorisée (policy : le candidat propriétaire, ou un membre équipe affecté/admin), jamais par un lien statique.
+**Décision.** `piece_justificative.chemin_stockage` pointe vers un espace de stockage Laravel non exposé par nginx (`storage/app/private/documents`, disque `documents`, volume Docker dédié `documents_data`, cf. `docker-compose.yml`). Tout accès passe par une route applicative authentifiée et autorisée (policy : le candidat propriétaire, ou un membre équipe affecté/admin), jamais par un lien statique.
 **Conséquence.** Un peu de latence supplémentaire (le fichier transite par PHP au lieu d'être servi directement par nginx) en échange d'un contrôle d'accès réel et audité.
+
+**Durcissement (Lot 3b).**
+- Le disque Laravel `local` (`storage/app/private`) est passé en `'serve' => false` : la route `GET|PUT /storage/{path}` que Laravel enregistre sinon (accès/upload par URL signée) **n'existe plus** (`php artisan route:list` ne montre aucune route `storage`). Le disque dédié `documents` a lui aussi `serve => false`.
+- Le **nom de stockage est 100 % serveur** (`{candidature_id}/{uuid}.{ext}`, `ext` dérivée du MIME détecté par contenu) — jamais construit à partir du nom ou de l'extension client (pas de path traversal, pas de collision). `nom_original` est conservé assaini, pour l'affichage seul.
+- Validation d'upload : `mimetypes` (MIME réel détecté par `finfo`, pas le `Content-Type` déclaré) + `extensions` (garde-fou) + `max` 10 Mo. Formats : PDF, JPEG, PNG.
+- Téléchargement en **streaming** depuis le disque privé (`Storage::download`), toujours `Content-Disposition: attachment` + `X-Content-Type-Options: nosniff` (jamais `inline` : un PDF/image valide peut porter une charge active).
+- `piece_justificative.type_mime` (colonne ajoutée au Lot 3b, cf. `docs/mld.md`) mémorise le MIME détecté pour servir le bon `Content-Type` sans re-scan.
 
 ## ADR-12 — Journal d'audit immuable : application **et** garantie PostgreSQL
 

@@ -38,4 +38,15 @@ class ExperienceProfessionnelle extends Model
     {
         return $this->belongsTo(Candidature::class, 'candidature_id');
     }
+
+    /**
+     * Justificatif de l'expérience (0 ou 1). `piece_justificative_id` est
+     * nullable (Lot 3a) ; le fichier est déposé au Lot 3b.
+     *
+     * @return BelongsTo<PieceJustificative, $this>
+     */
+    public function pieceJustificative(): BelongsTo
+    {
+        return $this->belongsTo(PieceJustificative::class, 'piece_justificative_id');
+    }
 }

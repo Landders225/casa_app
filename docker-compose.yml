@@ -30,6 +30,8 @@ services:
       # Pièces justificatives stockées hors webroot (cf. docs/ADR.md) : jamais
       # sous public/, jamais servies directement par nginx.
       - documents_data:/var/www/html/storage/app/private
+      # Surcharges PHP (limites d'upload — Lot 3b).
+      - ./docker/php/casa.ini:/usr/local/etc/php/conf.d/zz-casa.ini:ro
     depends_on:
       postgres:
         condition: service_healthy

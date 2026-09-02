@@ -32,7 +32,10 @@ class ClassementController extends Controller
         });
 
         return new CandidatureCandidatResource(
-            $candidature->load(['filiere', 'campagne', 'reponseFormulaire', 'experiences', 'classement.filiere']),
+            $candidature->load([
+                'filiere', 'campagne', 'reponseFormulaire',
+                'experiences.pieceJustificative', 'classement.filiere', 'piecesDossier',
+            ]),
         );
     }
 }

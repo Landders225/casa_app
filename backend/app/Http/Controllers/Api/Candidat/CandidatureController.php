@@ -20,7 +20,10 @@ class CandidatureController extends Controller
      *
      * @var list<string>
      */
-    private const RELATIONS = ['filiere', 'campagne', 'reponseFormulaire', 'experiences', 'classement.filiere'];
+    private const RELATIONS = [
+        'filiere', 'campagne', 'reponseFormulaire',
+        'experiences.pieceJustificative', 'classement.filiere', 'piecesDossier',
+    ];
 
     /**
      * GET /api/candidature — ma candidature courante (campagne ouverte).

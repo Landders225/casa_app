@@ -21,7 +21,10 @@ class ReponseFormulaireController extends Controller
         $candidature->reponseFormulaire->fill($request->donneesReponses())->save();
 
         return new CandidatureCandidatResource(
-            $candidature->load(['filiere', 'campagne', 'reponseFormulaire', 'experiences', 'classement.filiere']),
+            $candidature->load([
+                'filiere', 'campagne', 'reponseFormulaire',
+                'experiences.pieceJustificative', 'classement.filiere', 'piecesDossier',
+            ]),
         );
     }
 }
