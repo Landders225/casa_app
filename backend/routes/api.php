@@ -10,6 +10,9 @@ use App\Http\Controllers\Api\Candidat\PieceController;
 use App\Http\Controllers\Api\Candidat\PieceDossierController;
 use App\Http\Controllers\Api\Candidat\ReponseFormulaireController;
 use App\Http\Controllers\Api\Candidat\SoumissionController;
+use App\Http\Controllers\Api\Evaluateur\DossierController;
+use App\Http\Controllers\Api\Evaluateur\PieceEvaluateurController;
+use App\Http\Controllers\Api\Evaluateur\VerificationController;
 use App\Http\Controllers\Api\PingController;
 use Illuminate\Support\Facades\Route;
 
@@ -93,6 +96,24 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'deposer']);
                 Route::delete('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'destroy']);
             });
+        });
+    });
+
+    /*
+    |----------------------------------------------------------------------
+    | Lot 4a — Espace évaluateur : consultation & vérification du dossier
+    |----------------------------------------------------------------------
+    | evaluateur ET administrateur (ADR-10 : admin ⊇ évaluateur). L'évaluateur
+    | ne voit que ses affectations ; l'admin voit tout. Dossier non affecté ->
+    | 404 (CandidaturePolicy::voir/verifierCommeEvaluateur -> denyAsNotFound).
+    */
+    Route::middleware('role:evaluateur,administrateur')->prefix('evaluateur')->group(function () {
+        Route::get('/candidatures', [DossierController::class, 'index']);
+        Route::get('/pieces/{piece}/download', [PieceEvaluateurController::class, 'download']);
+
+        Route::prefix('candidatures/{candidature}')->scopeBindings()->group(function () {
+            Route::get('/', [DossierController::class, 'show']);
+            Route::put('/verification', [VerificationController::class, 'update']);
         });
     });
 });

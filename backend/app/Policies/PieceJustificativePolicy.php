@@ -15,9 +15,21 @@ use Illuminate\Auth\Access\Response;
  */
 class PieceJustificativePolicy
 {
+    /** Candidat propriétaire de la pièce. */
     public function download(User $user, PieceJustificative $piece): Response
     {
         return $this->estProprietaire($user, $piece)
+            ? Response::allow()
+            : Response::denyAsNotFound();
+    }
+
+    /**
+     * Évaluateur affecté à la candidature de la pièce, OU administrateur
+     * (Lot 4a). Refus = 404.
+     */
+    public function downloadCommeEvaluateur(User $user, PieceJustificative $piece): Response
+    {
+        return $this->peutInstruire($user, $piece)
             ? Response::allow()
             : Response::denyAsNotFound();
     }
@@ -34,6 +46,25 @@ class PieceJustificativePolicy
             && Candidature::query()
                 ->whereKey($candidatureId)
                 ->where('candidat_id', $user->candidat->id)
+                ->exists();
+    }
+
+    private function peutInstruire(User $user, PieceJustificative $piece): bool
+    {
+        $candidatureId = $piece->candidatureIdProprietaire();
+        if ($candidatureId === null) {
+            return false;
+        }
+
+        if ($user->isAdministrateur()) {
+            return Candidature::query()->whereKey($candidatureId)->exists();
+        }
+
+        return $user->isEvaluateur()
+            && $user->membreEquipe !== null
+            && Candidature::query()
+                ->whereKey($candidatureId)
+                ->where('evaluateur_id', $user->membreEquipe->id)
                 ->exists();
     }
 }

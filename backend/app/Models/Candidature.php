@@ -79,6 +79,26 @@ class Candidature extends Model
     }
 
     /**
+     * Membre d'équipe affecté à l'évaluation (🔴).
+     *
+     * @return BelongsTo<MembreEquipe, $this>
+     */
+    public function evaluateur(): BelongsTo
+    {
+        return $this->belongsTo(MembreEquipe::class, 'evaluateur_id');
+    }
+
+    /**
+     * Vérification du dossier par l'évaluateur (🔴, 0 ou 1).
+     *
+     * @return HasOne<VerificationDossier, $this>
+     */
+    public function verification(): HasOne
+    {
+        return $this->hasOne(VerificationDossier::class, 'candidature_id');
+    }
+
+    /**
      * @return HasOne<ReponseFormulaire, $this>
      */
     public function reponseFormulaire(): HasOne

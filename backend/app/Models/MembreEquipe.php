@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * CASA — profil équipe projet, table `membre_equipe` (docs/mld.md §1).
@@ -37,5 +38,15 @@ class MembreEquipe extends Model
     public function utilisateur(): BelongsTo
     {
         return $this->belongsTo(User::class, 'utilisateur_id');
+    }
+
+    /**
+     * Candidatures affectées à ce membre pour évaluation (`evaluateur_id`).
+     *
+     * @return HasMany<Candidature, $this>
+     */
+    public function dossiersAffectes(): HasMany
+    {
+        return $this->hasMany(Candidature::class, 'evaluateur_id');
     }
 }

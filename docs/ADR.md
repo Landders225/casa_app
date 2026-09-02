@@ -73,6 +73,8 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 **Décision.** `utilisateur` porte l'identité + le rôle ; `candidat` et `membre_equipe` sont deux sous-types exclusifs (CIF, cf. `docs/mcd.md`). Les policies Laravel autorisent `evaluateur` ET `administrateur` sur les endpoints d'évaluation/entretien ; `correction exceptionnelle` et les endpoints d'administration restent strictement réservés à `administrateur`.
 **Conséquence.** Pas de duplication de logique de permission entre "évaluateur" et "administrateur agissant comme évaluateur" — une seule policy par action, avec un rôle autorisé à plusieurs valeurs quand c'est le cas.
 
+**Portée d'accès (Lot 4a).** Sur l'espace évaluateur : un **évaluateur** n'accède qu'aux candidatures où `candidature.evaluateur_id = son membre_equipe.id` (ses affectations) ; un **administrateur** accède à **toutes** les candidatures instructibles (admin ⊇ évaluateur, conforme à `candidatures.html` admin de la maquette). Un dossier affecté à un autre évaluateur → **404** (`Response::denyAsNotFound`, cohérence zéro-fuite avec l'isolation candidat). Les Resources évaluateur (`App\Http\Resources\Evaluateur\*`) sont **distinctes** des Resources candidat et jamais réutilisées en croisé : l'évaluateur voit la zone 🔴 du dossier qu'il instruit (`statut_interne`, `statut_eligibilite_interne`, `verification_dossier`, critères éliminatoires), le candidat n'en voit **rien** (garanti par `StatutPublicResolver` + liste blanche `CandidatureCandidatResource`, testé sur le vrai chemin).
+
 ## ADR-11 — Pièces justificatives stockées hors webroot
 
 **Contexte.** Documents personnels (CNI, diplôme...) — ne doivent jamais être accessibles par une URL publique directe.
@@ -103,6 +105,8 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 **Décision.** Au Lot 3a, `POST /api/candidatures` **porte le geste d'inscription** : il prend `filiere_id` en entrée (filière ouverte pour la campagne en cours), génère le `numero_dossier` (`CASA-<année>-<6 chiffres>`), crée la ligne `reponse_formulaire` vide (1-1 strict) et pré-remplit `classement_filiere_preference` (filière visée en rang 1). L'édition des champs d'identité du `candidat` (`prenom`, `nom`, `date_naissance`, `cni`…) **n'est pas** couverte par ce lot.
 **Conséquence.** Un **lot inscription / profil réel reste à faire** : création de compte candidat en self-service, saisie/mise à jour de l'état civil, choix initial de la filière. Quand il existera, `POST /api/candidatures` sera réduit à « ouvrir la candidature de la campagne courante » (la filière proviendra du profil / de l'inscription) sans changer le contrat de lecture. En attendant, tester le Lot 3a nécessite un `candidat` pré-existant (seedé ou créé à la main).
 
+**Dépendance signalée (D-4a-1).** Aucun lot livré ne produit d'endpoint d'**affectation** d'un dossier à un évaluateur (`candidature.evaluateur_id`). Le Lot 4a consomme cette colonne en lecture mais ne l'écrit pas : le contexte de test/démo est posé par le trait `CreeContexteEvaluation` (tests) et le seeder explicite `DemoEvaluationSeeder` (smoke), qui fixent `evaluateur_id` + `statut_interne='en_instruction'`. Un **lot administration** devra fournir l'endpoint d'affectation (avec ligne `journal_audit`, action « Affectation »). Convention retenue en attendant : un dossier est réputé « en instruction » dès son affectation.
+
 **Point ouvert à porter au lot inscription (D-3c-1).** Le contrôle d'éligibilité `residence_ci` (résider en Côte d'Ivoire) n'est présent dans `scoring.js` que dans `checkEligibiliteInitiale` (§4.2, inscription), **pas** dans `checkCriteresEliminatoires` (§4.9, soumission). Le Lot 3c porte fidèlement `checkCriteresEliminatoires` : `residence_ci = false` **n'élimine donc pas à la soumission** aujourd'hui. Ce contrôle devra être effectué à l'inscription (ou, à défaut, par l'évaluateur avec `verification_dossier`). À ne pas perdre.
 
 ---
@@ -112,6 +116,7 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 - **Lot inscription / profil candidat** (self-service, état civil, choix de filière) — cf. ADR-13.
 - Règle « 1 expérience = 1 justificatif » : validée **à la soumission** (Lot 3c), pas au niveau colonne (`experience_professionnelle.piece_justificative_id` rendu nullable au Lot 3a, cf. `docs/mld.md`).
 
+- **Endpoint d'affectation** d'un dossier à un évaluateur (`candidature.evaluateur_id`) — cf. D-4a-1 (lot administration).
 - Détail des policies Laravel par endpoint (matrice complète rôle × action).
 - Stratégie de rate limiting / anti-bruteforce sur l'authentification.
 - Politique de rétention des pièces justificatives après clôture d'une campagne.
