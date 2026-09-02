@@ -56,6 +56,17 @@ class CandidaturePolicy
             : Response::denyAsNotFound();
     }
 
+    /**
+     * Notation du dossier /65 + validation/verrouillage (Lot 4b). Même portée
+     * que la vérification : l'évaluateur affecté OU tout administrateur.
+     */
+    public function evaluerCommeEvaluateur(User $user, Candidature $candidature): Response
+    {
+        return $this->peutInstruire($user, $candidature)
+            ? Response::allow()
+            : Response::denyAsNotFound();
+    }
+
     private function peutInstruire(User $user, Candidature $candidature): bool
     {
         if ($user->isAdministrateur()) {

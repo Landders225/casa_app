@@ -5,6 +5,7 @@ namespace Tests\Feature\Evaluateur;
 use App\Models\Candidature;
 use App\Models\MembreEquipe;
 use App\Models\User;
+use Database\Seeders\GrilleBaremeSeeder;
 use Tests\Feature\Candidat\CreeContexteCandidature;
 
 /**
@@ -42,6 +43,27 @@ trait CreeContexteEvaluation
     protected function creerAdmin(?string $email = null): User
     {
         return $this->creerMembreEquipe('administrateur', $email);
+    }
+
+    /** Barème complet en base (grille v1 active) — requis pour le scoring (Lot 4b). */
+    protected function seedBareme(): void
+    {
+        $this->seed(GrilleBaremeSeeder::class);
+    }
+
+    /**
+     * Pose (ou met à jour) la vérification 4a d'un dossier — préalable à la
+     * validation de la notation (Lot 4b).
+     */
+    protected function poserVerification(Candidature $candidature, ?string $diplome = 'bac', ?bool $nationalite = true): void
+    {
+        $verification = $candidature->verification()->firstOrNew([]);
+        $verification->forceFill([
+            'diplome_verifie' => $diplome,
+            'nationalite_confirmee' => $nationalite,
+            'verifie_le' => now(),
+        ])->save();
+        $candidature->refresh();
     }
 
     /**

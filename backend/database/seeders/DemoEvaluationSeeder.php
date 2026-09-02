@@ -45,7 +45,23 @@ class DemoEvaluationSeeder extends Seeder
                 'cqp_confirme' => true,
             ],
         );
-        $candidature->reponseFormulaire()->firstOrCreate([]);
+        $reponse = $candidature->reponseFormulaire()->firstOrCreate([]);
+        // Un jeu de réponses éligible + notable (pour l'aperçu de notation Lot 4b).
+        $reponse->forceFill([
+            'sc01_scolarise_actuellement' => 'non',
+            'sc02_derniere_classe' => 'terminale',
+            'sc03_document_justifiant_niveau' => 'oui',
+            'sc05_beneficiaire_formation_actuelle' => 'non',
+            'se02_orphelin' => 'non',
+            'se03_situation_emploi' => 'sans_emploi',
+            'se04_source_revenu' => 'aucune',
+            'se06_soutien_menage' => 'non',
+            'langue_ecrit' => 3, 'langue_parle' => 2, 'langue_comprehension' => 3,
+            'info_word' => 2, 'info_excel' => 1, 'info_internet' => 2,
+            'acces_plateau' => 'oui', 'acces_deux_plateaux_vallons' => 'non',
+            'mo04_lettre_motivation' => 'Je souhaite intégrer cette formation certifiante.',
+            'di01_disponible_lun_ven' => 'oui', 'di02_contraintes' => 'aucune', 'di03_engagement_complet' => 'oui',
+        ])->save();
 
         $candidature->forceFill([
             'evaluateur_id' => $membreEquipe->id,

@@ -100,6 +100,7 @@ class VerificationController extends Controller
             'candidat', 'filiere', 'campagne', 'evaluateur',
             'reponseFormulaire', 'experiences.pieceJustificative', 'piecesDossier',
             'verification.verifiePar', 'criteresEliminatoires',
+            'evaluationDossier.grille',
         ]));
     }
 }

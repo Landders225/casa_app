@@ -11,11 +11,12 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * qu'il instruit).
  *
  * Expose volontairement : `statut_interne`, `statut_eligibilite_interne`
- * (visibilité workflow), la vérification, et les critères éliminatoires
- * déclenchés (avec `detail` / `origine`).
+ * (visibilité workflow), la vérification, les critères éliminatoires déclenchés
+ * (avec `detail` / `origine`), le `commentaire_evaluateur`, l'état de
+ * verrouillage et un résumé de l'`evaluation` du dossier (Lot 4b — score /65
+ * figé). Le détail par rubrique se lit sur GET .../evaluation.
  *
- * N'expose PAS (lots ultérieurs) : score /65, `evaluation_dossier`,
- * `commentaire_evaluateur`, entretien, notes.
+ * N'expose PAS (lots ultérieurs) : entretien /35, notes de sous-critères.
  *
  * ⚠️ Resource DISTINCTE de CandidatureCandidatResource — jamais réutilisée en
  * croisé. Aucun de ces champs ne doit remonter au candidat.
@@ -35,7 +36,10 @@ class CandidatureEvaluateurResource extends JsonResource
             'statut_interne' => $this->statut_interne,
             'statut_eligibilite_interne' => $this->statut_eligibilite_interne,
             'date_soumission' => $this->date_soumission?->toIso8601String(),
+            'date_evaluation' => $this->date_evaluation?->toDateString(),
             'cqp_confirme' => (bool) $this->cqp_confirme,
+            'dossier_verrouille' => (bool) $this->dossier_verrouille,
+            'commentaire_evaluateur' => $this->commentaire_evaluateur,
 
             'filiere' => $this->whenLoaded('filiere', fn () => [
                 'id' => $this->filiere->id,
@@ -81,6 +85,13 @@ class CandidatureEvaluateurResource extends JsonResource
             'criteres_eliminatoires' => CritereEliminatoireResource::collection(
                 $this->whenLoaded('criteresEliminatoires'),
             ),
+
+            'evaluation' => $this->whenLoaded('evaluationDossier', fn () => $this->evaluationDossier ? [
+                'verrouille' => (bool) $this->evaluationDossier->valide,
+                'score_total' => $this->evaluationDossier->score_total,
+                'valide_le' => $this->evaluationDossier->valide_le?->toIso8601String(),
+                'grille_version' => $this->evaluationDossier->grille?->version,
+            ] : null),
         ];
     }
 }

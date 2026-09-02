@@ -107,6 +107,17 @@ class Candidature extends Model
     }
 
     /**
+     * Évaluation du volet Dossier (🔴, 0 ou 1). Snapshot figé à la validation
+     * (Lot 4b, ADR-04).
+     *
+     * @return HasOne<EvaluationDossier, $this>
+     */
+    public function evaluationDossier(): HasOne
+    {
+        return $this->hasOne(EvaluationDossier::class, 'candidature_id');
+    }
+
+    /**
      * @return HasMany<ExperienceProfessionnelle, $this>
      */
     public function experiences(): HasMany

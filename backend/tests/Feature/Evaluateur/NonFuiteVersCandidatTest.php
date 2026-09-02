@@ -30,6 +30,7 @@ class NonFuiteVersCandidatTest extends TestCase
         parent::setUp();
         Storage::fake('documents');
         $this->seedReferentiels();
+        $this->seedBareme();
         $this->candidat = $this->creerCandidat('cand@casa-demo.ci');
         $this->evaluateur = $this->creerEvaluateur('eval@casa-demo.ci');
 
@@ -65,6 +66,73 @@ class NonFuiteVersCandidatTest extends TestCase
         $apres = $this->actingAs($this->candidat)->getJson('/api/candidature');
         $apres->assertOk();
         $this->assertSame($avant->getContent(), $apres->getContent());
+    }
+
+    public function test_GET_candidature_du_candidat_inchange_apres_notation_et_verrouillage(): void
+    {
+        $this->candidature->forceFill([
+            'evaluateur_id' => $this->evaluateur->membreEquipe->id,
+            'statut_interne' => 'en_instruction',
+        ])->saveQuietly();
+        $cid = $this->candidature->id;
+
+        $avant = $this->actingAs($this->candidat)->getJson('/api/candidature');
+        $avant->assertOk()->assertJsonPath('data.statut_public', 'en_cours_de_traitement');
+
+        // Parcours évaluateur COMPLET : vérification → note MO.04 + commentaire → validation.
+        $this->actingAs($this->evaluateur)
+            ->putJson("/api/evaluateur/candidatures/{$cid}/verification", ['nationalite_confirmee' => true, 'diplome_verifie' => 'bac'])
+            ->assertOk();
+        $this->actingAs($this->evaluateur)
+            ->putJson("/api/evaluateur/candidatures/{$cid}/evaluation", [
+                'mo04_note_etoiles' => 4,
+                'commentaire_evaluateur' => 'Score interne élevé — ne doit jamais fuir vers le candidat.',
+            ])->assertOk();
+        $this->actingAs($this->evaluateur)
+            ->postJson("/api/evaluateur/candidatures/{$cid}/evaluation/validation")
+            ->assertOk()
+            ->assertJsonPath('data.verrouille', true);
+
+        $this->assertSame('evalue', $this->candidature->fresh()->statut_interne);
+        $this->assertDatabaseHas('evaluation_dossier', ['candidature_id' => $cid, 'valide' => true]);
+
+        // La réponse candidat est IDENTIQUE, octet pour octet (vrai chemin, D-3b-7).
+        $apres = $this->actingAs($this->candidat)->getJson('/api/candidature');
+        $apres->assertOk();
+        $this->assertSame($avant->getContent(), $apres->getContent());
+    }
+
+    public function test_aucune_reponse_candidat_ne_contient_de_donnee_de_score(): void
+    {
+        $this->candidature->forceFill([
+            'evaluateur_id' => $this->evaluateur->membreEquipe->id,
+            'statut_interne' => 'en_instruction',
+        ])->saveQuietly();
+        $cid = $this->candidature->id;
+
+        $this->actingAs($this->evaluateur)
+            ->putJson("/api/evaluateur/candidatures/{$cid}/verification", ['nationalite_confirmee' => true, 'diplome_verifie' => 'bac'])
+            ->assertOk();
+        $this->actingAs($this->evaluateur)
+            ->putJson("/api/evaluateur/candidatures/{$cid}/evaluation", ['mo04_note_etoiles' => 5])
+            ->assertOk();
+        $this->actingAs($this->evaluateur)
+            ->postJson("/api/evaluateur/candidatures/{$cid}/evaluation/validation")
+            ->assertOk();
+
+        foreach ([
+            $this->actingAs($this->candidat)->getJson('/api/candidature'),
+            $this->actingAs($this->candidat)->getJson("/api/candidatures/{$cid}"),
+        ] as $reponse) {
+            $body = $reponse->getContent();
+            foreach ([
+                'evaluation', 'evaluation_dossier', 'score', 'score_total', 'score_obtenu',
+                'score_rubrique', 'commentaire_evaluateur', 'dossier_verrouille', 'verrouille',
+                'mo04_note_etoiles', 'snapshot', 'grille', '/65', 'evalue',
+            ] as $interdit) {
+                $this->assertStringNotContainsString($interdit, $body, "« {$interdit} » ne doit pas fuir vers le candidat");
+            }
+        }
     }
 
     public function test_aucune_reponse_candidat_ne_contient_de_donnee_de_verification(): void

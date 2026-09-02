@@ -218,7 +218,10 @@ CREATE TABLE evaluation_dossier (              -- 🔴 (table entière)
 CREATE TABLE score_rubrique_dossier (          -- 🔴
   evaluation_dossier_id  uuid NOT NULL REFERENCES evaluation_dossier(candidature_id),
   rubrique_id            uuid NOT NULL REFERENCES rubrique(id),
-  score_obtenu           numeric(4,2) NOT NULL,
+  score_obtenu           numeric(6,4) NOT NULL, -- Lot 4b (D-4b-1) : élargi de numeric(4,2) — scoring.js
+                                                -- produit des décimales périodiques (experience, langues :
+                                                -- 6/9×10 = 6,6667). evaluation_dossier.score_total reste
+                                                -- numeric(4,1), arrondi 1 décimale comme scoring.js.
   PRIMARY KEY (evaluation_dossier_id, rubrique_id)
 );
 

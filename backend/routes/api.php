@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\Candidat\PieceDossierController;
 use App\Http\Controllers\Api\Candidat\ReponseFormulaireController;
 use App\Http\Controllers\Api\Candidat\SoumissionController;
 use App\Http\Controllers\Api\Evaluateur\DossierController;
+use App\Http\Controllers\Api\Evaluateur\EvaluationController;
 use App\Http\Controllers\Api\Evaluateur\PieceEvaluateurController;
 use App\Http\Controllers\Api\Evaluateur\VerificationController;
 use App\Http\Controllers\Api\PingController;
@@ -114,6 +115,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('candidatures/{candidature}')->scopeBindings()->group(function () {
             Route::get('/', [DossierController::class, 'show']);
             Route::put('/verification', [VerificationController::class, 'update']);
+
+            // Lot 4b — notation du volet Dossier (/65) + verrouillage réel.
+            Route::get('/evaluation', [EvaluationController::class, 'show']);
+            Route::put('/evaluation', [EvaluationController::class, 'update']);
+            Route::post('/evaluation/validation', [EvaluationController::class, 'valider']);
         });
     });
 });
