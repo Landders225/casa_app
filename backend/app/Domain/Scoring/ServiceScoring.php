@@ -168,6 +168,61 @@ final class ServiceScoring
         return new ScoreDossier($total, $voletMax, $indexees);
     }
 
+    /**
+     * Calcul du VOLET ENTRETIEN (/35) — portage fidèle de `scoring.js`
+     * `computeEntretienScore()`. Chaque sous-note bornée à `[0, sous_critere.max_points]`
+     * (lu EN BASE), somme par rubrique (pas de plafond rubrique séparé), somme
+     * des rubriques plafonnée à 35, arrondie à une décimale.
+     *
+     * Un sous-critère non renseigné vaut **0** (`rNotes[sc.code] ?? 0`).
+     * Aucun rééchelonnage, aucune constante algorithmique.
+     *
+     * @param  Candidature  $candidature  avec `entretien.notes` chargé (sinon rechargé)
+     */
+    public function calculerEntretien(Candidature $candidature, Grille $grille): ScoreEntretien
+    {
+        $candidature->loadMissing(['entretien.notes']);
+        $grille->loadMissing(['volets.rubriques.sousCriteres']);
+
+        $volet = $grille->volets->firstWhere('code', 'entretien');
+        abort_if($volet === null, 500, 'Grille sans volet « entretien ».');
+
+        $notesParSousCritere = $candidature->entretien?->notes->keyBy('sous_critere_id')
+            ?? collect();
+
+        $rubriques = [];
+        $sousNotes = [];
+        $total = 0.0;
+
+        foreach ($volet->rubriques as $rubrique) {
+            $raw = 0.0;
+            foreach ($rubrique->sousCriteres as $sousCritere) {
+                $brut = (float) ($notesParSousCritere->get($sousCritere->id)?->points_attribues ?? 0);
+                $borne = max(0.0, min($brut, (float) $sousCritere->max_points));
+                $raw += $borne;
+                $sousNotes[] = new SousNoteScore(
+                    code: $sousCritere->code,
+                    sousCritereId: $sousCritere->id,
+                    label: $sousCritere->label,
+                    rubriqueCode: $rubrique->code,
+                    max: (float) $sousCritere->max_points,
+                    points: $borne,
+                );
+            }
+            $rubriques[$rubrique->code] = $this->rubriqueScore($rubrique, $raw);
+            $total += $raw;
+        }
+
+        $voletMax = (float) $volet->max_points;
+
+        return new ScoreEntretien(
+            total: round(min($total, $voletMax) * 10) / 10,
+            voletMax: $voletMax,
+            rubriques: $rubriques,
+            sousNotes: $sousNotes,
+        );
+    }
+
     private function rubriqueScore(Rubrique $rubrique, float $score): RubriqueScore
     {
         return new RubriqueScore(

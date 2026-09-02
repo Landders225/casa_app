@@ -13,10 +13,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Expose volontairement : `statut_interne`, `statut_eligibilite_interne`
  * (visibilité workflow), la vérification, les critères éliminatoires déclenchés
  * (avec `detail` / `origine`), le `commentaire_evaluateur`, l'état de
- * verrouillage et un résumé de l'`evaluation` du dossier (Lot 4b — score /65
- * figé). Le détail par rubrique se lit sur GET .../evaluation.
+ * verrouillage, un résumé de l'`evaluation` du dossier (Lot 4b — score /65 figé)
+ * et un résumé de l'`entretien` (Lot 4c — statut + score /35 figé). Les détails
+ * par rubrique se lisent sur GET .../evaluation et GET .../entretien.
  *
- * N'expose PAS (lots ultérieurs) : entretien /35, notes de sous-critères.
+ * N'expose PAS (lots ultérieurs) : classement, publication, score final /100.
  *
  * ⚠️ Resource DISTINCTE de CandidatureCandidatResource — jamais réutilisée en
  * croisé. Aucun de ces champs ne doit remonter au candidat.
@@ -91,6 +92,17 @@ class CandidatureEvaluateurResource extends JsonResource
                 'score_total' => $this->evaluationDossier->score_total,
                 'valide_le' => $this->evaluationDossier->valide_le?->toIso8601String(),
                 'grille_version' => $this->evaluationDossier->grille?->version,
+            ] : null),
+
+            'entretien' => $this->whenLoaded('entretien', fn () => $this->entretien ? [
+                'statut' => $this->entretien->statut,
+                'verrouille' => $this->entretien->statut === 'valide',
+                'date' => $this->entretien->date?->toDateString(),
+                'lieu' => $this->entretien->lieu,
+                'presence' => $this->entretien->presence,
+                'score_total' => $this->entretien->score_total,
+                'valide_le' => $this->entretien->valide_le?->toIso8601String(),
+                'grille_version' => $this->entretien->grille?->version,
             ] : null),
         ];
     }

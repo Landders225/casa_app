@@ -118,6 +118,17 @@ class Candidature extends Model
     }
 
     /**
+     * Entretien (🔴, 0 ou 1). N'existe qu'une fois le dossier verrouillé ;
+     * snapshot figé quand `statut = 'valide'` (Lot 4c, ADR-04).
+     *
+     * @return HasOne<Entretien, $this>
+     */
+    public function entretien(): HasOne
+    {
+        return $this->hasOne(Entretien::class, 'candidature_id');
+    }
+
+    /**
      * @return HasMany<ExperienceProfessionnelle, $this>
      */
     public function experiences(): HasMany

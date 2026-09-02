@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\Candidat\PieceDossierController;
 use App\Http\Controllers\Api\Candidat\ReponseFormulaireController;
 use App\Http\Controllers\Api\Candidat\SoumissionController;
 use App\Http\Controllers\Api\Evaluateur\DossierController;
+use App\Http\Controllers\Api\Evaluateur\EntretienController;
 use App\Http\Controllers\Api\Evaluateur\EvaluationController;
 use App\Http\Controllers\Api\Evaluateur\PieceEvaluateurController;
 use App\Http\Controllers\Api\Evaluateur\VerificationController;
@@ -120,6 +121,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/evaluation', [EvaluationController::class, 'show']);
             Route::put('/evaluation', [EvaluationController::class, 'update']);
             Route::post('/evaluation/validation', [EvaluationController::class, 'valider']);
+
+            // Lot 4c — volet Entretien (/35) + verrouillage réel.
+            Route::get('/entretien', [EntretienController::class, 'show']);
+            Route::put('/entretien', [EntretienController::class, 'update']);
+            Route::post('/entretien/validation', [EntretienController::class, 'valider']);
         });
     });
 });

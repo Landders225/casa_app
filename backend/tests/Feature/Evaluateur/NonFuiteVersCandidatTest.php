@@ -135,6 +135,75 @@ class NonFuiteVersCandidatTest extends TestCase
         }
     }
 
+    public function test_GET_candidature_du_candidat_inchange_apres_validation_d_entretien(): void
+    {
+        $cid = $this->candidature->id;
+
+        // Dossier /65 verrouillé (état post-4b) — préalable à l'entretien.
+        $this->actingAs($this->evaluateur)
+            ->putJson("/api/evaluateur/candidatures/{$cid}/verification", ['nationalite_confirmee' => true, 'diplome_verifie' => 'bac'])->assertOk();
+        $this->actingAs($this->evaluateur)
+            ->putJson("/api/evaluateur/candidatures/{$cid}/evaluation", ['mo04_note_etoiles' => 4])->assertOk();
+        $this->actingAs($this->evaluateur)
+            ->postJson("/api/evaluateur/candidatures/{$cid}/evaluation/validation")->assertOk();
+
+        $avant = $this->actingAs($this->candidat)->getJson('/api/candidature');
+        $avant->assertOk()->assertJsonPath('data.statut_public', 'en_cours_de_traitement');
+
+        // Parcours entretien COMPLET : planif → présence + sous-notes → validation.
+        $this->actingAs($this->evaluateur)->putJson("/api/evaluateur/candidatures/{$cid}/entretien", [
+            'date' => '2026-07-06', 'heure' => '09:00', 'lieu' => 'Le Plateau',
+            'presence' => 'present', 'observation' => 'Interne — jamais visible du candidat.',
+            'notes' => ['PRES.01' => 3, 'REL.03' => 4, 'MOE.01' => 3],
+        ])->assertOk();
+        $this->actingAs($this->evaluateur)
+            ->postJson("/api/evaluateur/candidatures/{$cid}/entretien/validation")
+            ->assertOk()
+            ->assertJsonPath('data.entretien.verrouille', true);
+
+        $this->assertDatabaseHas('entretien', ['candidature_id' => $cid, 'statut' => 'valide']);
+        $this->assertSame('evalue', $this->candidature->fresh()->statut_interne);
+
+        // La réponse candidat est IDENTIQUE, octet pour octet (vrai chemin, D-3b-7).
+        $apres = $this->actingAs($this->candidat)->getJson('/api/candidature');
+        $apres->assertOk();
+        $this->assertSame($avant->getContent(), $apres->getContent());
+    }
+
+    public function test_aucune_reponse_candidat_ne_contient_de_donnee_d_entretien(): void
+    {
+        $cid = $this->candidature->id;
+
+        $this->actingAs($this->evaluateur)
+            ->putJson("/api/evaluateur/candidatures/{$cid}/verification", ['nationalite_confirmee' => true, 'diplome_verifie' => 'bac'])->assertOk();
+        $this->actingAs($this->evaluateur)
+            ->putJson("/api/evaluateur/candidatures/{$cid}/evaluation", ['mo04_note_etoiles' => 5])->assertOk();
+        $this->actingAs($this->evaluateur)
+            ->postJson("/api/evaluateur/candidatures/{$cid}/evaluation/validation")->assertOk();
+        $this->actingAs($this->evaluateur)->putJson("/api/evaluateur/candidatures/{$cid}/entretien", [
+            'date' => '2026-07-06', 'heure' => '09:00', 'lieu' => 'Le Plateau', 'presence' => 'present',
+            'notes' => ['PRES.01' => 3, 'REL.03' => 4],
+        ])->assertOk();
+        $this->actingAs($this->evaluateur)->postJson("/api/evaluateur/candidatures/{$cid}/entretien/validation")->assertOk();
+
+        foreach ([
+            $this->actingAs($this->candidat)->getJson('/api/candidature'),
+            $this->actingAs($this->candidat)->getJson("/api/candidatures/{$cid}"),
+        ] as $reponse) {
+            $body = $reponse->getContent();
+            foreach ([
+                // « entretien » nu apparaît légitimement dans un nom de filière
+                // (« entretien-hotelier ») : on cible la clé JSON et les champs.
+                '"entretien"', 'entretien_id', 'entretien_verrouille',
+                'sous_critere', 'sous_note', 'note_sous', 'points_attribues',
+                'presence', 'observation', 'score_total', 'score_entretien', '/35',
+                'PRES.0', 'REL.0', 'MOE.0', 'planifie', 'realise', 'snapshot',
+            ] as $interdit) {
+                $this->assertStringNotContainsString($interdit, $body, "« {$interdit} » ne doit pas fuir vers le candidat");
+            }
+        }
+    }
+
     public function test_aucune_reponse_candidat_ne_contient_de_donnee_de_verification(): void
     {
         $this->actingAs($this->evaluateur)

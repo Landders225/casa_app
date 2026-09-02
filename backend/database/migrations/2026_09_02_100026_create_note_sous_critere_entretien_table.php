@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * CASA — table `note_sous_critere_entretien` (docs/mld.md §5, ADR-05).
- * Les 10 sous-notes d'entretien persistées individuellement (PRES.01-03,
+ * Les sous-notes d'entretien persistées individuellement (12 — PRES.01-03,
  * REL.01-03, EO.01-03, MOE.01-03). FK vers `entretien(candidature_id)`.
  */
 return new class extends Migration

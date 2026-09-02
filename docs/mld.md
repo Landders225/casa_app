@@ -256,8 +256,11 @@ CREATE TABLE entretien (                       -- 🔴 (table entière)
 CREATE TABLE note_sous_critere_entretien (      -- 🔴
   entretien_id      uuid NOT NULL REFERENCES entretien(candidature_id),
   sous_critere_id   uuid NOT NULL REFERENCES sous_critere_entretien(id),
-  points_attribues  numeric(3,1) NOT NULL,
+  points_attribues  numeric(3,1) NOT NULL,      -- Lot 4c : 0..max du sous-critère (borné, 422 si dépassé)
   PRIMARY KEY (entretien_id, sous_critere_id)
+  -- D-4c-4 : le volet Entretien compte 12 sous-critères (PRES/REL/EO/MOE × 3),
+  -- pas « 10 » (erreur des commentaires initiaux). Source de vérité : scoring.js
+  -- (CASA_GRILLE, volet entretien) — Σ maxima = 8+10+8+9 = 35.
 );
 ```
 

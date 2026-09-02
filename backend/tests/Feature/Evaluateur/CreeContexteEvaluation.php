@@ -3,9 +3,12 @@
 namespace Tests\Feature\Evaluateur;
 
 use App\Models\Candidature;
+use App\Models\EvaluationDossier;
+use App\Models\Grille;
 use App\Models\MembreEquipe;
 use App\Models\User;
 use Database\Seeders\GrilleBaremeSeeder;
+use Illuminate\Support\Facades\DB;
 use Tests\Feature\Candidat\CreeContexteCandidature;
 
 /**
@@ -98,5 +101,86 @@ trait CreeContexteEvaluation
             ->json('data.id');
 
         return $this->affecter(Candidature::findOrFail($id), $evaluateur, $reponses);
+    }
+
+    /**
+     * Verrouille le dossier /65 (état post-Lot 4b) — préalable à l'entretien (4c).
+     */
+    protected function verrouillerDossier(Candidature $candidature, string $scoreTotal = '45.0'): Candidature
+    {
+        EvaluationDossier::create([
+            'candidature_id' => $candidature->id,
+            'grille_id' => Grille::active()->id,
+            'score_total' => $scoreTotal,
+            'valide' => true,
+            'valide_le' => now(),
+            'valide_par' => $candidature->evaluateur_id,
+        ]);
+
+        $candidature->forceFill([
+            'dossier_verrouille' => true,
+            'dossier_verrouille_le' => now(),
+            'dossier_verrouille_par' => $candidature->evaluateur_id,
+            'statut_interne' => 'evalue',
+            'date_evaluation' => now()->toDateString(),
+        ])->saveQuietly();
+
+        return $candidature->fresh();
+    }
+
+    /**
+     * Clone la grille active en une nouvelle version active (poids de chaque
+     * rubrique + 1, sous-critères et items inclus). Prouve le non-recalcul des
+     * snapshots (ADR-04).
+     */
+    protected function activerGrilleClone(int $version = 2): Grille
+    {
+        $source = Grille::active()->load('volets.rubriques.items.options', 'volets.rubriques.sousCriteres');
+        DB::table('grille')->where('id', $source->id)->update(['actif' => false]);
+
+        $clone = Grille::create([
+            'version' => $version,
+            'label' => "Grille v{$version} (clone de test)",
+            'date_effet' => now()->toDateString(),
+            'actif' => true,
+            'created_at' => now(),
+        ]);
+
+        foreach ($source->volets as $volet) {
+            $nvVolet = $clone->volets()->create([
+                'code' => $volet->code, 'label' => $volet->label, 'max_points' => $volet->max_points,
+            ]);
+
+            foreach ($volet->rubriques as $rubrique) {
+                $nvRubrique = $nvVolet->rubriques()->create([
+                    'code' => $rubrique->code, 'label' => $rubrique->label,
+                    'max_points' => (float) $rubrique->max_points + 1, 'ordre' => $rubrique->ordre,
+                ]);
+
+                foreach ($rubrique->items as $item) {
+                    $nvItem = $nvRubrique->items()->create([
+                        'code' => $item->code, 'label' => $item->label, 'type' => $item->type,
+                        'max_points' => $item->max_points, 'notation_evaluateur' => $item->notation_evaluateur,
+                        'notee' => $item->notee, 'eliminatoire' => $item->eliminatoire,
+                        'eliminatoire_groupe' => $item->eliminatoire_groupe,
+                    ]);
+                    foreach ($item->options as $option) {
+                        $nvItem->options()->create([
+                            'valeur' => $option->valeur, 'label' => $option->label,
+                            'points' => $option->points, 'eliminatoire' => $option->eliminatoire,
+                        ]);
+                    }
+                }
+
+                foreach ($rubrique->sousCriteres as $sousCritere) {
+                    $nvRubrique->sousCriteres()->create([
+                        'code' => $sousCritere->code, 'label' => $sousCritere->label,
+                        'max_points' => (float) $sousCritere->max_points + 1,
+                    ]);
+                }
+            }
+        }
+
+        return $clone->fresh();
     }
 }

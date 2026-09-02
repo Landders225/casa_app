@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * CASA — table `rubrique` (docs/mld.md §6). `max_points` = poids officiel
- * (scoring.js `poids`) : Dossier 12/13/5/10/15/10.
+ * (scoring.js `poids`) : Dossier 12/13/5/10/15/10 ; Entretien 8/10/8/9.
  */
 class Rubrique extends Model
 {
@@ -45,10 +45,22 @@ class Rubrique extends Model
     }
 
     /**
+     * Items notés (volet Dossier uniquement).
+     *
      * @return HasMany<Item, $this>
      */
     public function items(): HasMany
     {
         return $this->hasMany(Item::class, 'rubrique_id');
+    }
+
+    /**
+     * Sous-critères (volet Entretien uniquement).
+     *
+     * @return HasMany<SousCritereEntretien, $this>
+     */
+    public function sousCriteres(): HasMany
+    {
+        return $this->hasMany(SousCritereEntretien::class, 'rubrique_id')->orderBy('code');
     }
 }
