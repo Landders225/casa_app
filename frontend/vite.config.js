@@ -28,5 +28,11 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.js'],
     css: false,
     restoreMocks: true,
+    // jsdom + `userEvent.type` sur des formulaires à ~10 champs = lent (surtout
+    // machine chargée). Les tests ne sont pas bloqués, juste lents.
+    testTimeout: 20_000,
+    // Vitest = tests unitaires/composants sous src/ ; e2e/ appartient à Playwright.
+    include: ['src/**/*.{test,spec}.{js,jsx}'],
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
   },
 })

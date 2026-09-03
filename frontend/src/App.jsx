@@ -3,26 +3,29 @@ import { useAuth } from './auth/useAuth.js'
 import { FullPageSpinner } from './components/ui/Spinner.jsx'
 import { LoginPage } from './pages/auth/LoginPage.jsx'
 import { NotFoundPage } from './pages/NotFoundPage.jsx'
-import {
-  AdminPlaceholder,
-  CandidatPlaceholder,
-  EvaluateurPlaceholder,
-} from './pages/SpacePlaceholder.jsx'
+import { HomePage } from './pages/public/HomePage.jsx'
+import { InscriptionPage } from './pages/public/InscriptionPage.jsx'
+import { CandidatDashboard } from './pages/candidat/CandidatDashboard.jsx'
+import { AdminPlaceholder, EvaluateurPlaceholder } from './pages/SpacePlaceholder.jsx'
 import { ProtectedRoute } from './routing/ProtectedRoute.jsx'
 import { RedirectIfAuthed } from './routing/RedirectIfAuthed.jsx'
 import { paths, roleHome } from './routing/routes.js'
 
-/** Racine « / » : renvoie vers l'espace du rôle, ou vers la connexion. */
-function HomeRedirect() {
+/**
+ * Racine « / » : accueil public pour les visiteurs, redirection vers l'espace
+ * du rôle pour un utilisateur connecté.
+ */
+function Home() {
   const { status, role } = useAuth()
   if (status === 'loading') return <FullPageSpinner />
-  return <Navigate to={status === 'authenticated' ? roleHome(role) : paths.login} replace />
+  if (status === 'authenticated') return <Navigate to={roleHome(role)} replace />
+  return <HomePage />
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path={paths.home} element={<HomeRedirect />} />
+      <Route path={paths.home} element={<Home />} />
 
       <Route
         path={paths.login}
@@ -32,12 +35,20 @@ export default function App() {
           </RedirectIfAuthed>
         }
       />
+      <Route
+        path={paths.inscription}
+        element={
+          <RedirectIfAuthed>
+            <InscriptionPage />
+          </RedirectIfAuthed>
+        }
+      />
 
       <Route
         path={`${paths.candidat}/*`}
         element={
           <ProtectedRoute roles={['candidat']}>
-            <CandidatPlaceholder />
+            <CandidatDashboard />
           </ProtectedRoute>
         }
       />

@@ -1,0 +1,12 @@
+/* Écran d'inscription — transcrit de App_maquette/pages/public/inscription.html
+   (`.signup-wrap`). Étape 1 seule : état civil + identifiants + CGU. */
+
+.signup-wrap {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: var(--space-10) var(--space-4) var(--space-24);
+}
+
+.signup-wrap .stepper {
+  margin-bottom: var(--space-10);
+}

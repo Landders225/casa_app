@@ -8,3 +8,7 @@ npm-debug.log*
 .idea
 .DS_Store
 coverage
+e2e
+playwright.config.js
+playwright-report
+test-results

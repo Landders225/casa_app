@@ -52,6 +52,19 @@ export function AuthProvider({ children }) {
     return res.data
   }, [])
 
+  /**
+   * Inscription (Lot 8b-1). POST /api/register ouvre déjà la session côté serveur
+   * (auto-login, ADR-16) et renvoie le UserResource — on l'adopte directement.
+   * Les ApiError (422 champ par champ, message âge/résidence, 429...) remontent
+   * au formulaire.
+   */
+  const register = useCallback(async (payload) => {
+    const res = await apiClient.post('/register', payload)
+    setUser(res.data)
+    setStatus('authenticated')
+    return res.data
+  }, [])
+
   const logout = useCallback(async () => {
     try {
       await apiClient.post('/logout')
@@ -62,8 +75,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, status, role: user?.role ?? null, login, logout, reload: loadMe }),
-    [user, status, login, logout, loadMe],
+    () => ({ user, status, role: user?.role ?? null, login, register, logout, reload: loadMe }),
+    [user, status, login, register, logout, loadMe],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

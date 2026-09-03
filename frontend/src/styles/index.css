@@ -31,15 +31,20 @@
 /* ---------------------------------------------------------------------------
    Règles globales issues de App_maquette/assets/css/main.css (hors @import).
    Animations « premium subtil » + décor + utilitaire d'impression.
+
+   ⚠️ Le masquage initial des `[data-reveal]` est SCOPÉ à `html.js-reveal` :
+   cette classe n'est posée par `useScrollReveal` QUE si le JS tourne ET que
+   l'utilisateur n'a pas demandé `prefers-reduced-motion`. Sans JS ou en
+   reduced-motion, le contenu est donc toujours visible — jamais de page blanche.
 --------------------------------------------------------------------------- */
-[data-reveal] { opacity: 0; transform: translateY(24px); transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out); }
-[data-reveal].is-visible { opacity: 1; transform: translateY(0); }
-[data-reveal="scale"] { transform: scale(0.96); }
-[data-reveal="scale"].is-visible { transform: scale(1); }
-[data-reveal="left"] { transform: translateX(-28px); }
-[data-reveal="left"].is-visible { transform: translateX(0); }
-[data-reveal="right"] { transform: translateX(28px); }
-[data-reveal="right"].is-visible { transform: translateX(0); }
+html.js-reveal [data-reveal] { opacity: 0; transform: translateY(24px); transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out); }
+html.js-reveal [data-reveal].is-visible { opacity: 1; transform: translateY(0); }
+html.js-reveal [data-reveal="scale"] { transform: scale(0.96); }
+html.js-reveal [data-reveal="scale"].is-visible { transform: scale(1); }
+html.js-reveal [data-reveal="left"] { transform: translateX(-28px); }
+html.js-reveal [data-reveal="left"].is-visible { transform: translateX(0); }
+html.js-reveal [data-reveal="right"] { transform: translateX(28px); }
+html.js-reveal [data-reveal="right"].is-visible { transform: translateX(0); }
 
 .page-enter { animation: page-fade 0.4s var(--ease-out); }
 @keyframes page-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -59,6 +64,24 @@
 @media print {
   .no-print { display: none !important; }
   [data-reveal] { opacity: 1 !important; transform: none !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   Ajustement SPA — le contenu vit dans #root.
+
+   La maquette (pages HTML distinctes) pose `html, body { height: 100% }` dans
+   reset.css (fichier vendored, non éditable). Dans une SPA, `#root` porte tout
+   l'arbre React : si `html`/`body` restent bloqués à la hauteur du viewport,
+   `document.documentElement.scrollHeight` est plafonné et toute capture pleine
+   page / impression tronque le contenu qui dépasse. On les laisse donc grandir.
+--------------------------------------------------------------------------- */
+html,
+body {
+  height: auto;
+  min-height: 100dvh;
+}
+#root {
+  min-height: 100dvh;
 }
 
 /* ---------------------------------------------------------------------------

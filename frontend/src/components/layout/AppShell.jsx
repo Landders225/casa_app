@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth.js'
-import { paths } from '../../routing/routes.js'
+import { paths, roleHome } from '../../routing/routes.js'
 import { navConfig, roleLabel } from './navConfig.js'
 
 function initials(profil) {
@@ -52,14 +52,28 @@ export function AppShell({ title, children }) {
             <div key={section.title ?? si}>
               <div className="sidebar-section-label">{section.title ?? config.label}</div>
               {section.items.map((item, ii) => {
+                // Le tableau de bord est la seule entrée navigable pour l'instant ;
+                // les autres écrans arrivent aux sous-lots suivants.
                 const active = si === 0 && ii === 0
+                if (active) {
+                  return (
+                    <Link
+                      key={item.key}
+                      to={roleHome(role)}
+                      className="sidebar-link is-active"
+                      aria-current="page"
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <i className={`fa-solid ${item.icon}`} aria-hidden="true" /> {item.label}
+                    </Link>
+                  )
+                }
                 return (
                   <span
                     key={item.key}
-                    className={`sidebar-link${active ? ' is-active' : ''}`}
-                    aria-current={active ? 'page' : undefined}
-                    aria-disabled={active ? undefined : 'true'}
-                    title={active ? undefined : 'Écran à venir'}
+                    className="sidebar-link"
+                    aria-disabled="true"
+                    title="Écran à venir"
                   >
                     <i className={`fa-solid ${item.icon}`} aria-hidden="true" /> {item.label}
                   </span>

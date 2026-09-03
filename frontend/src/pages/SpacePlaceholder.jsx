@@ -25,21 +25,12 @@ export function SpacePlaceholder({ title, lot, children }) {
   )
 }
 
-export function CandidatPlaceholder() {
-  return (
-    <SpacePlaceholder title="Espace candidat" lot="candidature, documents, suivi">
-      <p className="caption" style={{ marginTop: 'var(--space-4)' }}>
-        À venir : inscription publique, formulaire de candidature, dépôt des pièces, suivi de la décision.
-      </p>
-    </SpacePlaceholder>
-  )
-}
-
 export function EvaluateurPlaceholder() {
   return (
     <SpacePlaceholder title="Espace évaluateur" lot="dossiers, notation, entretiens">
       <p className="caption" style={{ marginTop: 'var(--space-4)' }}>
-        À venir : consultation des dossiers affectés, vérification, notation du dossier /65 et de l'entretien /35.
+        À venir : consultation des dossiers affectés, vérification des pièces, notation du dossier puis de
+        l'entretien, classement.
       </p>
     </SpacePlaceholder>
   )
