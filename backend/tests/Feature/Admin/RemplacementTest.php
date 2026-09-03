@@ -106,6 +106,15 @@ class RemplacementTest extends TestCase
     {
         $this->publier();
 
+        // On salit les colonnes 🔴 de decision_candidature avec des sentinelles
+        // improbables : elles ne doivent apparaître dans AUCUNE réponse candidat.
+        // Le rang du sortant (🔴) est saboté avec une valeur improbable ; les motifs
+        // internes du promu et du sortant reçoivent une sentinelle alphabétique.
+        DB::table('decision_candidature')->where('candidature_id', $this->retenu->id)
+            ->update(['rang' => 4242, 'motif_interne' => 'SORTANT-MOTIF-SECRET-NEUFUNNEUFUN']);
+        DB::table('decision_candidature')->where('candidature_id', $this->premiereAttente->id)
+            ->update(['motif_interne' => 'PROMU-MOTIF-INTERNE-SECRET-QUATREDEUX']);
+
         $this->actingAs($this->admin)->postJson('/api/admin/remplacements', [
             'candidature_id' => $this->retenu->id,
             'motif' => 'Désistement.',
@@ -127,12 +136,16 @@ class RemplacementTest extends TestCase
             foreach ([
                 'remplacement', 'promu', 'motif_interne', 'score_final',
                 'score_dossier', 'score_entretien', 'departage', 'decision_candidature',
+                // Preuve DIRECTE : le rang interne (🔴) et le motif interne n'ont
+                // aucun chemin vers la réponse candidat.
+                'SORTANT-MOTIF-SECRET', 'PROMU-MOTIF-INTERNE-SECRET',
             ] as $interdit) {
                 $this->assertStringNotContainsString($interdit, $body, "« {$interdit} » ne doit pas fuir vers le candidat");
             }
         }
-        // Le sortant n'apprend pas qu'il a été « remplacé » : aucune mention de la promotion.
-        $reponseSortant->assertJsonMissingPath('data.score')->assertJsonMissingPath('data.rang_classement');
+        // Le rang interne de decision_candidature (🔴) n'est jamais une clé de la réponse.
+        $reponsePromu->assertJsonMissingPath('data.rang');
+        $reponseSortant->assertJsonMissingPath('data.rang')->assertJsonMissingPath('data.score');
     }
 
     public function test_remplacement_sans_motif_422(): void
