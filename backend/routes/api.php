@@ -1,10 +1,16 @@
 <?php
 
 use App\Domain\Piece\ContraintesFichier;
+use App\Http\Controllers\Api\Admin\AffectationController;
+use App\Http\Controllers\Api\Admin\AuditController;
+use App\Http\Controllers\Api\Admin\CampagneController as AdminCampagneController;
+use App\Http\Controllers\Api\Admin\CandidatureSupervisionController;
 use App\Http\Controllers\Api\Admin\ClassementController as AdminClassementController;
+use App\Http\Controllers\Api\Admin\FiliereController as AdminFiliereController;
 use App\Http\Controllers\Api\Admin\PublicationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Candidat\CandidatureController;
+use App\Http\Controllers\Api\FiliereController;
 use App\Http\Controllers\Api\Candidat\ClassementController;
 use App\Http\Controllers\Api\Candidat\ExperienceController;
 use App\Http\Controllers\Api\Candidat\JustificatifExperienceController;
@@ -30,6 +36,10 @@ use Illuminate\Support\Facades\Route;
 
 // Sonde applicative publique (indépendante de /up).
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'app' => 'CASA']));
+
+// Catalogue des filières — PUBLIC (Lot 6a). Liste blanche stricte : code, nom,
+// description, actif (le front affiche « Actuellement fermé » si actif=false).
+Route::get('/filieres', [FiliereController::class, 'index']);
 
 // Authentification.
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
@@ -70,6 +80,22 @@ Route::middleware('auth:sanctum')->group(function () {
         // Lot 5b — acte de publication (irréversible). Bascule StatutPublicResolver
         // sur sa branche « publication existe » : le candidat voit sa décision.
         Route::post('/campagnes/{campagne}/publier', [PublicationController::class, 'publier']);
+
+        /*
+        |------------------------------------------------------------------
+        | Lot 6a — Gestion & supervision (administrateur strict)
+        |------------------------------------------------------------------
+        */
+        // Affectation d'un évaluateur (résout D-4a-1).
+        Route::post('/affectations', [AffectationController::class, 'store']);
+        // Vue de supervision transverse.
+        Route::get('/candidatures', [CandidatureSupervisionController::class, 'index']);
+        // Filières : activation / désactivation.
+        Route::patch('/filieres/{filiere}', [AdminFiliereController::class, 'changerStatut']);
+        // Campagnes : transitions d'état (ouvrir / clôturer).
+        Route::patch('/campagnes/{campagne}', [AdminCampagneController::class, 'changerStatut']);
+        // Journal d'audit : consultation (lecture seule, append-only garanti par le trigger).
+        Route::get('/audit', [AuditController::class, 'index']);
     });
 
     /*

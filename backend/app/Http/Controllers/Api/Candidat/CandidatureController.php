@@ -26,18 +26,20 @@ class CandidatureController extends Controller
     ];
 
     /**
-     * GET /api/candidature — ma candidature courante (campagne ouverte).
+     * GET /api/candidature — ma candidature (la plus récente).
+     *
+     * On NE filtre PAS sur `campagne.statut = 'ouverte'` : après la clôture d'une
+     * campagne par l'admin (Lot 6a), le candidat doit toujours pouvoir consulter
+     * son dossier et — après publication (Lot 5b) — sa décision. Seule la
+     * CRÉATION (`store`) exige une campagne ouverte.
      */
     public function courante(Request $request): CandidatureCandidatResource
     {
         $candidat = $request->user()->candidat;
 
-        $candidature = $candidat?->candidatures()
-            ->whereHas('campagne', fn ($q) => $q->where('statut', 'ouverte'))
-            ->latest()
-            ->first();
+        $candidature = $candidat?->candidatures()->latest()->first();
 
-        abort_if($candidature === null, 404, 'Aucune candidature en cours.');
+        abort_if($candidature === null, 404, 'Aucune candidature.');
 
         return new CandidatureCandidatResource($candidature->load(self::RELATIONS));
     }
@@ -69,6 +71,9 @@ class CandidatureController extends Controller
             ->whereHas('campagnes', fn ($q) => $q->where('campagne.id', $campagne->id))
             ->first();
         abort_if($filiere === null, 422, "Cette filière n'est pas ouverte pour la campagne en cours.");
+
+        // Lot 6a : une filière désactivée par l'admin n'accepte plus de candidature.
+        abort_if(! $filiere->actif, 422, "Cette filière n'accepte pas de candidature actuellement.");
 
         $candidature = DB::transaction(function () use ($candidat, $campagne, $filiere) {
             $candidature = Candidature::create([
