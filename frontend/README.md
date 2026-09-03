@@ -1,16 +1,53 @@
-# React + Vite
+# CASA — Frontend (React + Vite)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+SPA React qui consomme l'API Laravel du dépôt. Servie **same-origin** (`:8080`)
+derrière le reverse-proxy nginx ; authentification **Sanctum SPA** en cookie de
+session (ADR-01) — **aucun jeton stocké côté JS**.
 
-Currently, two official plugins are available:
+## Scripts
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev      # serveur Vite :5173 (proxifie /api + /sanctum vers :8080)
+npm run build    # build de prod -> dist/
+npm run lint     # oxlint
+npm test         # vitest (jsdom)
+```
 
-## React Compiler
+En Docker, le `Dockerfile` build puis sert `dist/` via un nginx interne
+(`nginx.conf` — fallback SPA `try_files $uri /index.html`).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Structure (Lot 8a)
 
-## Expanding the Oxlint configuration
+```
+src/
+  main.jsx / App.jsx        bootstrap + arbre de routes
+  styles/                   COPIE VERBATIM de App_maquette/assets/css/ (ne pas éditer ici)
+                            + index.css (ordre d'import, polices/icônes npm)
+  lib/
+    apiClient.js            client HTTP unique : cycle Sanctum, retry 419, ApiError typée
+    csrf.js / ApiError.js
+  auth/
+    authContext.js          le contexte
+    AuthProvider.jsx        état de session (loading/authenticated/guest), reconstruit depuis /api/me
+    useAuth.js
+  routing/
+    routes.js               chemins + roleHome()
+    ProtectedRoute.jsx      gardiennage par rôle (strict en 8a — cf. commentaire, à rebrancher au 8c)
+    RedirectIfAuthed.jsx
+  components/
+    layout/AppShell.jsx     sidebar + topbar (design system maquette)
+    ui/                     Spinner, Alert, FormField (wrappers sur les classes maquette)
+  pages/
+    auth/LoginPage.jsx      écran de connexion réel
+    SpacePlaceholder.jsx    placeholders candidat / évaluateur / admin
+    NotFoundPage.jsx
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Conventions
+
+- Composants `PascalCase.jsx`, un par fichier ; hooks `useX.js`.
+- **Toute** la logique API vit dans `lib/` ; **tout** l'état d'auth dans `auth/`.
+- Le CSS métier réutilise les classes du design system (`btn`, `card`,
+  `sidebar-link`…) — on ne réécrit pas leur style. Une correction de style remonte
+  d'abord à `App_maquette`.

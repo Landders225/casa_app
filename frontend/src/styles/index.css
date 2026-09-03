@@ -1,0 +1,73 @@
+/* ==========================================================================
+   CASA — feuille de style racine du frontend React
+
+   ⚠️  variables.css / reset.css / typography.css / components.css / layouts.css
+   sont une COPIE VERBATIM de App_maquette/assets/css/ (design validé par la
+   direction). NE PAS les éditer ici : toute correction de style doit d'abord
+   remonter à la source (App_maquette) pour éviter une désynchronisation
+   silencieuse entre la maquette et l'application.
+
+   Ordre d'import imposé (comme App_maquette/assets/css/main.css) :
+   tokens > reset > typographie > composants > layouts.
+   ========================================================================== */
+
+/* Polices & icônes empaquetées (pas de CDN au runtime — D-8a-3). */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/plus-jakarta-sans/500.css';
+@import '@fontsource/plus-jakarta-sans/600.css';
+@import '@fontsource/plus-jakarta-sans/700.css';
+@import '@fontsource/plus-jakarta-sans/800.css';
+@import '@fortawesome/fontawesome-free/css/all.min.css';
+
+@import './variables.css';
+@import './reset.css';
+@import './typography.css';
+@import './components.css';
+@import './layouts.css';
+
+/* ---------------------------------------------------------------------------
+   Règles globales issues de App_maquette/assets/css/main.css (hors @import).
+   Animations « premium subtil » + décor + utilitaire d'impression.
+--------------------------------------------------------------------------- */
+[data-reveal] { opacity: 0; transform: translateY(24px); transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out); }
+[data-reveal].is-visible { opacity: 1; transform: translateY(0); }
+[data-reveal="scale"] { transform: scale(0.96); }
+[data-reveal="scale"].is-visible { transform: scale(1); }
+[data-reveal="left"] { transform: translateX(-28px); }
+[data-reveal="left"].is-visible { transform: translateX(0); }
+[data-reveal="right"] { transform: translateX(28px); }
+[data-reveal="right"].is-visible { transform: translateX(0); }
+
+.page-enter { animation: page-fade 0.4s var(--ease-out); }
+@keyframes page-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.hover-lift { transition: transform var(--dur-base) var(--ease-standard), box-shadow var(--dur-base); }
+.hover-lift:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+
+.bg-dot-grid { background-image: radial-gradient(var(--casa-primary-200) 1.4px, transparent 1.4px); background-size: 22px 22px; }
+.bg-gradient-hero {
+  background:
+    radial-gradient(1100px 480px at 85% -10%, var(--casa-primary-100) 0%, transparent 60%),
+    radial-gradient(700px 400px at -5% 20%, var(--casa-accent-100) 0%, transparent 55%),
+    var(--casa-bg);
+}
+.blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.5; z-index: -1; }
+
+@media print {
+  .no-print { display: none !important; }
+  [data-reveal] { opacity: 1 !important; transform: none !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   Chargement plein écran (boot de l'app pendant GET /api/me).
+--------------------------------------------------------------------------- */
+.app-boot {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--casa-bg);
+}

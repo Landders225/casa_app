@@ -1,0 +1,76 @@
+/* ==========================================================================
+   CASA DESIGN SYSTEM — Typography
+   ========================================================================== */
+
+h1, h2, h3, h4, .display, .h1, .h2, .h3, .h4 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  color: var(--casa-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.display-lg { font-size: var(--fs-display-lg); font-weight: var(--fw-extrabold); letter-spacing: -0.02em; }
+.display    { font-size: var(--fs-display); font-weight: var(--fw-extrabold); letter-spacing: -0.02em; }
+h1, .h1 { font-size: var(--fs-h1); }
+h2, .h2 { font-size: var(--fs-h2); }
+h3, .h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
+h4, .h4 { font-size: var(--fs-h4); font-weight: var(--fw-semibold); }
+
+p { font-size: var(--fs-body); color: var(--casa-text-secondary); line-height: var(--lh-relaxed); }
+
+.body-lg { font-size: var(--fs-body-lg); }
+.body-sm { font-size: var(--fs-body-sm); }
+
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--casa-primary-700);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.caption { font-size: var(--fs-caption); color: var(--casa-text-tertiary); }
+.micro   { font-size: var(--fs-micro); color: var(--casa-text-tertiary); }
+
+.label {
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--casa-text-primary);
+  display: block;
+  margin-bottom: var(--space-2);
+}
+
+.kpi-value {
+  font-family: var(--font-display);
+  font-size: var(--fs-kpi);
+  font-weight: var(--fw-extrabold);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--casa-text-primary);
+}
+
+.text-muted    { color: var(--casa-text-secondary); }
+.text-tertiary { color: var(--casa-text-tertiary); }
+.text-primary-brand { color: var(--casa-primary-700); }
+.text-success  { color: var(--casa-success-700); }
+.text-warning  { color: var(--casa-warning-700); }
+.text-danger   { color: var(--casa-danger-700); }
+.text-inverse  { color: var(--casa-text-inverse); }
+
+.text-center { text-align: center; }
+.text-right  { text-align: right; }
+
+.fw-medium   { font-weight: var(--fw-medium); }
+.fw-semibold { font-weight: var(--fw-semibold); }
+.fw-bold     { font-weight: var(--fw-bold); }
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

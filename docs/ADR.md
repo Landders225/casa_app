@@ -179,6 +179,19 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 - Vérification d'e-mail par code (wizard étape 3, **simulée** dans la maquette : code « 2026 » pré-rempli) → **hors périmètre**, point ouvert (aucun envoi d'e-mail réel dans le projet).
 - Format téléphone : la maquette impose `225` + 10 chiffres ; le backend reste **souple** (`string, max:20`) pour ne pas fragiliser sur les plans de numérotation ni toucher aux données de démo.
 
+## ADR-17 — Frontend : fondation React (Lot 8a)
+
+**Contexte.** Après un backend complet (Lots 0-7), on démarre le frontend qui consomme l'API. Le Lot 8a pose le **socle** — aucun écran métier, mais l'ossature (CSS, client HTTP, auth, routing) sur laquelle s'appuieront les espaces (8b/c/d).
+**Décision.**
+- **Design** : le CSS de la maquette (`App_maquette/assets/css/`, validé par la direction) est **copié verbatim** dans `frontend/src/styles/` (le contexte de build Docker ne voit que `frontend/`) et importé **globalement** (pas de CSS Modules — les classes `btn`, `card`, `sidebar-link`… sont globales par nature). En-tête de `src/styles/index.css` : avertissement « copie, ne pas éditer ici ». **Le template Vite par défaut est supprimé** (`App.css`, `index.css` violet, `src/assets/`, `public/icons.svg`) — son `#root { max-width:1280px; text-align:center }` cassait l'app-shell pleine largeur (**piège de spécificité résolu**).
+- **Polices & icônes empaquetées** (D-8a-3) : `@fontsource/inter`, `@fontsource/plus-jakarta-sans`, `@fortawesome/fontawesome-free` en dépendances npm au lieu des `<link>` CDN de la maquette — **rendu identique**, mais pas de dépendance à un tiers au runtime (robustesse hors-ligne / CI).
+- **Client HTTP unique** (`src/lib/apiClient.js`, ADR-01/02) : base `VITE_API_URL` (défaut `/api`), `credentials: 'include'`, **cycle CSRF** (`GET /sanctum/csrf-cookie` mémoïsé avant toute mutation, `X-XSRF-TOKEN` depuis le cookie décodé), **retry unique sur 419**, erreurs normalisées en `ApiError` typée (`unauthenticated` / `forbidden` / `validation` / `csrf` / `rate_limited` / `server` / `network`). **Aucun jeton stocké côté JS** — ni `localStorage`, ni `sessionStorage` ; seuls les cookies (session `httpOnly` + `XSRF-TOKEN`) portent l'auth.
+- **Contexte d'auth** (`src/auth/`) : `status` ∈ `loading` / `authenticated` / `guest`. Au boot **et à chaque rechargement de page**, l'état est reconstruit **exclusivement depuis `GET /api/me`** (le cookie de session, lui, persiste). `login()` utilise directement le `UserResource` renvoyé par `POST /api/login` (pas de `/me` supplémentaire).
+- **Routing protégé par rôle** (`react-router-dom` v7) : `ProtectedRoute` — `loading` → écran de chargement ; `guest` → `/connexion` (mémorise l'URL) ; **mauvais rôle → redirigé vers SON espace** (`roleHome`), pas une page 403. Gardiennage **strict par rôle principal** en 8a.
+  **⚠️ À REBRANCHER AU LOT 8c** : ADR-10 (« administrateur ⊇ évaluateur ») est une règle API ; côté navigation, l'accès admin aux écrans d'évaluation devra être rouvert quand ces écrans arrivent.
+- **Fallback SPA** (D-8a-1) : le conteneur `frontend` gagne un `nginx.conf` (`try_files $uri /index.html`) — l'image nginx par défaut renvoie 404 sur toute route client. `docker/nginx/default.conf` (proxy externe) **inchangé**. **Backend strictement inchangé.**
+**Conséquence.** Écran de connexion réel + placeholders par espace. Preuve (Lot 8a) : `build` + `lint` + `vitest` (20 tests) verts ; smoke `curl` Docker — `/` et `/connexion` → 200 (fallback), cycle Sanctum des 3 comptes démo (csrf → login → `/api/me` bon rôle → **2ᵉ `/api/me` = reload → toujours authentifié** → logout → 401). E2E navigateur repoussé au 8b (le wizard le justifiera).
+
 ---
 
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)

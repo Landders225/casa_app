@@ -1,0 +1,64 @@
+/* Mise en page de l'écran de connexion — transcrite du <style> de
+   App_maquette/pages/public/connexion.html (split-screen : panneau de marque à
+   gauche, formulaire à droite ; plein écran mono-colonne < 900px). */
+
+.auth-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 900px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+.auth-side {
+  background: linear-gradient(160deg, var(--casa-primary-800), var(--casa-secondary-800));
+  color: #fff;
+  padding: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+@media (max-width: 900px) {
+  .auth-side {
+    display: none;
+  }
+}
+.auth-side .brand {
+  color: #fff;
+}
+
+.auth-form-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+}
+.auth-form {
+  width: 100%;
+  max-width: 400px;
+}
+
+.demo-accounts {
+  background: var(--casa-primary-50);
+  border: 1px solid var(--casa-primary-200);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  margin-top: var(--space-8);
+}
+.demo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+  border-bottom: 1px dashed var(--casa-border);
+  font-size: var(--fs-caption);
+  gap: var(--space-3);
+}
+.demo-row:last-child {
+  border-bottom: none;
+}

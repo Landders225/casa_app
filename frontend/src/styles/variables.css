@@ -1,0 +1,153 @@
+/* ==========================================================================
+   CASA DESIGN SYSTEM — Design Tokens
+   Prototype front-end premium — Plateforme de sélection CASA (Arbre de Vie 2026)
+   ========================================================================== */
+
+:root {
+  /* ---- Couleurs de marque -------------------------------------------- */
+  /* Vert profond "Arbre de Vie" : croissance, avenir, confiance */
+  --casa-primary-900: #08332E;
+  --casa-primary-800: #0B4740;
+  --casa-primary-700: #0E5C53;
+  --casa-primary-600: #12766A;
+  --casa-primary-500: #178F80;
+  --casa-primary-400: #3FAA9A;
+  --casa-primary-300: #7FC7BB;
+  --casa-primary-200: #BFE3DB;
+  --casa-primary-100: #E4F4F0;
+  --casa-primary-50:  #F2FAF8;
+
+  /* Bleu nuit institutionnel : rigueur, coopération */
+  --casa-secondary-900: #0E1E33;
+  --casa-secondary-800: #142A47;
+  --casa-secondary-700: #1B3A5C;
+  --casa-secondary-600: #244B73;
+  --casa-secondary-500: #2E5D8C;
+  --casa-secondary-300: #9AB6D2;
+  --casa-secondary-100: #E4ECF4;
+
+  /* Ambre chaleureux : hôtellerie, accueil, hospitalité */
+  --casa-accent-700: #A2601E;
+  --casa-accent-600: #C17726;
+  --casa-accent-500: #E08D3C;
+  --casa-accent-400: #EBA75F;
+  --casa-accent-300: #F3C58F;
+  --casa-accent-100: #FCF0DF;
+
+  /* ---- Couleurs fonctionnelles ----------------------------------------- */
+  --casa-success-700: #146C48;
+  --casa-success-600: #1B8A5C;
+  --casa-success-500: #1F9D6B;
+  --casa-success-100: #E1F5EB;
+
+  --casa-warning-700: #92650E;
+  --casa-warning-600: #B7841A;
+  --casa-warning-500: #E0A82E;
+  --casa-warning-100: #FBF0DA;
+
+  --casa-danger-700: #A22E2E;
+  --casa-danger-600: #C13A3A;
+  --casa-danger-500: #D64545;
+  --casa-danger-100: #FBE6E6;
+
+  --casa-info-700: #1E5C96;
+  --casa-info-600: #2571B4;
+  --casa-info-500: #2E86D6;
+  --casa-info-100: #E4F0FB;
+
+  /* ---- Neutres / surfaces ------------------------------------------- */
+  --casa-bg:            #F6F8F7;
+  --casa-bg-alt:        #EEF3F1;
+  --casa-surface:       #FFFFFF;
+  --casa-surface-sunken:#FAFBFA;
+  --casa-overlay:       rgba(10, 20, 18, 0.55);
+
+  --casa-text-primary:   #12211D;
+  --casa-text-secondary: #56655F;
+  --casa-text-tertiary:  #8B978F;
+  --casa-text-inverse:   #F6F8F7;
+  --casa-text-link:      var(--casa-primary-700);
+
+  --casa-border:        #E1E7E3;
+  --casa-border-strong: #C9D3CD;
+  --casa-border-focus:  var(--casa-primary-500);
+
+  /* ---- Typographie ----------------------------------------------------- */
+  --font-display: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+  --fs-display-lg: clamp(2.75rem, 2.1rem + 2.6vw, 4.25rem);
+  --fs-display:    clamp(2.25rem, 1.8rem + 1.8vw, 3.25rem);
+  --fs-h1:         clamp(1.875rem, 1.6rem + 1.1vw, 2.5rem);
+  --fs-h2:         clamp(1.5rem, 1.35rem + 0.6vw, 1.875rem);
+  --fs-h3:         1.375rem;
+  --fs-h4:         1.125rem;
+  --fs-body-lg:    1.125rem;
+  --fs-body:       1rem;
+  --fs-body-sm:    0.9375rem;
+  --fs-caption:    0.8125rem;
+  --fs-micro:      0.75rem;
+  --fs-kpi:        clamp(1.75rem, 1.5rem + 1vw, 2.5rem);
+
+  --lh-tight: 1.15;
+  --lh-snug:  1.35;
+  --lh-normal:1.55;
+  --lh-relaxed:1.7;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+
+  /* ---- Espacement (échelle 4px) ---------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+  --space-32: 8rem;
+
+  /* ---- Rayons ------------------------------------------------------- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-2xl: 28px;
+  --radius-full: 999px;
+
+  /* ---- Ombres --------------------------------------------------------- */
+  --shadow-xs: 0 1px 2px rgba(18, 33, 29, 0.06);
+  --shadow-sm: 0 2px 6px rgba(18, 33, 29, 0.07), 0 1px 2px rgba(18, 33, 29, 0.05);
+  --shadow-md: 0 8px 24px rgba(18, 33, 29, 0.09), 0 2px 6px rgba(18, 33, 29, 0.06);
+  --shadow-lg: 0 16px 40px rgba(18, 33, 29, 0.14), 0 4px 12px rgba(18, 33, 29, 0.08);
+  --shadow-xl: 0 24px 64px rgba(18, 33, 29, 0.18);
+  --shadow-focus: 0 0 0 4px rgba(23, 143, 128, 0.25);
+  --shadow-primary: 0 10px 24px rgba(14, 92, 83, 0.28);
+
+  /* ---- Transitions ---------------------------------------------------- */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-slow: 400ms;
+
+  /* ---- Layout ----------------------------------------------------------- */
+  --container-max: 1280px;
+  --container-wide: 1440px;
+  --sidebar-w: 272px;
+  --sidebar-w-collapsed: 84px;
+  --topbar-h: 72px;
+  --z-header: 100;
+  --z-sidebar: 90;
+  --z-dropdown: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+}

@@ -1,0 +1,131 @@
+/* ==========================================================================
+   CASA DESIGN SYSTEM — Layouts (header public, sidebar back-office, grilles)
+   ========================================================================== */
+
+.container { max-width: var(--container-max); margin: 0 auto; padding: 0 var(--space-6); }
+.container-wide { max-width: var(--container-wide); margin: 0 auto; padding: 0 var(--space-6); }
+@media (max-width: 640px) { .container, .container-wide { padding: 0 var(--space-4); } }
+
+.section { padding: var(--space-24) 0; }
+@media (max-width: 900px) { .section { padding: var(--space-16) 0; } }
+
+/* ---------------------------------------------------------------------------
+   Header public
+--------------------------------------------------------------------------- */
+.site-header {
+  position: sticky; top: 0; z-index: var(--z-header);
+  background: rgba(246, 248, 247, 0.85); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--casa-border);
+}
+.site-header .container { display: flex; align-items: center; justify-content: space-between; height: 80px; }
+.brand { display: flex; align-items: center; gap: var(--space-3); font-family: var(--font-display); font-weight: var(--fw-extrabold); font-size: 1.15rem; color: var(--casa-text-primary); }
+.brand-mark {
+  width: 40px; height: 40px; border-radius: var(--radius-md);
+  background: linear-gradient(145deg, var(--casa-primary-600), var(--casa-primary-800));
+  display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.1rem; flex-shrink: 0;
+  box-shadow: var(--shadow-primary);
+}
+.main-nav { display: flex; align-items: center; gap: var(--space-8); }
+.main-nav ul { display: flex; gap: var(--space-6); }
+.main-nav a { font-weight: var(--fw-medium); font-size: var(--fs-body-sm); color: var(--casa-text-secondary); transition: color var(--dur-fast); }
+.main-nav a:hover, .main-nav a.is-active { color: var(--casa-primary-700); }
+.header-actions { display: flex; align-items: center; gap: var(--space-3); }
+.nav-toggle { display: none; }
+
+@media (max-width: 960px) {
+  .main-nav ul { display: none; }
+  .nav-toggle { display: flex; }
+  .header-actions .btn-outline { display: none; }
+}
+@media (max-width: 480px) { .brand-subtitle { display: none; } }
+
+.mobile-nav {
+  position: fixed; inset: 0; z-index: var(--z-modal); background: var(--casa-surface);
+  padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-2);
+  animation: fade-in var(--dur-base);
+}
+.mobile-nav a { display: block; padding: var(--space-4); font-size: var(--fs-h4); font-weight: var(--fw-semibold); border-bottom: 1px solid var(--casa-border); }
+
+/* ---------------------------------------------------------------------------
+   Footer
+--------------------------------------------------------------------------- */
+.site-footer { background: var(--casa-secondary-900); color: var(--casa-secondary-100); padding: var(--space-16) 0 var(--space-8); margin-top: var(--space-24); }
+.footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: var(--space-10); margin-bottom: var(--space-12); }
+@media (max-width: 860px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .footer-grid { grid-template-columns: 1fr; } }
+.site-footer h4 { color: #fff; font-size: var(--fs-body); margin-bottom: var(--space-4); }
+.site-footer ul li { margin-bottom: var(--space-3); }
+.site-footer a { color: var(--casa-secondary-300); font-size: var(--fs-body-sm); }
+.site-footer a:hover { color: #fff; }
+.footer-bottom { border-top: 1px solid rgba(255,255,255,0.12); padding-top: var(--space-6); display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); font-size: var(--fs-caption); color: var(--casa-secondary-300); }
+
+/* ---------------------------------------------------------------------------
+   Back-office layout (sidebar + topbar)
+--------------------------------------------------------------------------- */
+.app-shell { display: flex; min-height: 100vh; background: var(--casa-bg); }
+
+.app-sidebar {
+  width: var(--sidebar-w); flex-shrink: 0; background: var(--casa-secondary-900); color: var(--casa-secondary-100);
+  position: fixed; top: 0; left: 0; bottom: 0; z-index: var(--z-sidebar); display: flex; flex-direction: column;
+  transition: transform var(--dur-base) var(--ease-standard);
+}
+.sidebar-brand { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-6) var(--space-5); }
+.sidebar-brand .brand { color: #fff; }
+.sidebar-nav { flex: 1; overflow-y: auto; padding: var(--space-3); }
+.sidebar-section-label { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: 0.08em; color: var(--casa-secondary-300); opacity: 0.7; padding: var(--space-4) var(--space-4) var(--space-2); }
+.sidebar-link {
+  display: flex; align-items: center; gap: var(--space-3); padding: 0.7rem var(--space-4); border-radius: var(--radius-md);
+  font-size: var(--fs-body-sm); font-weight: var(--fw-medium); color: var(--casa-secondary-300); margin-bottom: 2px;
+  transition: all var(--dur-fast);
+}
+.sidebar-link i, .sidebar-link svg { width: 1.15em; flex-shrink: 0; text-align: center; }
+.sidebar-link:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.sidebar-link.is-active { background: var(--casa-primary-700); color: #fff; box-shadow: var(--shadow-sm); }
+.sidebar-link .badge { margin-left: auto; }
+.sidebar-footer { padding: var(--space-4); border-top: 1px solid rgba(255,255,255,0.1); }
+.sidebar-user { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2); border-radius: var(--radius-md); }
+.sidebar-user-info { flex: 1; min-width: 0; }
+.sidebar-user-info .name { color: #fff; font-size: var(--fs-body-sm); font-weight: var(--fw-semibold); }
+.sidebar-user-info .role { font-size: var(--fs-micro); color: var(--casa-secondary-300); }
+
+.app-main { flex: 1; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-width: 0; }
+
+.app-topbar {
+  height: var(--topbar-h); background: var(--casa-surface); border-bottom: 1px solid var(--casa-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-6);
+  position: sticky; top: 0; z-index: var(--z-header); gap: var(--space-4);
+}
+.topbar-search { position: relative; max-width: 340px; flex: 1; }
+.sidebar-toggle-mobile { display: none; }
+
+.app-content { padding: var(--space-6); flex: 1; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--space-6); gap: var(--space-4); flex-wrap: wrap; }
+
+@media (max-width: 1080px) {
+  .app-sidebar { transform: translateX(-100%); }
+  .app-sidebar.is-open { transform: translateX(0); box-shadow: var(--shadow-xl); }
+  .app-main { margin-left: 0; }
+  .sidebar-toggle-mobile { display: flex; }
+  .topbar-search { display: none; }
+}
+
+.sidebar-scrim { position: fixed; inset: 0; background: var(--casa-overlay); z-index: calc(var(--z-sidebar) - 1); display: none; }
+.sidebar-scrim.is-visible { display: block; }
+
+/* ---------------------------------------------------------------------------
+   Grilles utilitaires
+--------------------------------------------------------------------------- */
+.grid { display: grid; gap: var(--space-6); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-5 { grid-template-columns: repeat(5, 1fr); }
+.grid-12 { grid-template-columns: repeat(12, 1fr); }
+@media (max-width: 1100px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } .grid-5 { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 780px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } .grid-5 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .grid-5 { grid-template-columns: 1fr; } }
+
+.dashboard-layout { display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-6); align-items: start; }
+@media (max-width: 1024px) { .dashboard-layout { grid-template-columns: 1fr; } }
+
+.candidate-shell { max-width: 640px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-16); }
