@@ -121,11 +121,11 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 
 **Conséquence.** L'immuabilité ne repose plus sur la seule absence de chemin applicatif : un `UPDATE`/`DELETE`/`TRUNCATE` sur `journal_audit` échoue au niveau moteur, quel que soit le point d'entrée (route, `php artisan tinker`, `psql` direct, script de maintenance). Le `DROP TABLE` de `migrate:fresh` n'est pas concerné (DDL de gestion de schéma, pas une altération de ligne) ; un contournement resterait théoriquement possible pour un super-utilisateur PostgreSQL via `SET session_replication_role = replica`, ce qui n'est pas le rôle applicatif et sortirait de tout usage normal. Corollaire opérationnel : une ligne insérée par erreur ne peut pas être « nettoyée » — les tests du trigger s'exécutent donc en transaction annulée (`ROLLBACK`).
 
-## ADR-13 — Pas de parcours d'inscription dédié : la création de candidature le porte temporairement (Lot 3a)
+## ADR-13 — Pas de parcours d'inscription dédié : la création de candidature le porte temporairement (Lot 3a) — **RÉSOLU au Lot 7 (ADR-16)**
 
 **Contexte.** Dans la maquette, `inscription.html` crée le couple `candidat` + `candidature` : il fixe la filière visée (`filiere_id`), génère le `numero_dossier`, initialise le classement des préférences et met `statut='brouillon'`. Aucun lot livré (0 à 3a) n'a produit d'endpoint d'inscription ; le Lot 2 se limite à l'authentification et à 3 comptes de démonstration seedés (le `candidat` de démo est créé par un seeder).
 **Décision.** Au Lot 3a, `POST /api/candidatures` **porte le geste d'inscription** : il prend `filiere_id` en entrée (filière ouverte pour la campagne en cours), génère le `numero_dossier` (`CASA-<année>-<6 chiffres>`), crée la ligne `reponse_formulaire` vide (1-1 strict) et pré-remplit `classement_filiere_preference` (filière visée en rang 1). L'édition des champs d'identité du `candidat` (`prenom`, `nom`, `date_naissance`, `cni`…) **n'est pas** couverte par ce lot.
-**Conséquence.** Un **lot inscription / profil réel reste à faire** : création de compte candidat en self-service, saisie/mise à jour de l'état civil, choix initial de la filière. Quand il existera, `POST /api/candidatures` sera réduit à « ouvrir la candidature de la campagne courante » (la filière proviendra du profil / de l'inscription) sans changer le contrat de lecture. En attendant, tester le Lot 3a nécessite un `candidat` pré-existant (seedé ou créé à la main).
+**Conséquence — LEVÉE au Lot 7 (ADR-16).** `POST /api/register` crée désormais le compte (`utilisateur` role=candidat + `candidat`) ; `POST /api/candidatures` est **inchangé** (il lisait déjà `user()->candidat`, il ne créait jamais le `candidat`) et **garde `filiere_id`** — la suggestion « filière du profil » d'origine est écartée : la filière est un choix **par candidature** (re-candidature possible sur une autre filière à une cohorte ultérieure), et `classement_filiere_preference` est déjà porté par la candidature (**D-7-1**). L'édition d'identité passe par `PATCH /api/candidat/profil`.
 
 **Dépendance signalée (D-4a-1) — RÉSOLUE au Lot 6a.** Le Lot 4a consommait `candidature.evaluateur_id` en lecture sans endpoint pour l'écrire (contexte posé par le trait `CreeContexteEvaluation` / le seeder `DemoEvaluationSeeder`). Le Lot 6a fournit **`POST /api/admin/affectations`** (`role:administrateur` strict) : affectation **en masse** (`{ evaluateur_id, candidature_ids: [1..n] }`), cible = `membre_equipe` de rôle `evaluateur`, candidatures affectables `statut_interne ∈ {soumis, en_instruction}` (**atomique** : 422 + liste si une seule ne l'est pas), `soumis → en_instruction` (la convention « en instruction dès l'affectation » devient un comportement testé sur le vrai chemin), ré-affectation possible tant que `en_instruction`. Le trait/seeder restent comme raccourci rapide.
 
@@ -143,7 +143,7 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 - **D-6a-3** : l'élimination manuelle (`candidatures.html` : admin force `non_eligible` + motif) est reportée au Lot 6b (acte cassant un invariant).
 - **D-6a-4** (correctif transverse) : `GET /api/candidature` (`courante`, Lot 3a) ne filtre plus sur `campagne.statut = 'ouverte'` — il renvoie la candidature la plus récente du candidat. Sinon, dès qu'un admin clôture la campagne (nouveau au 6a), le candidat perdrait l'accès à son propre dossier **et à sa décision publiée** (Lot 5b : la publication suit typiquement la clôture). Seule la CRÉATION (`store`) exige toujours une campagne ouverte.
 
-**Point ouvert à porter au lot inscription (D-3c-1).** Le contrôle d'éligibilité `residence_ci` (résider en Côte d'Ivoire) n'est présent dans `scoring.js` que dans `checkEligibiliteInitiale` (§4.2, inscription), **pas** dans `checkCriteresEliminatoires` (§4.9, soumission). Le Lot 3c porte fidèlement `checkCriteresEliminatoires` : `residence_ci = false` **n'élimine donc pas à la soumission** aujourd'hui. Ce contrôle devra être effectué à l'inscription (ou, à défaut, par l'évaluateur avec `verification_dossier`). À ne pas perdre.
+**~~Point ouvert à porter au lot inscription (D-3c-1)~~ — RÉSOLU au Lot 7.** Le contrôle d'éligibilité `residence_ci` (résider en Côte d'Ivoire) n'est présent dans `scoring.js` que dans `checkEligibiliteInitiale` (§4.2, inscription), **pas** dans `checkCriteresEliminatoires` (§4.9, soumission). Le Lot 3c portait fidèlement `checkCriteresEliminatoires`. Le Lot 7 porte `checkEligibiliteInitiale` **là où scoring.js le place** — à l'inscription : `ServiceEligibiliteInitiale` (`VERSION=1`) refuse `POST /api/register` en 422 si l'âge n'est pas dans [18,30] (référence = maintenant) ou si `residence_ci = false`. `ServiceEligibilite::evaluerSoumission` **reste inchangé** (pas de `residence_ci` à la soumission). La dette est donc close au bon endroit : aucun compte candidat ne peut exister hors tranche d'âge ou hors CI (**D-7-3**).
 
 ## ADR-15 — Actes exceptionnels tracés : correction, remplacement, élimination manuelle (Lot 6b)
 
@@ -155,11 +155,38 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 
 **Conséquence.** Aucune colonne de « correction » sur `candidature` (D-6b : Q9) : la trace vit exclusivement dans `journal_audit`. `effectue_par` / `valide_par` = `membre_equipe` de l'admin (422 si profil équipe incomplet, D-6b : Q8).
 
+## ADR-16 — Inscription & profil candidat : la porte d'entrée (Lot 7, comble ADR-13)
+
+**Contexte.** Jusqu'au Lot 6b, les comptes candidats venaient de seeders et `POST /api/candidatures` « portait » le geste d'inscription (ADR-13). Il manquait la création de compte self-service et la gestion de l'état civil.
+**Décision.** Frontière nette en trois gestes :
+| Geste | Endpoint | Effet |
+|---|---|---|
+| **Inscription** | `POST /api/register` (**public**, `throttle:register` = 3/min + 20/jour par IP) | crée `utilisateur` (role=`candidat`) + `candidat`, **rien d'autre** ; transaction unique ; **auto-login** (session régénérée) ; `journal_audit` « Inscription candidat » |
+| **Profil** | `GET` + `PATCH /api/candidat/profil` (`role:candidat`, **sans paramètre d'URL**) | lecture / édition de son état civil ; `journal_audit` « Mise à jour du profil » |
+| **Candidature** | `POST /api/candidatures` (**Lot 3a, code inchangé**) | crée la candidature pour un candidat déjà inscrit |
+
+- **Éligibilité initiale** (`App\Domain\Eligibilite\ServiceEligibiliteInitiale`, `VERSION=1`, portage fidèle de `scoring.js checkEligibiliteInitiale`) : `POST /api/register` **refuse en 422** (motif explicite) si âge ∉ [18,30] (référence = maintenant) ou `residence_ci = false`. **`evaluerSoumission` inchangé** → double gate assumé (âge re-contrôlé à `campagne.date_ouverture`). Ferme **D-3c-1**.
+- **`residence_ci`** : fixé et contrôlé **à l'inscription uniquement** — **non éditable** via le profil (`prohibited` → 422). Un vrai changement de résidence relève d'une démarche administrative, pas d'un toggle self-service.
+- **Sécurité** : e-mail `unique` ; mot de passe `Password::min(10)->letters()->numbers()->mixedCase()` (pas de symbole imposé — NIST privilégie la longueur ; pas de contrôle HaveIBeenPwned en v1 — **durcissement futur**) ; hash bcrypt 12 rounds (cast `hashed`). **E-mail déjà pris → message explicite** (« Un compte existe déjà pour cette adresse e-mail. ») : l'inscription diffère légitimement du login (l'utilisateur a besoin de savoir qu'il a déjà un compte) ; l'abus est borné par le throttle.
+- **CGU** : `required|accepted` **et horodatées** (`utilisateur.cgu_acceptees_le`, migration `2026_09_09_100000`) — l'acceptation est un acte juridique, prouver *quand* elle a eu lieu a de la valeur en litige (cohérent ADR-12).
+- **ADR-07** : `nationalite` / `diplome` / `diplome_verifie` / `sc04*` sont `prohibited` sur `/register` **et** sur `/profil` — jamais déclarés par le candidat.
+- **Resource** : `CandidatResource` (déjà la liste blanche stricte des 8 champs 🟢) réutilisée — aucune nouvelle Resource.
+
+**Divergences maquette.**
+- **D-7-1** : inscription et candidature **séparées** (le wizard `inscription.html` fusionne compte + filière + candidature). `filiere_id` reste sur `POST /api/candidatures`.
+- **D-7-2** : `email` éditable dans `candidature.html` étape 1 → **exclu** de `PATCH /api/candidat/profil` (changement de *credential* → flux dédié avec ré-authentification — **point ouvert**).
+- **D-7-3** : `residence_ci` contrôlé à l'inscription (ferme D-3c-1), non ajouté aux critères de soumission.
+- Vérification d'e-mail par code (wizard étape 3, **simulée** dans la maquette : code « 2026 » pré-rempli) → **hors périmètre**, point ouvert (aucun envoi d'e-mail réel dans le projet).
+- Format téléphone : la maquette impose `225` + 10 chiffres ; le backend reste **souple** (`string, max:20`) pour ne pas fragiliser sur les plans de numérotation ni toucher aux données de démo.
+
 ---
 
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)
 
-- **Lot inscription / profil candidat** (self-service, état civil, choix de filière) — cf. ADR-13.
+- ~~**Lot inscription / profil candidat** (self-service, état civil, choix de filière)~~ — **livré au Lot 7** (`POST /api/register`, `GET|PATCH /api/candidat/profil`, cf. ADR-16).
+- **Changement d'adresse e-mail** (identifiant de connexion) : flux dédié avec ré-authentification / confirmation — non couvert par le Lot 7 (D-7-2).
+- **Vérification d'e-mail** à l'inscription (lien ou code) : hors périmètre Lot 7 — pas d'infra d'envoi d'e-mail dans le projet.
+- **Durcissement mot de passe** : `Password::uncompromised()` (Have I Been Pwned) — écarté en v1 (appel réseau sur le chemin d'inscription).
 - Règle « 1 expérience = 1 justificatif » : validée **à la soumission** (Lot 3c), pas au niveau colonne (`experience_professionnelle.piece_justificative_id` rendu nullable au Lot 3a, cf. `docs/mld.md`).
 
 - ~~**Endpoint d'affectation** d'un dossier à un évaluateur~~ — **livré au Lot 6a** (`POST /api/admin/affectations`, cf. ADR-14).

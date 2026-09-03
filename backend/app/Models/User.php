@@ -40,6 +40,7 @@ class User extends Authenticatable
         'role',
         'actif',
         'derniere_connexion_le',
+        'cgu_acceptees_le',
     ];
 
     /**
@@ -61,6 +62,7 @@ class User extends Authenticatable
             'actif' => 'boolean',
             'cree_le' => 'datetime',
             'derniere_connexion_le' => 'datetime',
+            'cgu_acceptees_le' => 'datetime',
             'mot_de_passe_hash' => 'hashed',
         ];
     }

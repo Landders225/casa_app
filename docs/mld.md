@@ -19,6 +19,8 @@ CREATE TABLE utilisateur (
   actif               boolean NOT NULL DEFAULT true,         -- 🟢
   cree_le             timestamptz NOT NULL DEFAULT now(),    -- 🟢
   derniere_connexion_le timestamptz,                         -- 🟢
+  cgu_acceptees_le    timestamptz,                           -- 🟢 Lot 7 : horodatage de l'acceptation des CGU à l'inscription
+                                                             -- (nullable : comptes seedés / équipe sans parcours d'inscription)
   created_at timestamptz, updated_at timestamptz
 );
 

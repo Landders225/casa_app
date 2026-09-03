@@ -26,6 +26,12 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($cle);
         });
 
+        // --- Limitation des inscriptions (anti-bot) : 3 / min ET 20 / jour par IP ---
+        RateLimiter::for('register', fn (Request $request) => [
+            Limit::perMinute(3)->by('register|'.$request->ip()),
+            Limit::perDay(20)->by('register-day|'.$request->ip()),
+        ]);
+
         // --- Autorisations sémantiques (fondation ADR-10) ---
         // Middleware `role:` pour protéger les routes ; ces Gates pour les
         // autorisations fines dans les contrôleurs des lots suivants.

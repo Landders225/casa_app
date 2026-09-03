@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\Admin\PublicationController;
 use App\Http\Controllers\Api\Admin\RemplacementController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Candidat\CandidatureController;
+use App\Http\Controllers\Api\Candidat\ProfilController;
+use App\Http\Controllers\Api\RegisterController;
 use App\Http\Controllers\Api\FiliereController;
 use App\Http\Controllers\Api\Candidat\ClassementController;
 use App\Http\Controllers\Api\Candidat\ExperienceController;
@@ -46,6 +48,10 @@ Route::get('/filieres', [FiliereController::class, 'index']);
 
 // Authentification.
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
+// Inscription candidat — PUBLIC (Lot 7, comble ADR-13). Crée le compte seul
+// (utilisateur role=candidat + candidat) ; la candidature reste POST /api/candidatures.
+Route::post('/register', [RegisterController::class, 'store'])->middleware('throttle:register');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -126,6 +132,11 @@ Route::middleware('auth:sanctum')->group(function () {
     | denyAsNotFound), jamais 403.
     */
     Route::middleware('role:candidat')->group(function () {
+        // Lot 7 — profil candidat (état civil). Sans paramètre : agit toujours sur
+        // le candidat du compte courant -> aucune surface vers le profil d'autrui.
+        Route::get('/candidat/profil', [ProfilController::class, 'show']);
+        Route::patch('/candidat/profil', [ProfilController::class, 'update']);
+
         Route::get('/candidature', [CandidatureController::class, 'courante']);
         Route::post('/candidatures', [CandidatureController::class, 'store']);
 
