@@ -230,7 +230,9 @@ CREATE TABLE critere_eliminatoire_declenche (  -- 🔴
   candidature_id  uuid NOT NULL REFERENCES candidature(id),
   code_critere    varchar(50) NOT NULL,        -- ex. 'DI.01', 'acces_sites', 'age_min'
   detail          text NOT NULL,
-  origine         varchar(30) NOT NULL CHECK (origine IN ('soumission_candidat','verification_evaluateur')),
+  origine         varchar(30) NOT NULL CHECK (origine IN ('soumission_candidat','verification_evaluateur','decision_administrative')),
+                  -- Lot 6b (D-6b-3) : 'decision_administrative' pour l'élimination manuelle
+                  -- (admin force non_eligible avec motif). detail = motif de l'admin.
   declenche_le    timestamptz NOT NULL DEFAULT now()
 );
 ```

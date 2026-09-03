@@ -6,8 +6,11 @@ use App\Http\Controllers\Api\Admin\AuditController;
 use App\Http\Controllers\Api\Admin\CampagneController as AdminCampagneController;
 use App\Http\Controllers\Api\Admin\CandidatureSupervisionController;
 use App\Http\Controllers\Api\Admin\ClassementController as AdminClassementController;
+use App\Http\Controllers\Api\Admin\CorrectionController;
+use App\Http\Controllers\Api\Admin\EliminationController;
 use App\Http\Controllers\Api\Admin\FiliereController as AdminFiliereController;
 use App\Http\Controllers\Api\Admin\PublicationController;
+use App\Http\Controllers\Api\Admin\RemplacementController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Candidat\CandidatureController;
 use App\Http\Controllers\Api\FiliereController;
@@ -96,6 +99,23 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/campagnes/{campagne}', [AdminCampagneController::class, 'changerStatut']);
         // Journal d'audit : consultation (lecture seule, append-only garanti par le trigger).
         Route::get('/audit', [AuditController::class, 'index']);
+
+        /*
+        |------------------------------------------------------------------
+        | Lot 6b — Actes exceptionnels tracés (administrateur strict)
+        |------------------------------------------------------------------
+        | Chaque acte exige un `motif` (422 sinon) et écrit 1 ligne
+        | `journal_audit` ancienne_valeur -> nouvelle_valeur.
+        */
+        // Correction exceptionnelle : SEULE exception au verrouillage ADR-04.
+        // Pré-publication uniquement (409 sinon, D-6b-2). Nouveau snapshot serveur.
+        Route::post('/candidatures/{candidature}/correction/dossier', [CorrectionController::class, 'dossier']);
+        Route::post('/candidatures/{candidature}/correction/entretien', [CorrectionController::class, 'entretien']);
+        // Remplacement : post-publication. Promeut le 1er de la liste d'attente
+        // (même filière, par rang) ; sortant -> indisponible, promu -> retenu.
+        Route::post('/remplacements', [RemplacementController::class, 'store']);
+        // Élimination manuelle : force `non_eligible` + motif (fraude, pièce non conforme).
+        Route::post('/candidatures/{candidature}/elimination', [EliminationController::class, 'store']);
     });
 
     /*

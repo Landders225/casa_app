@@ -145,6 +145,16 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 
 **Point ouvert à porter au lot inscription (D-3c-1).** Le contrôle d'éligibilité `residence_ci` (résider en Côte d'Ivoire) n'est présent dans `scoring.js` que dans `checkEligibiliteInitiale` (§4.2, inscription), **pas** dans `checkCriteresEliminatoires` (§4.9, soumission). Le Lot 3c porte fidèlement `checkCriteresEliminatoires` : `residence_ci = false` **n'élimine donc pas à la soumission** aujourd'hui. Ce contrôle devra être effectué à l'inscription (ou, à défaut, par l'évaluateur avec `verification_dossier`). À ne pas perdre.
 
+## ADR-15 — Actes exceptionnels tracés : correction, remplacement, élimination manuelle (Lot 6b)
+
+**Contexte.** Trois gestes d'administration cassent un invariant du cœur métier : rouvrir une évaluation verrouillée (ADR-04), rétrograder/promouvoir une décision publiée (règle reine / ADR-08), forcer une inéligibilité hors `ServiceEligibilite` (ADR-06). Ils sont indispensables (erreur de saisie, désistement d'un lauréat, fraude découverte) mais doivent rester rares, tracés et réservés à `administrateur` strict (ADR-10).
+**Décision.** Trois endpoints sous `role:administrateur` / `App\Http\Controllers\Api\Admin\*`, **`motif` obligatoire** (422 sinon), **1 ligne `journal_audit` par acte** portant l'intégralité du changement `ancienne_valeur → nouvelle_valeur` (D-6b : reconstituable à la seule lecture de la ligne).
+- **Correction exceptionnelle** (`POST /api/admin/candidatures/{c}/correction/dossier` | `/entretien`) — **seule exception au verrouillage ADR-04**. Surface large (D-6b-1) : réponses candidat + vérification + notation. Le nouveau snapshot **écrase** l'ancien (MLD 1-1) ; l'historique vit dans l'audit. Recalcul 100 % serveur sur la **grille active** (D-6b-1), puis **relance complète de `ServiceEligibilite`** (les entrées ont changé) → `statut_eligibilite_interne` + retrace `critere_eliminatoire_declenche` ; `statut_interne` reste `evalue`. **Pré-publication uniquement** (D-6b-2) : **409** si la campagne est publiée — corriger une décision communiquée relève du contentieux, pas du logiciel. Re-corrigible (un nouvel acte tracé, jamais un undo).
+- **Remplacement** (`POST /api/admin/remplacements` `{candidature_id, motif}`) — acte **post-publication** (422 si non publiée : avant, relancer le classement). Précondition : `decision = 'retenu'` (422 sinon). Promeut le **premier `liste_attente` de la même filière par `rang`** ; sortant → `indisponible`, promu → `retenu` (rangs inchangés). Ligne `remplacement` + audit. Liste d'attente vide → acte tracé **sans promu**. `StatutPublicResolver` gère la transition **sans logique spéciale** (il lit `decision` en direct). `indisponible` est un statut **factuel neutre** (D-6b : Q5) — il ne révèle rien d'interne, distinct du `non_eligible` qu'on masque en `non_retenu` générique. **Non-fuite** (D-3b-7) : ni score, ni rang, ni le fait même du remplacement ne transparaît côté candidat. Irréversible.
+- **Élimination manuelle** (`POST /api/admin/candidatures/{c}/elimination` `{motif}`) — force `statut_eligibilite_interne = 'non_eligible'` + 1 ligne `critere_eliminatoire_declenche` d'**`origine = 'decision_administrative'`** (D-6b-3 : valeur ajoutée au CHECK, migration `2026_09_08_100000` — on ne réutilise pas `verification_evaluateur`, ça mentirait sur l'origine). `statut_interne` inchangé (verdict ≠ position workflow — divergence assumée avec `candidatures.html`). Décision existante → `non_retenu` générique (`motif_communicable` préservé) : après publication, **indiscernable** d'un non-retenu ordinaire (règle reine, D-5b-1). **Pas** de promotion automatique (D-6b : Q7 — fraude ≠ désistement). Une par une (D-6b-4). Irréversible.
+
+**Conséquence.** Aucune colonne de « correction » sur `candidature` (D-6b : Q9) : la trace vit exclusivement dans `journal_audit`. `effectue_par` / `valide_par` = `membre_equipe` de l'admin (422 si profil équipe incomplet, D-6b : Q8).
+
 ---
 
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)
@@ -153,9 +163,8 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 - Règle « 1 expérience = 1 justificatif » : validée **à la soumission** (Lot 3c), pas au niveau colonne (`experience_professionnelle.piece_justificative_id` rendu nullable au Lot 3a, cf. `docs/mld.md`).
 
 - ~~**Endpoint d'affectation** d'un dossier à un évaluateur~~ — **livré au Lot 6a** (`POST /api/admin/affectations`, cf. ADR-14).
-- **Correction exceptionnelle** admin (score verrouillé), **remplacement** (indisponible → promotion liste d'attente), **élimination manuelle** (D-6a-3) — Lot 6b.
+- ~~**Correction exceptionnelle** admin (score verrouillé), **remplacement** (indisponible → promotion liste d'attente), **élimination manuelle** (D-6a-3)~~ — **livré au Lot 6b** (cf. ADR-15).
 - Création de campagne / édition nom·description·quota de filière (D-6a-2).
-- **Correction exceptionnelle admin** d'une évaluation verrouillée (motif obligatoire, nouveau snapshot tracé) — cf. D-4b-2 / ADR-04.
 - **Score final /100** (`computeScoreFinal` = dossier /65 + entretien /35) et **classement par filière** (`rankCandidatsParFiliere` : départage mixité > vulnérabilité > expérience secteur > motivation) — lot ultérieur.
 - Détail des policies Laravel par endpoint (matrice complète rôle × action).
 - Stratégie de rate limiting / anti-bruteforce sur l'authentification.
