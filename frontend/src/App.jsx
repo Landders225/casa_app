@@ -8,7 +8,10 @@ import { InscriptionPage } from './pages/public/InscriptionPage.jsx'
 import { CandidatDashboard } from './pages/candidat/CandidatDashboard.jsx'
 import { CandidatureWizard } from './pages/candidat/CandidatureWizard.jsx'
 import { MaCandidature } from './pages/candidat/MaCandidature.jsx'
-import { AdminPlaceholder, EvaluateurPlaceholder } from './pages/SpacePlaceholder.jsx'
+import { DossiersList } from './pages/evaluateur/DossiersList.jsx'
+import { EvaluateurDashboard } from './pages/evaluateur/EvaluateurDashboard.jsx'
+import { FicheCandidat } from './pages/evaluateur/FicheCandidat.jsx'
+import { AdminPlaceholder } from './pages/SpacePlaceholder.jsx'
 import { ProtectedRoute } from './routing/ProtectedRoute.jsx'
 import { RedirectIfAuthed } from './routing/RedirectIfAuthed.jsx'
 import { paths, roleHome } from './routing/routes.js'
@@ -71,10 +74,26 @@ export default function App() {
         }
       />
       <Route
+        path={paths.evaluateurDossiers}
+        element={
+          <ProtectedRoute roles={['evaluateur', 'administrateur']}>
+            <DossiersList />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/evaluateur/candidatures/:id"
+        element={
+          <ProtectedRoute roles={['evaluateur', 'administrateur']}>
+            <FicheCandidat />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path={`${paths.evaluateur}/*`}
         element={
-          <ProtectedRoute roles={['evaluateur']}>
-            <EvaluateurPlaceholder />
+          <ProtectedRoute roles={['evaluateur', 'administrateur']}>
+            <EvaluateurDashboard />
           </ProtectedRoute>
         }
       />

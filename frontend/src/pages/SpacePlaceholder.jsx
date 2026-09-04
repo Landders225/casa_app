@@ -25,17 +25,6 @@ export function SpacePlaceholder({ title, lot, children }) {
   )
 }
 
-export function EvaluateurPlaceholder() {
-  return (
-    <SpacePlaceholder title="Espace évaluateur" lot="dossiers, notation, entretiens">
-      <p className="caption" style={{ marginTop: 'var(--space-4)' }}>
-        À venir : consultation des dossiers affectés, vérification des pièces, notation du dossier puis de
-        l'entretien, classement.
-      </p>
-    </SpacePlaceholder>
-  )
-}
-
 export function AdminPlaceholder() {
   return (
     <SpacePlaceholder title="Espace administrateur" lot="campagnes, classement, publication, audit">

@@ -1,0 +1,26 @@
+/* Fiche candidat évaluateur — transcrit de
+   App_maquette/pages/evaluator/fiche-candidat.html (bloc <style>).
+   Les classes du design system restent dans src/styles/. */
+
+.fiche-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--space-6);
+  align-items: start;
+  margin-top: var(--space-6);
+}
+@media (max-width: 1024px) {
+  .fiche-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Un enfant de grille a `min-width: auto` par défaut = la largeur min-content de
+   son contenu — le `.tabs` non-wrappé (9 onglets) forcerait sinon toute la
+   grille (donc la page) à s'élargir, malgré son propre `overflow-x: auto`
+   (qui ne réduit QUE le min-content de .tabs, pas celui de l'item de grille
+   parent). Sans ce `min-width: 0`, la fiche débordait horizontalement sous
+   1024px — pas de scroll horizontal de page toléré (contrainte responsive). */
+.fiche-layout > .card {
+  min-width: 0;
+}

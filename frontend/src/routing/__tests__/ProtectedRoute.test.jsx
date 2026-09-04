@@ -26,6 +26,34 @@ function renderAt(path, roles) {
   )
 }
 
+/** Mêmes routes que App.jsx pour /evaluateur/* : roles ['evaluateur','administrateur']. */
+function renderAtEvaluateur(path) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route
+          path="/evaluateur/*"
+          element={
+            <ProtectedRoute roles={['evaluateur', 'administrateur']}>
+              <div>contenu évaluateur</div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute roles={['administrateur']}>
+              <div>contenu admin</div>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/connexion" element={<div>écran de connexion</div>} />
+        <Route path="/candidat" element={<div>espace candidat</div>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
 describe('ProtectedRoute', () => {
   beforeEach(() => vi.clearAllMocks())
 
@@ -58,5 +86,34 @@ describe('ProtectedRoute', () => {
     useAuth.mockReturnValue({ status: 'authenticated', role: 'evaluateur' })
     renderAt('/candidat', ['candidat'])
     expect(screen.getByText('espace évaluateur')).toBeInTheDocument()
+  })
+})
+
+describe('ProtectedRoute — recouvrement admin ⊇ évaluateur (Lot 8c-1, ADR-10)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('candidat sur /evaluateur/* -> redirigé HORS de l’espace évaluateur', () => {
+    useAuth.mockReturnValue({ status: 'authenticated', role: 'candidat' })
+    renderAtEvaluateur('/evaluateur/mes-dossiers')
+    expect(screen.getByText('espace candidat')).toBeInTheDocument()
+    expect(screen.queryByText('contenu évaluateur')).not.toBeInTheDocument()
+  })
+
+  it('évaluateur sur /evaluateur/* -> accède (ses dossiers)', () => {
+    useAuth.mockReturnValue({ status: 'authenticated', role: 'evaluateur' })
+    renderAtEvaluateur('/evaluateur/mes-dossiers')
+    expect(screen.getByText('contenu évaluateur')).toBeInTheDocument()
+  })
+
+  it('administrateur sur /evaluateur/* -> accède AUSSI (recouvrement)', () => {
+    useAuth.mockReturnValue({ status: 'authenticated', role: 'administrateur' })
+    renderAtEvaluateur('/evaluateur/mes-dossiers')
+    expect(screen.getByText('contenu évaluateur')).toBeInTheDocument()
+  })
+
+  it('évaluateur sur /admin/* -> reste bloqué (le recouvrement n’est PAS symétrique)', () => {
+    useAuth.mockReturnValue({ status: 'authenticated', role: 'evaluateur' })
+    renderAtEvaluateur('/admin/campagnes')
+    expect(screen.queryByText('contenu admin')).not.toBeInTheDocument()
   })
 })

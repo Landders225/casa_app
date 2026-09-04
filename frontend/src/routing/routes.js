@@ -7,15 +7,24 @@ export const paths = {
   candidatureWizard: '/candidat/candidature',
   maCandidature: '/candidat/ma-candidature',
   evaluateur: '/evaluateur',
+  evaluateurDossiers: '/evaluateur/mes-dossiers',
   admin: '/admin',
+}
+
+/** Fiche candidat vue par l'évaluateur — segment dynamique. */
+export function evaluateurDossierPath(id) {
+  return `/evaluateur/candidatures/${id}`
 }
 
 /**
  * Espace d'accueil d'un rôle après connexion / en cas de redirection.
  *
- * NB (Lot 8a) : gardiennage STRICT par rôle principal. Le recouvrement
- * « administrateur ⊇ évaluateur » d'ADR-10 est une règle API ; il sera rebranché
- * côté navigation au Lot 8c quand les écrans d'évaluation arriveront.
+ * NB (Lot 8a, rebranché au Lot 8c-1) : le recouvrement « administrateur ⊇
+ * évaluateur » (ADR-10) est désormais actif aussi côté navigation — un
+ * administrateur peut accéder aux routes /evaluateur/* (cf. App.jsx, roles
+ * ['evaluateur','administrateur']). `roleHome` reste inchangé : l'accueil PAR
+ * DÉFAUT d'un administrateur reste /admin, le recouvrement ne joue que lorsqu'il
+ * navigue explicitement vers l'espace évaluateur.
  */
 export function roleHome(role) {
   switch (role) {

@@ -14,7 +14,7 @@ const NAV_LINKS = {
     dashboard: paths.candidat,
     candidature: paths.maCandidature,
   },
-  evaluateur: { dashboard: paths.evaluateur },
+  evaluateur: { dashboard: paths.evaluateur, 'mes-dossiers': paths.evaluateurDossiers },
   administrateur: { dashboard: paths.admin },
 }
 
@@ -36,15 +36,25 @@ function fullName(profil, fallback) {
  *
  * Lot 8a : la navigation latérale est affichée mais inerte (fidélité visuelle) ;
  * seul le bouton « se déconnecter » est fonctionnel.
+ *
+ * `space` (Lot 8c-1, recouvrement admin⊇évaluateur, ADR-10) : la navigation
+ * affichée dépend d'OÙ l'utilisateur se trouve, pas seulement de QUI il est.
+ * Par défaut elle replie sur `role` (comportement inchangé pour candidat/
+ * évaluateur/admin dans leur propre espace). Un écran évaluateur passe
+ * explicitement `space="evaluateur"` : un administrateur qui y navigue voit donc
+ * la sidebar évaluateur (cohérente avec l'écran affiché), tandis que le pied de
+ * sidebar continue d'afficher son VRAI rôle (« Administrateur ») — l'identité
+ * ne ment jamais, seule la navigation s'adapte au contexte.
  */
-export function AppShell({ title, children }) {
+export function AppShell({ title, space, children }) {
   const { user, role, logout } = useAuth()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const config = navConfig[role] ?? navConfig.candidat
-  const links = NAV_LINKS[role] ?? NAV_LINKS.candidat
+  const navRole = space ?? role
+  const config = navConfig[navRole] ?? navConfig.candidat
+  const links = NAV_LINKS[navRole] ?? NAV_LINKS.candidat
 
   const handleLogout = async () => {
     await logout()
@@ -83,7 +93,11 @@ export function AppShell({ title, children }) {
                     </span>
                   )
                 }
+                // « Mes dossiers » reste actif sur la fiche candidat (route
+                // sœur /evaluateur/candidatures/:id, pas sous /mes-dossiers).
                 const isActive = pathname === href
+                  || pathname.startsWith(`${href}/`)
+                  || (href === paths.evaluateurDossiers && pathname.startsWith('/evaluateur/candidatures/'))
                 return (
                   <Link
                     key={item.key}
