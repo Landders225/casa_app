@@ -117,3 +117,58 @@ describe('ProtectedRoute — recouvrement admin ⊇ évaluateur (Lot 8c-1, ADR-1
     expect(screen.queryByText('contenu admin')).not.toBeInTheDocument()
   })
 })
+
+/**
+ * Lot 8d-1 — /admin/candidatures, /admin/filieres, /admin/campagnes,
+ * /admin/audit sont maintenant de VRAIS écrans (plus un wildcard placeholder) :
+ * chacun est protégé individuellement par `roles={['administrateur']}` dans
+ * App.jsx. Preuve que évaluateur ET candidat en sont rejetés, sur les chemins
+ * CONCRETS (pas seulement le préfixe générique /admin/*).
+ */
+function renderAtAdminScreen(path, screenPath) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route
+          path={screenPath}
+          element={
+            <ProtectedRoute roles={['administrateur']}>
+              <div>contenu admin</div>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/connexion" element={<div>écran de connexion</div>} />
+        <Route path="/candidat" element={<div>espace candidat</div>} />
+        <Route path="/evaluateur" element={<div>espace évaluateur</div>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+describe('ProtectedRoute — écrans admin concrets (Lot 8d-1)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it.each([
+    ['/admin/candidatures', '/admin/candidatures'],
+    ['/admin/filieres', '/admin/filieres'],
+    ['/admin/campagnes', '/admin/campagnes'],
+    ['/admin/audit', '/admin/audit'],
+  ])('évaluateur ET candidat rejetés de %s', (path, screenPath) => {
+    useAuth.mockReturnValue({ status: 'authenticated', role: 'evaluateur' })
+    const { unmount } = renderAtAdminScreen(path, screenPath)
+    expect(screen.getByText('espace évaluateur')).toBeInTheDocument()
+    expect(screen.queryByText('contenu admin')).not.toBeInTheDocument()
+    unmount()
+
+    useAuth.mockReturnValue({ status: 'authenticated', role: 'candidat' })
+    renderAtAdminScreen(path, screenPath)
+    expect(screen.getByText('espace candidat')).toBeInTheDocument()
+    expect(screen.queryByText('contenu admin')).not.toBeInTheDocument()
+  })
+
+  it('administrateur accède aux écrans admin concrets', () => {
+    useAuth.mockReturnValue({ status: 'authenticated', role: 'administrateur' })
+    renderAtAdminScreen('/admin/candidatures', '/admin/candidatures')
+    expect(screen.getByText('contenu admin')).toBeInTheDocument()
+  })
+})

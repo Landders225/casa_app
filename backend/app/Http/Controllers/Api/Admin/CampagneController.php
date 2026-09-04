@@ -4,13 +4,16 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ChangerStatutCampagneRequest;
+use App\Http\Resources\Admin\CampagneResource;
 use App\Models\Campagne;
 use App\Models\JournalAudit;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
- * CAMPAGNES — transitions d'état (Lot 6a) — administrateur strict.
+ * CAMPAGNES — liste (Lot 8d-1) + transitions d'état (Lot 6a) — administrateur strict.
  *
+ *   GET   /api/admin/campagnes                    liste (Lot 8d-1 — comblait D-6a côté lecture)
  *   PATCH /api/admin/campagnes/{campagne}  { statut: 'ouverte' | 'cloturee' }
  *
  * Transitions autorisées : `brouillon → ouverte`, `ouverte → cloturee`. Toute
@@ -29,6 +32,18 @@ class CampagneController extends Controller
         'ouverte' => ['cloturee'],
         'cloturee' => [],
     ];
+
+    /**
+     * Liste blanche (Lot 8d-1) — non paginée (peu de campagnes). Alimente
+     * l'écran de gestion des campagnes et le filtre `?campagne=` de
+     * `GET /admin/candidatures`.
+     */
+    public function index(): AnonymousResourceCollection
+    {
+        $campagnes = Campagne::query()->orderByDesc('date_ouverture')->get();
+
+        return CampagneResource::collection($campagnes);
+    }
 
     public function changerStatut(ChangerStatutCampagneRequest $request, Campagne $campagne): JsonResponse
     {

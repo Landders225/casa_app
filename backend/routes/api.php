@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Admin\CandidatureSupervisionController;
 use App\Http\Controllers\Api\Admin\ClassementController as AdminClassementController;
 use App\Http\Controllers\Api\Admin\CorrectionController;
 use App\Http\Controllers\Api\Admin\EliminationController;
+use App\Http\Controllers\Api\Admin\EvaluateurController as AdminEvaluateurController;
 use App\Http\Controllers\Api\Admin\FiliereController as AdminFiliereController;
 use App\Http\Controllers\Api\Admin\PublicationController;
 use App\Http\Controllers\Api\Admin\RemplacementController;
@@ -101,8 +102,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/candidatures', [CandidatureSupervisionController::class, 'index']);
         // Filières : activation / désactivation.
         Route::patch('/filieres/{filiere}', [AdminFiliereController::class, 'changerStatut']);
-        // Campagnes : transitions d'état (ouvrir / clôturer).
+        // Campagnes : liste (Lot 8d-1) + transitions d'état (ouvrir / clôturer).
+        Route::get('/campagnes', [AdminCampagneController::class, 'index']);
         Route::patch('/campagnes/{campagne}', [AdminCampagneController::class, 'changerStatut']);
+        // Évaluateurs : liste (Lot 8d-1) — sélecteur d'affectation + filtre supervision.
+        Route::get('/evaluateurs', [AdminEvaluateurController::class, 'index']);
         // Journal d'audit : consultation (lecture seule, append-only garanti par le trigger).
         Route::get('/audit', [AuditController::class, 'index']);
 

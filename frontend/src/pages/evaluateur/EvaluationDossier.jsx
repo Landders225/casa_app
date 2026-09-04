@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAuth } from '../../auth/useAuth.js'
 import { AppShell } from '../../components/layout/AppShell.jsx'
 import { Alert } from '../../components/ui/Alert.jsx'
 import { FullPageSpinner } from '../../components/ui/Spinner.jsx'
 import { formatDateFr } from '../../lib/formatDate.js'
-import { evaluateurDossierPath, evaluateurEntretienPath, paths } from '../../routing/routes.js'
+import { evaluateurDossierPath, evaluateurEntretienPath, retourListeLabel, retourListePath } from '../../routing/routes.js'
 import { ConfirmDialog } from './ConfirmDialog.jsx'
 import { EligibilitePanel } from './EligibilitePanel.jsx'
 import './Notation.css'
@@ -36,10 +37,12 @@ import { useFicheCandidat } from './useFicheCandidat.js'
  */
 export function EvaluationDossier() {
   const { id } = useParams()
+  const { role } = useAuth()
   // Identité, lettre MO.04, éligibilité, statut de vérification — déjà fourni
   // par l'endpoint fiche (8c-1), aucun appel réseau supplémentaire nécessaire.
   const { status: ficheStatus, dossier } = useFicheCandidat(id)
   const { status, evaluation, saving, validating, error, save, validate } = useEvaluationDossier(id)
+  const retour = retourListePath(role)
 
   if (ficheStatus === 'loading' || status === 'loading') return <FullPageSpinner />
 
@@ -52,7 +55,7 @@ export function EvaluationDossier() {
           </div>
           <h3>Candidat introuvable</h3>
           <p>Ce dossier n'existe pas ou ne vous est pas affecté.</p>
-          <Link to={paths.evaluateurDossiers} className="btn btn-primary">Retour à la liste</Link>
+          <Link to={retour} className="btn btn-primary">Retour à la liste</Link>
         </div>
       </AppShell>
     )
@@ -69,7 +72,7 @@ export function EvaluationDossier() {
   return (
     <AppShell title="Évaluation du dossier" space="evaluateur">
       <div className="breadcrumbs" style={{ marginBottom: 'var(--space-4)' }}>
-        <Link to={paths.evaluateurDossiers}>Mes dossiers</Link>
+        <Link to={retour}>{retourListeLabel(role)}</Link>
         <span className="sep">/</span>
         <Link to={evaluateurDossierPath(dossier.id)}>{dossier.candidat?.prenom} {dossier.candidat?.nom}</Link>
         <span className="sep">/</span>

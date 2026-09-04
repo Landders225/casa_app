@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAuth } from '../../auth/useAuth.js'
 import { AppShell } from '../../components/layout/AppShell.jsx'
 import { Alert } from '../../components/ui/Alert.jsx'
 import { FullPageSpinner } from '../../components/ui/Spinner.jsx'
 import { formatDateFr } from '../../lib/formatDate.js'
-import { evaluateurDossierPath, evaluateurEvaluationPath, paths } from '../../routing/routes.js'
+import { evaluateurDossierPath, evaluateurEvaluationPath, retourListeLabel, retourListePath } from '../../routing/routes.js'
 import { ConfirmDialog } from './ConfirmDialog.jsx'
 import './Notation.css'
 import { PointPicker } from './PointPicker.jsx'
@@ -36,8 +37,10 @@ const LIEUX_ENTRETIEN = ['Le Plateau', '2 Plateaux Vallons']
  */
 export function Entretien() {
   const { id } = useParams()
+  const { role } = useAuth()
   const { status: ficheStatus, dossier } = useFicheCandidat(id)
   const { status, dossierVerrouille, entretien, saving, validating, error, save, validate } = useEntretien(id)
+  const retour = retourListePath(role)
 
   if (ficheStatus === 'loading' || status === 'loading') return <FullPageSpinner />
 
@@ -50,7 +53,7 @@ export function Entretien() {
           </div>
           <h3>Candidat introuvable</h3>
           <p>Ce dossier n'existe pas ou ne vous est pas affecté.</p>
-          <Link to={paths.evaluateurDossiers} className="btn btn-primary">Retour à la liste</Link>
+          <Link to={retour} className="btn btn-primary">Retour à la liste</Link>
         </div>
       </AppShell>
     )
@@ -67,7 +70,7 @@ export function Entretien() {
   return (
     <AppShell title="Entretien" space="evaluateur">
       <div className="breadcrumbs" style={{ marginBottom: 'var(--space-4)' }}>
-        <Link to={paths.evaluateurDossiers}>Mes dossiers</Link>
+        <Link to={retour}>{retourListeLabel(role)}</Link>
         <span className="sep">/</span>
         <Link to={evaluateurDossierPath(dossier.id)}>{dossier.candidat?.prenom} {dossier.candidat?.nom}</Link>
         <span className="sep">/</span>

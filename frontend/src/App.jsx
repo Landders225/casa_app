@@ -13,7 +13,11 @@ import { Entretien } from './pages/evaluateur/Entretien.jsx'
 import { EvaluateurDashboard } from './pages/evaluateur/EvaluateurDashboard.jsx'
 import { EvaluationDossier } from './pages/evaluateur/EvaluationDossier.jsx'
 import { FicheCandidat } from './pages/evaluateur/FicheCandidat.jsx'
-import { AdminPlaceholder } from './pages/SpacePlaceholder.jsx'
+import { AdminDashboard } from './pages/admin/AdminDashboard.jsx'
+import { Audit } from './pages/admin/Audit.jsx'
+import { Campagnes } from './pages/admin/Campagnes.jsx'
+import { CandidaturesSupervision } from './pages/admin/CandidaturesSupervision.jsx'
+import { Filieres } from './pages/admin/Filieres.jsx'
 import { ProtectedRoute } from './routing/ProtectedRoute.jsx'
 import { RedirectIfAuthed } from './routing/RedirectIfAuthed.jsx'
 import { paths, roleHome } from './routing/routes.js'
@@ -116,10 +120,42 @@ export default function App() {
         }
       />
       <Route
-        path={`${paths.admin}/*`}
+        path={paths.admin}
         element={
           <ProtectedRoute roles={['administrateur']}>
-            <AdminPlaceholder />
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={paths.adminCandidatures}
+        element={
+          <ProtectedRoute roles={['administrateur']}>
+            <CandidaturesSupervision />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={paths.adminFilieres}
+        element={
+          <ProtectedRoute roles={['administrateur']}>
+            <Filieres />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={paths.adminCampagnes}
+        element={
+          <ProtectedRoute roles={['administrateur']}>
+            <Campagnes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={paths.adminAudit}
+        element={
+          <ProtectedRoute roles={['administrateur']}>
+            <Audit />
           </ProtectedRoute>
         }
       />

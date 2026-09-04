@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAuth } from '../../auth/useAuth.js'
 import { AppShell } from '../../components/layout/AppShell.jsx'
 import { Alert } from '../../components/ui/Alert.jsx'
 import { FullPageSpinner } from '../../components/ui/Spinner.jsx'
 import { formatDateFr } from '../../lib/formatDate.js'
-import { evaluateurEntretienPath, evaluateurEvaluationPath, paths } from '../../routing/routes.js'
+import { evaluateurEntretienPath, evaluateurEvaluationPath, retourListeLabel, retourListePath } from '../../routing/routes.js'
 import { EligibilitePanel } from './EligibilitePanel.jsx'
 import './FicheCandidat.css'
 import { useFicheCandidat } from './useFicheCandidat.js'
@@ -108,8 +109,10 @@ function PieceLink({ label, piece }) {
 
 export function FicheCandidat() {
   const { id } = useParams()
+  const { role } = useAuth()
   const { status, dossier, saving, verifError, updateVerification } = useFicheCandidat(id)
   const [tab, setTab] = useState('profil')
+  const retour = retourListePath(role)
 
   if (status === 'loading') return <FullPageSpinner />
 
@@ -122,7 +125,7 @@ export function FicheCandidat() {
           </div>
           <h3>Candidat introuvable</h3>
           <p>Ce dossier n'existe pas ou ne vous est pas affecté.</p>
-          <Link to={paths.evaluateurDossiers} className="btn btn-primary">Retour à la liste</Link>
+          <Link to={retour} className="btn btn-primary">Retour à la liste</Link>
         </div>
       </AppShell>
     )
@@ -143,7 +146,7 @@ export function FicheCandidat() {
   return (
     <AppShell title="Fiche candidat" space="evaluateur">
       <div className="breadcrumbs" style={{ marginBottom: 'var(--space-4)' }}>
-        <Link to={paths.evaluateurDossiers}>Mes dossiers</Link>
+        <Link to={retour}>{retourListeLabel(role)}</Link>
         <span className="sep">/</span>
         <span>{dossier.candidat?.prenom} {dossier.candidat?.nom}</span>
       </div>

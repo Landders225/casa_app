@@ -15,7 +15,13 @@ const NAV_LINKS = {
     candidature: paths.maCandidature,
   },
   evaluateur: { dashboard: paths.evaluateur, 'mes-dossiers': paths.evaluateurDossiers },
-  administrateur: { dashboard: paths.admin },
+  administrateur: {
+    dashboard: paths.admin,
+    candidatures: paths.adminCandidatures,
+    cqp: paths.adminFilieres,
+    campagnes: paths.adminCampagnes,
+    audit: paths.adminAudit,
+  },
 }
 
 function initials(profil) {

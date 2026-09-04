@@ -9,6 +9,10 @@ export const paths = {
   evaluateur: '/evaluateur',
   evaluateurDossiers: '/evaluateur/mes-dossiers',
   admin: '/admin',
+  adminCandidatures: '/admin/candidatures',
+  adminFilieres: '/admin/filieres',
+  adminCampagnes: '/admin/campagnes',
+  adminAudit: '/admin/audit',
 }
 
 /** Fiche candidat vue par l'évaluateur — segment dynamique. */
@@ -24,6 +28,22 @@ export function evaluateurEvaluationPath(id) {
 /** Entretien /35 (Lot 8c-2) — segment dynamique. */
 export function evaluateurEntretienPath(id) {
   return `/evaluateur/candidatures/${id}/entretien`
+}
+
+/**
+ * Retour depuis la fiche/notation évaluateur (Lot 8d-1) — CONTINUITÉ de
+ * navigation : un administrateur en recouvrement (ADR-10) qui a ouvert un
+ * dossier depuis `/admin/candidatures` doit y revenir, pas atterrir dans
+ * l'espace évaluateur qui n'est pas le sien (Étape 1, Q5). Pour un évaluateur,
+ * inchangé : `/evaluateur/mes-dossiers`.
+ */
+export function retourListePath(role) {
+  return role === 'administrateur' ? paths.adminCandidatures : paths.evaluateurDossiers
+}
+
+/** Libellé assorti à `retourListePath` — affiché dans la même logique. */
+export function retourListeLabel(role) {
+  return role === 'administrateur' ? 'Candidatures' : 'Mes dossiers'
 }
 
 /**
