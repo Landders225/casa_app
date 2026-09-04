@@ -1,0 +1,194 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useAuth } from '../../../auth/useAuth.js'
+import { apiClient } from '../../../lib/apiClient.js'
+import { ApiError } from '../../../lib/ApiError.js'
+import { EvaluationDossier } from '../EvaluationDossier.jsx'
+
+vi.mock('../../../lib/apiClient.js', () => ({ apiClient: { get: vi.fn(), put: vi.fn(), post: vi.fn() } }))
+vi.mock('../../../auth/useAuth.js', () => ({ useAuth: vi.fn() }))
+
+function dossier(over = {}) {
+  return {
+    id: 'c-1',
+    numero_dossier: 'CASA-2026-000001',
+    statut_interne: 'en_instruction',
+    statut_eligibilite_interne: 'eligible',
+    dossier_verrouille: false,
+    filiere: { id: 'f1', code: 'cuisine', nom: 'Agent de cuisine' },
+    candidat: { id: 'cand-1', prenom: 'Awa', nom: 'Konan', ville_residence: 'Abidjan - Cocody' },
+    reponses: { mo04_lettre_motivation: 'Je souhaite intégrer ce programme.' },
+    experiences: [],
+    pieces_dossier: [],
+    verification: { nationalite_confirmee: true, diplome_verifie: 'bepc', verifie_le: '2026-06-10T09:00:00Z', verifie_par: null },
+    criteres_eliminatoires: [],
+    ...over,
+  }
+}
+
+function evaluationApercu(over = {}) {
+  return {
+    verrouille: false,
+    source: 'apercu',
+    grille: { version: 1, label: 'Grille 2026' },
+    mo04_note_etoiles: null,
+    commentaire_evaluateur: null,
+    score_total: '18.5',
+    volet_max: 65,
+    rubriques: [
+      { code: 'scolaire', label: 'Scolaire', score_obtenu: '6.0000', max: 15 },
+      { code: 'socioEco', label: 'Socio-éco', score_obtenu: '3.0000', max: 10 },
+      { code: 'experience', label: 'Expérience', score_obtenu: '2.0000', max: 10 },
+      { code: 'langues', label: 'Langues', score_obtenu: '4.5000', max: 10 },
+      { code: 'motivation', label: 'Motivation', score_obtenu: '0.0000', max: 15 },
+      { code: 'disponibilite', label: 'Disponibilité', score_obtenu: '3.0000', max: 5 },
+    ],
+    valide_le: null,
+    valide_par: null,
+    ...over,
+  }
+}
+
+function evaluationSnapshot(over = {}) {
+  return evaluationApercu({
+    verrouille: true,
+    source: 'snapshot',
+    mo04_note_etoiles: 4,
+    score_total: '52.0',
+    valide_le: '2026-06-15T10:00:00Z',
+    valide_par: { id: 'm1', prenom: 'Solange', nom: "N'Dri" },
+    ...over,
+  })
+}
+
+function mockGet(dossierData, evaluationData) {
+  apiClient.get.mockImplementation((path) => {
+    if (path.endsWith('/evaluation')) return Promise.resolve({ data: evaluationData })
+    return Promise.resolve({ data: dossierData })
+  })
+}
+
+function renderScreen(id = 'c-1') {
+  return render(
+    <MemoryRouter initialEntries={[`/evaluateur/candidatures/${id}/evaluation`]}>
+      <Routes>
+        <Route path="/evaluateur/candidatures/:id/evaluation" element={<EvaluationDossier />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  useAuth.mockReturnValue({ user: { profil: { prenom: 'Solange', nom: "N'Dri" } }, role: 'evaluateur', logout: vi.fn() })
+})
+afterEach(() => vi.restoreAllMocks())
+
+describe('EvaluationDossier — le score AFFICHÉ vient toujours de la réponse API', () => {
+  it("l'aperçu (total, max, détail par rubrique) est celui du GET, rien de calculé", async () => {
+    mockGet(dossier(), evaluationApercu())
+    renderScreen()
+
+    expect(await screen.findByText('18.5')).toBeInTheDocument()
+    expect(screen.getByText('/ 65')).toBeInTheDocument()
+    expect(screen.getByText('Scolaire')).toBeInTheDocument()
+    expect(screen.getByText('6.0/15')).toBeInTheDocument()
+    expect(screen.getByText('Je souhaite intégrer ce programme.')).toBeInTheDocument()
+  })
+
+  it('saisie étoiles + commentaire -> PUT -> le nouvel aperçu renvoyé par le PUT est affiché', async () => {
+    mockGet(dossier(), evaluationApercu())
+    apiClient.put.mockResolvedValueOnce({
+      data: evaluationApercu({ mo04_note_etoiles: 3, commentaire_evaluateur: 'Motivation sincère.', score_total: '25.5' }),
+    })
+    renderScreen()
+    await screen.findByText('18.5')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '3 étoiles' }))
+    await user.type(screen.getByPlaceholderText(/observations de l'évaluateur/i), 'Motivation sincère.')
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() => expect(apiClient.put).toHaveBeenCalledTimes(1))
+    expect(apiClient.put).toHaveBeenCalledWith('/evaluateur/candidatures/c-1/evaluation', {
+      mo04_note_etoiles: 3,
+      commentaire_evaluateur: 'Motivation sincère.',
+    })
+    expect(await screen.findByText('25.5')).toBeInTheDocument()
+    expect(screen.getByText('Brouillon enregistré.')).toBeInTheDocument()
+  })
+})
+
+describe('EvaluationDossier — verrouillage visuel RÉEL après validation (ADR-04)', () => {
+  it('valider -> fieldset nativement désactivé, boutons remplacés par la bannière, snapshot affiché', async () => {
+    mockGet(dossier(), evaluationApercu({ mo04_note_etoiles: 4 }))
+    apiClient.post.mockResolvedValueOnce({ data: evaluationSnapshot() })
+    renderScreen()
+    await screen.findByText('18.5')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Valider définitivement' }))
+    await user.click(screen.getByRole('button', { name: 'Valider' }))
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledTimes(1))
+    expect(apiClient.post).toHaveBeenCalledWith('/evaluateur/candidatures/c-1/evaluation/validation')
+
+    expect(await screen.findByText('🔒 ÉVALUATION VALIDÉE')).toBeInTheDocument()
+    expect(screen.getByText('52.0')).toBeInTheDocument()
+    // Le score affiché est le SNAPSHOT figé renvoyé par la validation, pas un recalcul.
+    expect(screen.queryByRole('button', { name: 'Enregistrer' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Valider définitivement' })).not.toBeInTheDocument()
+
+    // Tentative d'édition après verrouillage : les champs sont NATIVEMENT désactivés (fieldset), pas juste grisés en CSS.
+    expect(screen.getByRole('button', { name: '3 étoiles' })).toBeDisabled()
+    expect(screen.getByPlaceholderText(/observations de l'évaluateur/i)).toHaveAttribute('readonly')
+
+    // Le lien vers l'entretien est proposé une fois le dossier verrouillé.
+    expect(screen.getByRole('link', { name: /entretien/i })).toBeInTheDocument()
+  })
+
+  it('422 serveur à la validation (précondition rejouée) -> message affiché, écran reste déverrouillé', async () => {
+    mockGet(dossier(), evaluationApercu({ mo04_note_etoiles: 4 }))
+    apiClient.post.mockRejectedValueOnce(
+      new ApiError('validation', { status: 422, message: 'La note de motivation (MO.04) doit être saisie avant la validation définitive.' }),
+    )
+    renderScreen()
+    await screen.findByText('18.5')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Valider définitivement' }))
+    await user.click(screen.getByRole('button', { name: 'Valider' }))
+
+    expect(await screen.findByText(/la note de motivation \(mo\.04\) doit être saisie/i)).toBeInTheDocument()
+    expect(screen.queryByText('🔒 ÉVALUATION VALIDÉE')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Valider définitivement' })).toBeInTheDocument()
+  })
+})
+
+describe('EvaluationDossier — préconditions reflétées côté UI', () => {
+  it('vérification incomplète -> "Valider" désactivé + message explicite', async () => {
+    mockGet(dossier({ verification: { nationalite_confirmee: true, diplome_verifie: null, verifie_le: null, verifie_par: null } }), evaluationApercu({ mo04_note_etoiles: 4 }))
+    renderScreen()
+    await screen.findByText('18.5')
+
+    expect(screen.getByText(/la vérification du dossier.*doit être complétée/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Valider définitivement' })).toBeDisabled()
+  })
+
+  it('note MO.04 absente -> "Valider" désactivé (précondition backend miroir)', async () => {
+    mockGet(dossier(), evaluationApercu({ mo04_note_etoiles: null }))
+    renderScreen()
+    await screen.findByText('18.5')
+    expect(screen.getByRole('button', { name: 'Valider définitivement' })).toBeDisabled()
+  })
+
+  it("dossier non « en_instruction » -> formulaire non modifiable (miroir du 409 backend)", async () => {
+    mockGet(dossier({ statut_interne: 'soumis' }), evaluationApercu())
+    renderScreen()
+    await screen.findByText('18.5')
+    expect(screen.getByText(/n'est pas \(ou plus\) « en cours d'instruction »/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Enregistrer' })).not.toBeInTheDocument()
+  })
+})

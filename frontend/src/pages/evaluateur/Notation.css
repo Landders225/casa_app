@@ -1,0 +1,156 @@
+/* Notation dossier /65 + entretien /35 (Lot 8c-2) — transcrit du bloc <style>
+   commun à App_maquette/pages/evaluator/evaluation.html et entretien.html.
+   Les classes du design system restent dans src/styles/. */
+
+.eval-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (max-width: 1080px) {
+  .eval-layout {
+    grid-template-columns: 1fr;
+  }
+}
+/* Même gotcha grid que .fiche-layout (Lot 8c-1) : min-width: 0 sur l'enfant
+   pour ne pas laisser un contenu large forcer la grille à déborder. */
+.eval-layout > * {
+  min-width: 0;
+}
+
+.eval-sticky {
+  position: sticky;
+  top: calc(var(--topbar-h) + var(--space-4));
+}
+
+.rubrique-card {
+  margin-bottom: var(--space-6);
+}
+.rubrique-card .rc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+.rc-score {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--casa-primary-700);
+}
+
+.sc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-bottom: 1px dashed var(--casa-border);
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.sc-row:last-child {
+  border-bottom: none;
+}
+
+.score-gauge-wrap {
+  text-align: center;
+  padding: var(--space-4) 0 var(--space-6);
+}
+.score-ring {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  margin: 0 auto;
+}
+.score-ring svg {
+  transform: rotate(-90deg);
+}
+.score-ring .val {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-bar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-caption);
+  padding: 6px 0;
+}
+.mini-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--casa-bg-alt);
+  border-radius: var(--radius-full);
+  margin: 0 var(--space-3);
+  overflow: hidden;
+}
+.mini-bar-fill {
+  height: 100%;
+  background: var(--casa-primary-600);
+  transition: width 0.3s var(--ease-out);
+}
+
+.star-select {
+  display: flex;
+  gap: 6px;
+}
+.star-select button {
+  font-size: 1.4rem;
+  color: var(--casa-border-strong);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+}
+.star-select button.is-active {
+  color: var(--casa-accent-500);
+}
+.star-select button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.presence-toggle {
+  display: flex;
+  gap: var(--space-3);
+}
+.presence-toggle button {
+  flex: 1;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--casa-border);
+  background: var(--casa-surface);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-standard);
+}
+.presence-toggle button.is-present.is-selected {
+  border-color: var(--casa-success-500);
+  background: var(--casa-success-100);
+  color: var(--casa-success-700);
+}
+.presence-toggle button.is-absent.is-selected {
+  border-color: var(--casa-danger-500);
+  background: var(--casa-danger-100);
+  color: var(--casa-danger-700);
+}
+.presence-toggle button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.lock-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--casa-success-100);
+  color: var(--casa-success-700);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  font-weight: 700;
+}

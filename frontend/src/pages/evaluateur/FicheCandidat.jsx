@@ -4,17 +4,16 @@ import { AppShell } from '../../components/layout/AppShell.jsx'
 import { Alert } from '../../components/ui/Alert.jsx'
 import { FullPageSpinner } from '../../components/ui/Spinner.jsx'
 import { formatDateFr } from '../../lib/formatDate.js'
-import { paths } from '../../routing/routes.js'
+import { evaluateurEntretienPath, evaluateurEvaluationPath, paths } from '../../routing/routes.js'
+import { EligibilitePanel } from './EligibilitePanel.jsx'
 import './FicheCandidat.css'
 import { useFicheCandidat } from './useFicheCandidat.js'
 import { VerificationForm } from './VerificationForm.jsx'
 import {
   DI02_CONTRAINTES,
-  ELIGIBILITE_LABELS,
   EXPERIENCE_DOMAINES,
   EXPERIENCE_DUREES,
   NIVEAUX,
-  ORIGINE_LABELS,
   PIECES_DOSSIER,
   SC02_CLASSE,
   SE01_VIT_AVEC,
@@ -37,7 +36,9 @@ import {
  * recalculée ici (contrairement à `fiche-candidat.html` de la maquette, qui
  * appelle `checkCriteresEliminatoires` côté navigateur — on NE reproduit PAS ça).
  *
- * Pas d'onglet Évaluation/Entretien, aucun score affiché (Lot 8c-2).
+ * La notation (dossier /65, entretien /35 — Lot 8c-2) est un ÉCRAN DÉDIÉ, pas
+ * un onglet de plus ici : les boutons d'en-tête y renvoient. Aucun score n'est
+ * calculé ou affiché sur CETTE fiche.
  */
 
 const TABS = [
@@ -102,46 +103,6 @@ function PieceLink({ label, piece }) {
         <i className="fa-solid fa-download" aria-hidden="true" /> Télécharger
       </span>
     </a>
-  )
-}
-
-function EligibilitePanel({ dossier }) {
-  const info = ELIGIBILITE_LABELS[dossier.statut_eligibilite_interne] ?? {
-    label: dossier.statut_eligibilite_interne,
-    badge: 'badge-neutral',
-  }
-  const criteres = dossier.criteres_eliminatoires || []
-
-  return (
-    <div className="card">
-      <h3 style={{ marginBottom: 'var(--space-4)' }}>
-        <i className="fa-solid fa-shield-halved" style={{ color: 'var(--casa-primary-600)' }} aria-hidden="true" />{' '}
-        Éligibilité
-      </h3>
-      <span className={`badge ${info.badge} badge-lg`} style={{ marginBottom: 'var(--space-4)', display: 'inline-block' }}>
-        {info.label}
-      </span>
-
-      {dossier.statut_eligibilite_interne === 'non_eligible' ? (
-        <Alert variant="danger" title="Critère(s) éliminatoire(s) déclenché(s)">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-            {criteres.map((c) => (
-              <div className="body-sm" key={`${c.code_critere}-${c.declenche_le}`}>
-                <strong>{c.code_critere}</strong> — {c.detail}
-                <div className="caption" style={{ marginTop: 2 }}>
-                  <span className="badge badge-neutral">{ORIGINE_LABELS[c.origine] ?? c.origine}</span>{' '}
-                  {formatDateFr(c.declenche_le)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Alert>
-      ) : dossier.statut_eligibilite_interne === 'eligible' ? (
-        <Alert variant="success">Aucun critère éliminatoire détecté.</Alert>
-      ) : (
-        <Alert variant="info">Éligibilité non encore vérifiée.</Alert>
-      )}
-    </div>
   )
 }
 
@@ -210,6 +171,17 @@ export function FicheCandidat() {
               </span>
             ) : null}
           </div>
+        </div>
+
+        <div className="flex gap-2" style={{ flexWrap: 'wrap', marginTop: 'var(--space-4)' }}>
+          <Link to={evaluateurEvaluationPath(dossier.id)} className="btn btn-outline btn-sm">
+            {dossier.dossier_verrouille ? 'Revoir l’évaluation' : 'Noter le dossier'}
+          </Link>
+          {dossier.dossier_verrouille ? (
+            <Link to={evaluateurEntretienPath(dossier.id)} className="btn btn-outline btn-sm">
+              <i className="fa-solid fa-comments" aria-hidden="true" /> Entretien
+            </Link>
+          ) : null}
         </div>
       </div>
 

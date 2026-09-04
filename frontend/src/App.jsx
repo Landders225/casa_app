@@ -9,7 +9,9 @@ import { CandidatDashboard } from './pages/candidat/CandidatDashboard.jsx'
 import { CandidatureWizard } from './pages/candidat/CandidatureWizard.jsx'
 import { MaCandidature } from './pages/candidat/MaCandidature.jsx'
 import { DossiersList } from './pages/evaluateur/DossiersList.jsx'
+import { Entretien } from './pages/evaluateur/Entretien.jsx'
 import { EvaluateurDashboard } from './pages/evaluateur/EvaluateurDashboard.jsx'
+import { EvaluationDossier } from './pages/evaluateur/EvaluationDossier.jsx'
 import { FicheCandidat } from './pages/evaluateur/FicheCandidat.jsx'
 import { AdminPlaceholder } from './pages/SpacePlaceholder.jsx'
 import { ProtectedRoute } from './routing/ProtectedRoute.jsx'
@@ -86,6 +88,22 @@ export default function App() {
         element={
           <ProtectedRoute roles={['evaluateur', 'administrateur']}>
             <FicheCandidat />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/evaluateur/candidatures/:id/evaluation"
+        element={
+          <ProtectedRoute roles={['evaluateur', 'administrateur']}>
+            <EvaluationDossier />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/evaluateur/candidatures/:id/entretien"
+        element={
+          <ProtectedRoute roles={['evaluateur', 'administrateur']}>
+            <Entretien />
           </ProtectedRoute>
         }
       />

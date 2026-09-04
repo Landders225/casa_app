@@ -16,6 +16,16 @@ export function evaluateurDossierPath(id) {
   return `/evaluateur/candidatures/${id}`
 }
 
+/** Notation du dossier /65 (Lot 8c-2) — segment dynamique. */
+export function evaluateurEvaluationPath(id) {
+  return `/evaluateur/candidatures/${id}/evaluation`
+}
+
+/** Entretien /35 (Lot 8c-2) — segment dynamique. */
+export function evaluateurEntretienPath(id) {
+  return `/evaluateur/candidatures/${id}/entretien`
+}
+
 /**
  * Espace d'accueil d'un rôle après connexion / en cas de redirection.
  *
