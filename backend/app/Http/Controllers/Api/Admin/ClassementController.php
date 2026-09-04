@@ -29,13 +29,16 @@ use Illuminate\Support\Facades\DB;
  *  - un `non_eligible` évalué (dossier + entretien) reçoit `non_retenu` +
  *    `motif_interne = 'non éligible'` (🔴), `rang = null` (D-5a-4) ;
  *  - RIEN ne fuit au candidat : aucune `publication` n'est créée ici,
- *    `StatutPublicResolver` est inchangé (toujours « en_cours_de_traitement »).
+ *    `StatutPublicResolver` est inchangé (toujours « en_cours_de_traitement ») ;
+ *  - `publie` (bool) reflète l'existence d'une `publication` pour la campagne ;
+ *    si publié, `publiee_le`/`publiee_par` (Lot 8d-2, Étape 1 Q3) accompagnent —
+ *    liste blanche : le NOM de l'auteur, jamais son e-mail — pour que l'écran
+ *    admin affiche la traçabilité de l'acte même après un rechargement de page
+ *    (la réponse de `POST .../publier` ne survit pas à un F5).
  */
 class ClassementController extends Controller
 {
-    public function __construct(private readonly ServiceClassement $classement)
-    {
-    }
+    public function __construct(private readonly ServiceClassement $classement) {}
 
     public function calculer(Request $request, Campagne $campagne): ClassementResource
     {
@@ -136,7 +139,7 @@ class ClassementController extends Controller
      */
     private function etat(Campagne $campagne, ?string $filiereCode = null): array
     {
-        $campagne->loadMissing('filieres');
+        $campagne->loadMissing(['filieres', 'publication.publiePar']);
 
         $decisions = DecisionCandidature::query()
             ->whereIn(
@@ -176,7 +179,15 @@ class ClassementController extends Controller
             'version_algorithme' => ServiceClassement::VERSION,
             'liste_attente_taille' => ServiceClassement::TAILLE_LISTE_ATTENTE,
             'calcule' => $decisions->isNotEmpty(),
-            'publie' => $campagne->publication()->exists(),
+            'publie' => $campagne->publication !== null,
+            // Traçabilité de l'acte notarial (Lot 8d-2, Étape 1 Q3) : survit au
+            // rechargement de la page, contrairement à la seule réponse du POST
+            // .../publier. Liste blanche : le NOM de l'auteur, jamais son e-mail.
+            'publiee_le' => $campagne->publication?->publiee_le?->toIso8601String(),
+            'publiee_par' => $campagne->publication?->publiePar ? [
+                'prenom' => $campagne->publication->publiePar->prenom,
+                'nom' => $campagne->publication->publiePar->nom,
+            ] : null,
             'filieres' => $filieres,
         ];
     }

@@ -153,6 +153,9 @@ describe('ProtectedRoute — écrans admin concrets (Lot 8d-1)', () => {
     ['/admin/filieres', '/admin/filieres'],
     ['/admin/campagnes', '/admin/campagnes'],
     ['/admin/audit', '/admin/audit'],
+    // Lot 8d-2 — la zone la plus confidentielle du système (rang, score final,
+    // motif interne) : mêmes gardes que les autres écrans admin.
+    ['/admin/classement/camp-1', '/admin/classement/:campagneId'],
   ])('évaluateur ET candidat rejetés de %s', (path, screenPath) => {
     useAuth.mockReturnValue({ status: 'authenticated', role: 'evaluateur' })
     const { unmount } = renderAtAdminScreen(path, screenPath)

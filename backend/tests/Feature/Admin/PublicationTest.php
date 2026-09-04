@@ -18,7 +18,9 @@ class PublicationTest extends TestCase
     use RefreshDatabase;
 
     private Campagne $campagne;
+
     private User $admin;
+
     private User $evaluateur;
 
     protected function setUp(): void
@@ -105,6 +107,38 @@ class PublicationTest extends TestCase
             $this->actingAs($intrus)->postJson($this->url())->assertStatus(403);
         }
         $this->assertDatabaseCount('publication', 0);
+    }
+
+    public function test_get_classement_expose_publiee_le_et_publiee_par_apres_publication_lot_8d2(): void
+    {
+        $this->candidatureEvaluee($this->campagne, $this->evaluateur, 'cuisine', 60.0, 30.0);
+        $this->calculer();
+
+        // Avant publication : absents (pas de F5-proof à donner puisqu'il n'y a
+        // encore rien à tracer).
+        $this->actingAs($this->admin)->getJson("/api/admin/campagnes/{$this->campagne->id}/classement")
+            ->assertOk()
+            ->assertJsonPath('data.publie', false)
+            ->assertJsonPath('data.publiee_le', null)
+            ->assertJsonPath('data.publiee_par', null);
+
+        $this->actingAs($this->admin)->postJson($this->url())->assertOk();
+
+        // Après publication : un DEUXIÈME appel GET indépendant (simule un
+        // rechargement de page, pas la réponse du POST elle-même) doit encore
+        // exposer la traçabilité — c'est tout le point de l'ajout (Étape 1 Q3).
+        $reponse = $this->actingAs($this->admin)->getJson("/api/admin/campagnes/{$this->campagne->id}/classement")
+            ->assertOk()
+            ->assertJsonPath('data.publie', true)
+            ->assertJsonPath('data.publiee_par.prenom', 'Admin')
+            ->assertJsonPath('data.publiee_par.nom', 'Test');
+        $this->assertNotNull($reponse->json('data.publiee_le'));
+
+        // Liste blanche : le NOM, jamais l'e-mail de l'auteur.
+        $this->assertStringNotContainsString('admin@casa-demo.ci', $reponse->getContent());
+        $this->assertArrayHasKey('prenom', $reponse->json('data.publiee_par'));
+        $this->assertArrayHasKey('nom', $reponse->json('data.publiee_par'));
+        $this->assertSame(['prenom', 'nom'], array_keys($reponse->json('data.publiee_par')));
     }
 
     public function test_publier_sans_membre_equipe_422(): void

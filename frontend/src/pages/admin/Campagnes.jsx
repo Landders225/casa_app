@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { AppShell } from '../../components/layout/AppShell.jsx'
 import { Alert } from '../../components/ui/Alert.jsx'
 import { Spinner } from '../../components/ui/Spinner.jsx'
 import { formatDateFr } from '../../lib/formatDate.js'
+import { adminClassementPath } from '../../routing/routes.js'
 import { ConfirmDialog } from './ConfirmDialog.jsx'
 import { useCampagnes } from './useCampagnes.js'
 
@@ -102,6 +104,9 @@ export function Campagnes() {
                     Clôturer la campagne
                   </button>
                 ) : null}
+                <Link to={adminClassementPath(c.id)} className="btn btn-outline btn-sm">
+                  Voir le classement
+                </Link>
               </div>
             </div>
           ))}

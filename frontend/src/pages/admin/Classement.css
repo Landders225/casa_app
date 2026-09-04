@@ -1,0 +1,48 @@
+/* Classement & publication (Lot 8d-2) — transcrit du bloc <style> de
+   App_maquette/pages/admin/classement.html, + `.lock-banner` DUPLIQUÉ de
+   pages/evaluateur/Notation.css (même règle, même raison que `ConfirmDialog.jsx`
+   côté JS : les arbres candidat/évaluateur/admin restent étanches, y compris
+   pour du CSS — cf. noBridge.test.js). Les classes du design system restent
+   dans src/styles/. */
+
+.medal {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: var(--fs-caption);
+}
+.medal.gold {
+  background: linear-gradient(145deg, #ffd873, #e0a82e);
+  color: #5c3d00;
+}
+.medal.silver {
+  background: linear-gradient(145deg, #e7ecef, #b9c2c9);
+  color: #3a4147;
+}
+.medal.bronze {
+  background: linear-gradient(145deg, #e3a97a, #c17726);
+  color: #4a2c0d;
+}
+
+.decision-row.retenu {
+  background: var(--casa-success-100);
+}
+.decision-row.liste_attente {
+  background: var(--casa-warning-100);
+}
+
+.lock-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--casa-success-100);
+  color: var(--casa-success-700);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  font-weight: 700;
+}

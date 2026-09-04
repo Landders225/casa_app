@@ -13,6 +13,12 @@ export const paths = {
   adminFilieres: '/admin/filieres',
   adminCampagnes: '/admin/campagnes',
   adminAudit: '/admin/audit',
+  adminClassement: '/admin/classement',
+}
+
+/** Classement d'une campagne (Lot 8d-2) — segment dynamique. */
+export function adminClassementPath(campagneId) {
+  return `/admin/classement/${campagneId}`
 }
 
 /** Fiche candidat vue par l'évaluateur — segment dynamique. */
