@@ -7,6 +7,7 @@ import { HomePage } from './pages/public/HomePage.jsx'
 import { InscriptionPage } from './pages/public/InscriptionPage.jsx'
 import { CandidatDashboard } from './pages/candidat/CandidatDashboard.jsx'
 import { CandidatureWizard } from './pages/candidat/CandidatureWizard.jsx'
+import { MaCandidature } from './pages/candidat/MaCandidature.jsx'
 import { AdminPlaceholder, EvaluateurPlaceholder } from './pages/SpacePlaceholder.jsx'
 import { ProtectedRoute } from './routing/ProtectedRoute.jsx'
 import { RedirectIfAuthed } from './routing/RedirectIfAuthed.jsx'
@@ -50,6 +51,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={['candidat']}>
             <CandidatureWizard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={paths.maCandidature}
+        element={
+          <ProtectedRoute roles={['candidat']}>
+            <MaCandidature />
           </ProtectedRoute>
         }
       />

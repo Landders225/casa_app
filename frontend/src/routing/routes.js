@@ -5,6 +5,7 @@ export const paths = {
   inscription: '/inscription',
   candidat: '/candidat',
   candidatureWizard: '/candidat/candidature',
+  maCandidature: '/candidat/ma-candidature',
   evaluateur: '/evaluateur',
   admin: '/admin',
 }

@@ -85,6 +85,20 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
+   Navigation latérale — entrées non encore branchées (Lots 8c/8d).
+   Elles restent visibles (fidélité maquette) mais ne doivent PAS paraître
+   cliquables : atténuées, curseur par défaut, pas d'effet de survol.
+--------------------------------------------------------------------------- */
+.sidebar-link.is-inert {
+  opacity: 0.45;
+  cursor: default;
+}
+.sidebar-link.is-inert:hover {
+  background: transparent;
+  color: var(--casa-secondary-300);
+}
+
+/* ---------------------------------------------------------------------------
    Chargement plein écran (boot de l'app pendant GET /api/me).
 --------------------------------------------------------------------------- */
 .app-boot {

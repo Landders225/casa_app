@@ -237,6 +237,41 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 
 ---
 
+## ADR-20 — Frontend : suivi & résultat candidat (Lot 8b-3)
+
+**Contexte.** On termine l'espace candidat : le **suivi** de la candidature puis, après publication, l'**affichage du résultat**. C'est l'écran où la **règle reine** (règle non négociable 1, contexte §14-17) se joue côté UI — `ma-candidature.html` de la maquette la **viole** doublement (bannière « Candidature non éligible » l.78-79, et un timeline granulaire l.50-72 qui expose chaque jalon interne).
+
+**Décision.**
+- **Un seul écran `MaCandidature`** (`/candidat/ma-candidature`) + **dashboard** complété, tous deux alimentés par le hook `useMaCandidature()` qui consomme `GET /api/candidature` et **n'expose que 9 primitives d'affichage** (`statutPublic`, `decision`, `motifCommunicable`, `numeroDossier`, `dateSoumission`, `filiereNom`, `campagneNom`, `piecesCount`, `status`), **copiées telles quelles** — aucune dérivation. `reponses` / `experiences` / `classement` (pourtant dans le payload) ne sont **pas** remontés. `StatutPublicResolver` a déjà tout fait côté serveur (ADR-03).
+- **Rendu conditionnel par `statut_public` SEUL** :
+  - `brouillon` (ou 404) → empty-state + CTA vers le wizard ;
+  - `en_cours_de_traitement` → **une** phrase neutre (« Votre dossier suit son cours. Le résultat vous sera communiqué à l'issue du processus de sélection. »), rien d'autre — pas d'« un évaluateur regarde votre dossier » ;
+  - `decision_publiee` → bannière **résultat** par `decision` : `retenu` (félicitations + filière), `liste_attente` (attente), `non_retenu` (+ `motif_communicable` s'il existe, **sinon** message générique **FIXE côté client** `MESSAGE_NON_RETENU_GENERIQUE`), `indisponible` (**D-8b3-3** : nouveau — « Votre candidature a été clôturée. Votre place n'a pas pu être maintenue. […] »). `decision` inattendue (`null`/inconnue) → repli défensif sur le message générique de non-retenue.
+- **Stepper « Suivi » = 4 étapes coarse** (`Compte créé` · `Dossier soumis` · `En traitement` · `Résultat`), état dérivé **uniquement** de `statut_public` (**D-8b3-1**). On **ne reproduit PAS** le timeline `Vérification d'éligibilité` / `Instruction` / `Évaluation` / `Entretien` / badge « Non conforme » : chaque jalon trahirait la position interne dans le workflow, autant que la bannière « non éligible ».
+- **On ne reproduit PAS** la bannière « Candidature non éligible » (**D-8b3-2**, D-5b-1 déjà acté) : un `non_retenu` est un `non_retenu`, qu'il vienne d'un non-éligible interne ou d'un manque de places. Le backend rend déjà les deux réponses **byte-identiques** ; l'UI ne lit que `decision` + `motif_communicable`, elle ne peut donc pas réintroduire la distinction.
+- **Tout le texte affiché vient d'un `switch` PUR** (`resultatMessages.js`) sur `(statutPublic, decision)` → une constante. Zéro arithmétique, zéro seuil, aucun mot d'éligibilité/score/évaluation dans le JSX.
+- **Dashboard SOBRE** (**D-8b3-5**) : la maquette calcule une barre `progression %` depuis `statut_interne` — retirée. Un « 66 % qui stagne » inquiète ou fait sur-interpréter ; le stepper communique l'avancement honnêtement. On garde les infos factuelles neutres (badge statut, Documents X/6, filière).
+- **Nav latérale** : l'entrée « Ma candidature » devient un vrai lien ; les entrées non branchées (`.sidebar-link.is-inert`) sont **atténuées, curseur par défaut, sans survol** — elles ne doivent pas paraître cliquables (**D-8b3, Q2**).
+- **Récapitulatif** : Numéro / Date de soumission / Filière / Cohorte (`campagne.nom`) / Documents X/6. Bouton « Voir mes documents » de la maquette **retiré** (**D-8b3-6** : pas d'écran documents au périmètre).
+- **Pas de card « Notifications récentes »** (**D-8b3-4**) : aucune API notifications (point ouvert connu).
+
+**Comment la non-fuite est garantie (et testée).**
+1. Le hook n'expose que des primitives, copiées de l'API.
+2. Le rendu est un `switch` pur ; le message générique de non-retenue est une **constante client**.
+3. Le stepper ne lit que `statut_public`, pas de branche `is-rejected`.
+4. **Test Vitest de non-fuite** : pour **chaque** `statut_public × decision × (motif|null)` — y compris avec un payload sali (`statut_interne`, `motif_interne`, `rang`, `score_total` injectés) — `container.textContent` ne matche **aucun** de `/score|rang|barème|éligib|évaluat|note|\/(35|65|100)|points?|pondér|non_eligible|statut_interne|motif_interne/i`.
+5. **Test d'indiscernabilité** : `non_retenu` + `motif_communicable:null` avec vs sans champs internes parasites → `container.innerHTML` **strictement identique**. Les deux `non_retenu` (issu d'un non-éligible / ordinaire) produisent le **même DOM**.
+
+**Conséquence.** **Backend strictement inchangé.** Preuve : `vitest` **109 tests** (dont `MaCandidature.test.jsx` — un par `statut_public`, un par `decision`, non-fuite `it.each` sur 8 combos, indiscernabilité DOM ; `resultatMessages.test.js` ; `useMaCandidature.test.js` ; `CandidatDashboard.test.jsx` étendu), E2E `suivi-candidature.spec.js` (base jetable `migrate:fresh` avant/après ; `en cours de traitement` → phrase neutre + 0 jalon interne ; `retenu` / `non_retenu` après publication ; le `non_retenu` d'un non-éligible rendu identiquement), captures `suivi-{en-cours,retenu,non-retenu}` en 390 / 1280, smoke `smoke8b3.sh` (`GET /api/candidature` dans les 3 états, réponse sans `rang` / `motif_interne` / `statut_interne` / `score` même après avoir sali la base ; `non_retenu`-issu-de-non-éligible byte-identique à un `non_retenu` ordinaire).
+
+**Note bundle.** Les termes « éligibilité » / « égalité de score » présents dans le bundle proviennent de la **vitrine publique** (`HomePage`, critères d'élimination + FAQ — Lot 8b-1, formulation déjà arbitrée à l'ADR-18) et de `routes.js`/`navConfig` (`evaluateur`) — **pas** des écrans de suivi, dont le DOM rendu est vérifié propre par le test de non-fuite.
+
+**⚠️ POINT OUVERT INSTITUTIONNEL.** La formulation de **tous les textes candidats** de `resultatMessages.js` (résultats retenu / liste d'attente / non-retenue générique / clôture `indisponible`) relève d'une décision de **communication** — à faire **relire par les partenaires (CCI-CI / FADV / AICS) avant mise en production**, au même titre que les FAQ publiques du Lot 8b-1.
+
+**Divergences maquette.** D-8b3-1 (timeline granulaire non reproduit), D-8b3-2 (« non éligible » non reproduit), D-8b3-3 (`indisponible` : message neuf), D-8b3-4 (pas de notifications), D-8b3-5 (pas de barre %), D-8b3-6 (pas de bouton « documents »).
+
+---
+
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)
 
 - ~~**Lot inscription / profil candidat** (self-service, état civil, choix de filière)~~ — **livré au Lot 7** (`POST /api/register`, `GET|PATCH /api/candidat/profil`, cf. ADR-16).

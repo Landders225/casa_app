@@ -1,8 +1,22 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth.js'
-import { paths, roleHome } from '../../routing/routes.js'
+import { paths } from '../../routing/routes.js'
 import { navConfig, roleLabel } from './navConfig.js'
+
+/**
+ * Entrées de navigation RÉELLEMENT branchées, par rôle et par clé `navConfig`.
+ * Les autres entrées restent affichées (fidélité maquette) mais inertes — elles
+ * ne doivent pas paraître cliquables (cf. `.sidebar-link.is-inert`).
+ */
+const NAV_LINKS = {
+  candidat: {
+    dashboard: paths.candidat,
+    candidature: paths.maCandidature,
+  },
+  evaluateur: { dashboard: paths.evaluateur },
+  administrateur: { dashboard: paths.admin },
+}
 
 function initials(profil) {
   const p = (profil?.prenom || '').trim()
@@ -26,9 +40,11 @@ function fullName(profil, fallback) {
 export function AppShell({ title, children }) {
   const { user, role, logout } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const config = navConfig[role] ?? navConfig.candidat
+  const links = NAV_LINKS[role] ?? NAV_LINKS.candidat
 
   const handleLogout = async () => {
     await logout()
@@ -51,32 +67,33 @@ export function AppShell({ title, children }) {
           {config.sections.map((section, si) => (
             <div key={section.title ?? si}>
               <div className="sidebar-section-label">{section.title ?? config.label}</div>
-              {section.items.map((item, ii) => {
-                // Le tableau de bord est la seule entrée navigable pour l'instant ;
-                // les autres écrans arrivent aux sous-lots suivants.
-                const active = si === 0 && ii === 0
-                if (active) {
+              {section.items.map((item) => {
+                const href = links[item.key]
+                // Entrées non branchées : affichées (fidélité maquette) mais
+                // INERTES — pas de curseur pointer, état atténué (.is-inert).
+                if (!href) {
                   return (
-                    <Link
+                    <span
                       key={item.key}
-                      to={roleHome(role)}
-                      className="sidebar-link is-active"
-                      aria-current="page"
-                      onClick={() => setSidebarOpen(false)}
+                      className="sidebar-link is-inert"
+                      aria-disabled="true"
+                      title="Écran à venir"
                     >
                       <i className={`fa-solid ${item.icon}`} aria-hidden="true" /> {item.label}
-                    </Link>
+                    </span>
                   )
                 }
+                const isActive = pathname === href
                 return (
-                  <span
+                  <Link
                     key={item.key}
-                    className="sidebar-link"
-                    aria-disabled="true"
-                    title="Écran à venir"
+                    to={href}
+                    className={`sidebar-link${isActive ? ' is-active' : ''}`}
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={() => setSidebarOpen(false)}
                   >
                     <i className={`fa-solid ${item.icon}`} aria-hidden="true" /> {item.label}
-                  </span>
+                  </Link>
                 )
               })}
             </div>
