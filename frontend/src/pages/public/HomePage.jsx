@@ -347,7 +347,7 @@ export function HomePage() {
               </span>
               <h2 style={{ marginTop: 'var(--space-4)' }}>Critères pouvant entraîner une élimination</h2>
               <p style={{ marginTop: 'var(--space-3)' }}>
-                Ces points sont contrôlés automatiquement à la soumission de votre dossier, ou lors de la
+                Ces critères sont contrôlés automatiquement à la soumission de votre dossier, ou lors de la
                 vérification de vos pièces justificatives.
               </p>
             </div>

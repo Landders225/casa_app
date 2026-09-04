@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { AppShell } from '../../components/layout/AppShell.jsx'
 import { Alert } from '../../components/ui/Alert.jsx'
 import { Spinner } from '../../components/ui/Spinner.jsx'
 import { useAuth } from '../../auth/useAuth.js'
 import { apiClient } from '../../lib/apiClient.js'
 import { ApiError } from '../../lib/ApiError.js'
+import { paths } from '../../routing/routes.js'
 
 const STATUT_LABEL = {
   brouillon: { label: 'Brouillon', badge: 'badge-neutral' },
@@ -91,17 +93,25 @@ export function CandidatDashboard() {
                 </span>
                 <div style={{ flex: 1 }}>
                   <div className="fw-semibold body-lg">
-                    {candidature ? 'Suivre ma candidature' : 'Compléter mon dossier'}
+                    {candidature && candidature.statut_public !== 'brouillon'
+                      ? 'Suivre ma candidature'
+                      : candidature
+                        ? 'Reprendre mon dossier'
+                        : 'Compléter mon dossier'}
                   </div>
                   <div className="text-muted body-sm">
-                    {candidature
+                    {candidature && candidature.statut_public !== 'brouillon'
                       ? 'Votre dossier suit son cours. Le résultat vous sera communiqué à l\'issue du processus de sélection.'
-                      : 'Le formulaire de candidature (choix de la filière, informations, justificatifs) sera disponible très prochainement.'}
+                      : 'Formulaire guidé : filière, profil, expériences, justificatifs, puis soumission.'}
                   </div>
                 </div>
-                <button type="button" className="btn btn-primary" disabled>
-                  {candidature ? 'Suivre' : 'Bientôt disponible'}
-                </button>
+                {candidature && candidature.statut_public !== 'brouillon' ? (
+                  <button type="button" className="btn btn-primary" disabled>Suivre</button>
+                ) : (
+                  <Link to={paths.candidatureWizard} className="btn btn-primary">
+                    {candidature ? 'Reprendre' : 'Commencer'}
+                  </Link>
+                )}
               </div>
 
               <h4 style={{ margin: 'var(--space-8) 0 var(--space-4)' }}>Mon parcours de candidature</h4>

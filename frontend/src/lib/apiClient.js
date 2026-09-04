@@ -57,8 +57,9 @@ function toApiError(res, body) {
   }
 }
 
-async function send(method, path, body, { retriedCsrf = false } = {}) {
+async function send(method, path, body, { retriedCsrf = false, isForm = false } = {}) {
   const isMutating = MUTATING.has(method)
+  const hasBody = body !== undefined
 
   if (isMutating) {
     await ensureCsrfCookie({ force: retriedCsrf })
@@ -69,7 +70,9 @@ async function send(method, path, body, { retriedCsrf = false } = {}) {
     const token = readXsrfToken()
     if (token) headers['X-XSRF-TOKEN'] = token
   }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  // Multipart (upload) : on ne fixe PAS Content-Type — le navigateur ajoute la
+  // frontière `boundary` lui-même.
+  if (hasBody && !isForm) headers['Content-Type'] = 'application/json'
 
   let res
   try {
@@ -77,7 +80,7 @@ async function send(method, path, body, { retriedCsrf = false } = {}) {
       method,
       credentials: 'include',
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: hasBody ? (isForm ? body : JSON.stringify(body)) : undefined,
     })
   } catch {
     throw new ApiError('network', { message: 'Impossible de contacter le serveur.' })
@@ -85,7 +88,7 @@ async function send(method, path, body, { retriedCsrf = false } = {}) {
 
   // Jeton CSRF expiré : on renouvelle le cookie et on retente une seule fois.
   if (res.status === 419 && isMutating && !retriedCsrf) {
-    return send(method, path, body, { retriedCsrf: true })
+    return send(method, path, body, { retriedCsrf: true, isForm })
   }
 
   const parsed = await parseBody(res)
@@ -100,4 +103,6 @@ export const apiClient = {
   put: (path, body) => send('PUT', path, body ?? {}),
   patch: (path, body) => send('PATCH', path, body ?? {}),
   del: (path) => send('DELETE', path, undefined),
+  /** Upload multipart. `form` est un FormData (champ `fichier` pour les pièces). */
+  postForm: (path, form) => send('POST', path, form, { isForm: true }),
 }

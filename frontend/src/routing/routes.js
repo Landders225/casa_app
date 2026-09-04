@@ -4,6 +4,7 @@ export const paths = {
   login: '/connexion',
   inscription: '/inscription',
   candidat: '/candidat',
+  candidatureWizard: '/candidat/candidature',
   evaluateur: '/evaluateur',
   admin: '/admin',
 }

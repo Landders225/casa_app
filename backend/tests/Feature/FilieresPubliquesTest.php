@@ -28,17 +28,21 @@ class FilieresPubliquesTest extends TestCase
             ->assertJsonCount(5, 'data');
     }
 
-    public function test_liste_blanche_stricte_des_4_champs_verts(): void
+    public function test_liste_blanche_stricte_des_champs_verts(): void
     {
         $reponse = $this->getJson('/api/filieres')->assertOk();
 
         foreach ($reponse->json('data') as $ligne) {
-            $this->assertSame(['code', 'nom', 'description', 'actif'], array_keys($ligne));
+            // `id` ajouté au Lot 8b-2 : nécessaire au frontend candidat pour
+            // POST /api/candidatures et PUT .../classement ; c'est un UUID de
+            // filière, déjà exposé au candidat authentifié — pas un secret.
+            $this->assertSame(['id', 'code', 'nom', 'description', 'actif'], array_keys($ligne));
+            $this->assertIsString($ligne['id']);
         }
 
-        // Aucune donnée du modèle interne.
+        // Aucune donnée INTERNE (quota, icône, timestamps) ni de campagne.
         $body = $reponse->getContent();
-        foreach (['"id"', 'quota', 'campagne', 'created_at', 'updated_at', 'icone'] as $interdit) {
+        foreach (['quota', 'campagne', 'created_at', 'updated_at', 'icone'] as $interdit) {
             $this->assertStringNotContainsString($interdit, $body);
         }
     }

@@ -11,8 +11,9 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  * Filières — `GET /api/filieres` (Lot 6a). PREMIÈRE ROUTE PUBLIQUE du projet
  * (hors `auth:sanctum`) : le catalogue des CQP pour le site vitrine.
  *
- * `FiliereResource` = liste blanche stricte des 4 champs 🟢. Une filière
- * `actif = false` reste listée (le front affiche « Actuellement fermé »).
+ * `FiliereResource` = liste blanche 🟢 (`id` + code/nom/description/actif ;
+ * `id` ajouté au Lot 8b-2 — cf. la Resource). Une filière `actif = false` reste
+ * listée (le front affiche « Actuellement fermé »).
  */
 class FiliereController extends Controller
 {

@@ -1,0 +1,131 @@
+/* Styles du formulaire de candidature — transcrits de
+   App_maquette/pages/candidate/candidature.html (bloc <style>).
+   Les classes du design system restent dans src/styles/. */
+
+.form-shell {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.step-progress-head {
+  margin-bottom: var(--space-8);
+}
+.step-dots {
+  display: flex;
+  gap: 6px;
+  margin-top: var(--space-3);
+}
+.step-dots span {
+  height: 5px;
+  flex: 1;
+  border-radius: var(--radius-full);
+  background: var(--casa-border-strong);
+}
+.step-dots span.is-done {
+  background: var(--casa-primary-600);
+}
+.step-dots span.is-current {
+  background: var(--casa-primary-400);
+}
+
+/* Classement (motivation) */
+.rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rank-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--casa-border);
+  border-radius: var(--radius-md);
+  background: var(--casa-surface);
+  cursor: grab;
+}
+.rank-item.is-dragging {
+  opacity: 0.5;
+  border-style: dashed;
+  border-color: var(--casa-primary-500);
+}
+.rank-item .rank-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--casa-primary-100);
+  color: var(--casa-primary-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--fs-caption);
+  flex-shrink: 0;
+}
+.rank-item .rank-actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-2);
+}
+/* Seul mécanisme de réordonnancement fonctionnel au toucher : cible tactile
+   explicite ≥ 44px (le drag & drop HTML5 n'est pas déclenchable sur mobile). */
+.rank-item .rank-actions .btn-icon {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
+/* Échelle segmentée Langues / Informatique : cible ≥ 44px + repli 2×2 sous
+   ~420px pour que « Intermédiaire » / « Élémentaire » tiennent sur une ligne. */
+.form-shell .segmented {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.form-shell .segmented button {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 420px) {
+  .form-shell .segmented button {
+    flex: 1 1 calc(50% - 4px);
+  }
+}
+
+/* Récapitulatif */
+.recap-section {
+  margin-bottom: var(--space-6);
+}
+.recap-section h4 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+  gap: var(--space-3);
+}
+.recap-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--casa-border);
+  font-size: var(--fs-body-sm);
+  gap: var(--space-4);
+}
+.recap-row span:first-child {
+  color: var(--casa-text-secondary);
+}
+.recap-row span:last-child {
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Ligne fichier vide : bouton « Déposer » qui reste accessible sur petit écran */
+@media (max-width: 380px) {
+  .file-row {
+    flex-wrap: wrap;
+  }
+  .file-row .btn-sm {
+    flex: 1 1 100%;
+  }
+}
