@@ -278,3 +278,167 @@ describe('Classement — état « déjà publié » : consultation stricte', () 
     expect(screen.queryByRole('button', { name: 'Motif' })).not.toBeInTheDocument()
   })
 })
+
+describe('Classement — remplacement (Lot 8d-3, post-publication uniquement)', () => {
+  const filierePublieeAvecAttente = (over = {}) => classementData({
+    publie: true,
+    publiee_le: '2026-06-15T10:00:00Z',
+    publiee_par: { prenom: 'Admin', nom: 'Test' },
+    filieres: [{
+      filiere: { code: 'cuisine', nom: 'Agent de cuisine' },
+      quota: 1, retenus: 1, liste_attente: 1, non_retenus: 0,
+      lignes: [
+        ligne({ candidature_id: 'c-retenu', decision: 'retenu' }),
+        ligne({ candidature_id: 'c-attente', decision: 'liste_attente', numero_dossier: 'CASA-2026-000002', rang: 2, candidat: { prenom: 'Yao', nom: 'Bamba', sexe: 'M', ville_residence: 'Abidjan - Yopougon' } }),
+      ],
+    }],
+    ...over,
+  })
+
+  it('précondition : « Déclarer indisponible » seulement sur une ligne "retenu" une fois publié', async () => {
+    // Non publié -> aucun bouton de remplacement, même sur un "retenu".
+    mockGet(classementData())
+    renderScreen()
+    await screen.findByText('Awa Konan')
+    expect(screen.queryByRole('button', { name: /déclarer indisponible/i })).not.toBeInTheDocument()
+  })
+
+  it('publié + retenu -> le bouton apparaît ; publié + liste_attente -> pas de bouton de remplacement', async () => {
+    mockGet(filierePublieeAvecAttente())
+    renderScreen()
+    await screen.findByText('Awa Konan')
+    expect(screen.getAllByRole('button', { name: /déclarer indisponible/i })).toHaveLength(1)
+  })
+
+  it('ouvre le modal -> montre le candidat promu (aperçu, "sous réserve") AVANT confirmation', async () => {
+    mockGet(filierePublieeAvecAttente())
+    renderScreen()
+    await screen.findByText('Awa Konan')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /déclarer indisponible/i }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Déclarer indisponible' })
+    expect(within(dialog).getByText(/action irréversible/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/awa konan.*passera de « retenu » à « indisponible »/i)).toBeInTheDocument()
+    // Le candidat promu affiché est une LECTURE du 1er `liste_attente` déjà trié serveur — PAS un recalcul.
+    expect(within(dialog).getByText(/sera promu « retenu » \(sous réserve\)/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/yao bamba/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/rang 2 en liste d'attente/i)).toBeInTheDocument()
+  })
+
+  it('aucun candidat en liste d’attente -> message explicite, personne annoncé comme promu', async () => {
+    mockGet(filierePublieeAvecAttente({
+      filieres: [{
+        filiere: { code: 'cuisine', nom: 'Agent de cuisine' },
+        quota: 1, retenus: 1, liste_attente: 0, non_retenus: 0,
+        lignes: [ligne({ candidature_id: 'c-retenu', decision: 'retenu' })],
+      }],
+    }))
+    renderScreen()
+    await screen.findByText('Awa Konan')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /déclarer indisponible/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Déclarer indisponible' })
+    expect(within(dialog).getByText(/aucun candidat en liste d'attente.*personne ne sera promu/i)).toBeInTheDocument()
+  })
+
+  it('motif obligatoire (bouton bloqué < 3 caractères), confirmation -> POST /remplacements -> résultat RÉEL affiché (pas l’aperçu) -> re-GET', async () => {
+    mockGet(filierePublieeAvecAttente())
+    renderScreen()
+    await screen.findByText('Awa Konan')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /déclarer indisponible/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Déclarer indisponible' })
+    const confirmBtn = within(dialog).getByRole('button', { name: /confirmer le remplacement/i })
+    expect(confirmBtn).toBeDisabled()
+    await user.type(within(dialog).getByLabelText(/motif/i), 'De')
+    expect(confirmBtn).toBeDisabled()
+    await user.type(within(dialog).getByLabelText(/motif/i), 'sistement')
+    expect(confirmBtn).toBeEnabled()
+
+    apiClient.post.mockResolvedValueOnce({ data: { indisponible: 'CASA-2026-000001', promu: 'CASA-2026-000002' } })
+    // Le re-GET après le POST reflète l'état réel (sortant indisponible, promu retenu).
+    mockGet(classementData({
+      publie: true, publiee_le: '2026-06-15T10:00:00Z', publiee_par: { prenom: 'Admin', nom: 'Test' },
+      filieres: [{
+        filiere: { code: 'cuisine', nom: 'Agent de cuisine' },
+        quota: 1, retenus: 1, liste_attente: 0, non_retenus: 0,
+        lignes: [
+          ligne({ candidature_id: 'c-retenu', decision: 'indisponible' }),
+          ligne({ candidature_id: 'c-attente', decision: 'retenu', numero_dossier: 'CASA-2026-000002', rang: 2, candidat: { prenom: 'Yao', nom: 'Bamba', sexe: 'M', ville_residence: 'Abidjan - Yopougon' } }),
+        ],
+      }],
+    }))
+    await user.click(confirmBtn)
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/remplacements', { candidature_id: 'c-retenu', motif: 'Desistement' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // Le résultat RÉEL (réponse POST), pas l'aperçu :
+    expect(await screen.findByText(/remplacement effectué : casa-2026-000001 → indisponible ; casa-2026-000002 → retenu/i)).toBeInTheDocument()
+    expect(screen.getByText('Yao Bamba')).toBeInTheDocument()
+    // Le sortant affiche un libellé dédié (pas un statut brut ni un des 3 codes de décision existants).
+    expect(screen.getByText('Indisponible')).toBeInTheDocument()
+    // La ligne du sortant est devenue terminale : plus de bouton de remplacement dessus
+    // (le nouveau retenu Yao, lui, en a désormais un — c'est sa ligne qui devient éligible au remplacement).
+    const ligneSortant = screen.getByRole('row', { name: /awa konan/i })
+    expect(within(ligneSortant).queryByRole('button', { name: /déclarer indisponible/i })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('row', { name: /yao bamba/i })).getByRole('button', { name: /déclarer indisponible/i })).toBeInTheDocument()
+  })
+
+  it('aucun promu (réponse POST promu:null) -> message "aucun candidat en liste d’attente à promouvoir"', async () => {
+    mockGet(filierePublieeAvecAttente())
+    renderScreen()
+    await screen.findByText('Awa Konan')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /déclarer indisponible/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Déclarer indisponible' })
+    await user.type(within(dialog).getByLabelText(/motif/i), 'Désistement tardif')
+
+    apiClient.post.mockResolvedValueOnce({ data: { indisponible: 'CASA-2026-000001', promu: null } })
+    mockGet(filierePublieeAvecAttente())
+    await user.click(within(dialog).getByRole('button', { name: /confirmer le remplacement/i }))
+
+    expect(await screen.findByText(/aucun candidat en liste d'attente à promouvoir/i)).toBeInTheDocument()
+  })
+
+  it('422 backend (déjà indisponible / pas de publication) -> message affiché verbatim, le modal reste ouvert', async () => {
+    mockGet(filierePublieeAvecAttente())
+    apiClient.post.mockRejectedValueOnce(
+      new ApiError('validation', { status: 422, message: "Ce candidat n'est pas actuellement retenu : aucun remplacement possible." }),
+    )
+    renderScreen()
+    await screen.findByText('Awa Konan')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /déclarer indisponible/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Déclarer indisponible' })
+    await user.type(within(dialog).getByLabelText(/motif/i), 'Motif suffisant')
+    await user.click(within(dialog).getByRole('button', { name: /confirmer le remplacement/i }))
+
+    expect(await screen.findByText(/aucun remplacement possible/i)).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Déclarer indisponible' })).toBeInTheDocument()
+  })
+
+  it('RÈGLE REINE : le résultat affiché ne porte que des numéros de dossier — jamais un rang ou un score (rien à fuiter)', async () => {
+    // La non-fuite CÔTÉ CANDIDAT est garantie serveur (Lot 6b, prouvée par smoke curl :
+    // le sortant voit "indisponible", le promu voit "retenu", sans rang/score/mention du
+    // remplacement) — cette assertion couvre le volet front : même la bannière ADMIN,
+    // affichée à l'issue du POST, ne réintroduit ni rang ni score dans son libellé.
+    mockGet(filierePublieeAvecAttente())
+    renderScreen()
+    await screen.findByText('Awa Konan')
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /déclarer indisponible/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Déclarer indisponible' })
+    await user.type(within(dialog).getByLabelText(/motif/i), 'Motif suffisant')
+    apiClient.post.mockResolvedValueOnce({ data: { indisponible: 'CASA-2026-000001', promu: 'CASA-2026-000002' } })
+    mockGet(filierePublieeAvecAttente())
+    await user.click(within(dialog).getByRole('button', { name: /confirmer le remplacement/i }))
+    const banniere = await screen.findByText(/remplacement effectué/i)
+    expect(banniere.textContent).not.toMatch(/rang|score/i)
+  })
+})

@@ -243,3 +243,67 @@ describe('Entretien — verrouillage visuel RÉEL après validation (ADR-04)', (
     within(pr01Group).getAllByRole('button').forEach((btn) => expect(btn).toBeDisabled())
   })
 })
+
+describe('Entretien — correction exceptionnelle (Lot 8d-3, administrateur uniquement)', () => {
+  it('précondition : le bouton n’apparaît que verrouillé + administrateur', async () => {
+    mockGet(dossier(), entretienApercu({ presence: 'present' })) // non verrouillé
+    renderScreen()
+    await screen.findByRole('heading', { name: 'Présentation', level: 3 })
+    expect(screen.queryByRole('button', { name: /correction exceptionnelle/i })).not.toBeInTheDocument()
+  })
+
+  it('évaluateur (non admin) : même verrouillé, aucun bouton de correction', async () => {
+    mockGet(dossier(), entretienSnapshot())
+    renderScreen()
+    await screen.findByText('🔒 ENTRETIEN VALIDÉ')
+    expect(screen.queryByRole('button', { name: /correction exceptionnelle/i })).not.toBeInTheDocument()
+  })
+
+  it('admin + verrouillé -> bannière "vous rouvrez un entretien validé", motif obligatoire, POST puis re-GET entretien', async () => {
+    useAuth.mockReturnValue({ user: { profil: { prenom: 'Admin', nom: 'Test' } }, role: 'administrateur', logout: vi.fn() })
+    mockGet(dossier(), entretienSnapshot())
+    renderScreen()
+    await screen.findByText('🔒 ENTRETIEN VALIDÉ')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /correction exceptionnelle/i }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Correction exceptionnelle — entretien' })
+    expect(within(dialog).getByText(/vous rouvrez un entretien validé/i)).toBeInTheDocument()
+
+    const confirmBtn = within(dialog).getByRole('button', { name: 'Enregistrer la correction' })
+    expect(confirmBtn).toBeDisabled() // motif obligatoire, réellement bloquant
+    await user.type(within(dialog).getByLabelText(/motif de la correction/i), 'Points recomptés après réécoute')
+    expect(confirmBtn).toBeEnabled()
+
+    apiClient.post.mockResolvedValueOnce({ data: { numero_dossier: 'CASA-2026-000001', score_entretien: '30.0', champs_modifies: ['PR.01'] } })
+    mockGet(dossier(), entretienSnapshot({ score_total: '30.0' }))
+    await user.click(confirmBtn)
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith(
+      '/admin/candidatures/c-1/correction/entretien',
+      expect.objectContaining({ motif: 'Points recomptés après réécoute' }),
+    ))
+    expect(await screen.findByText('30.0')).toBeInTheDocument() // le nouveau snapshot rechargé, pas la réponse POST
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('409 (campagne déjà publiée) -> message backend affiché verbatim, le modal reste ouvert', async () => {
+    useAuth.mockReturnValue({ user: { profil: { prenom: 'Admin', nom: 'Test' } }, role: 'administrateur', logout: vi.fn() })
+    mockGet(dossier(), entretienSnapshot())
+    apiClient.post.mockRejectedValueOnce(
+      new ApiError('http', { status: 409, message: 'Les résultats de cette campagne sont déjà publiés : plus aucune correction possible.' }),
+    )
+    renderScreen()
+    await screen.findByText('🔒 ENTRETIEN VALIDÉ')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /correction exceptionnelle/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Correction exceptionnelle — entretien' })
+    await user.type(within(dialog).getByLabelText(/motif de la correction/i), 'Motif suffisant')
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer la correction' }))
+
+    expect(await screen.findByText(/déjà publiés.*plus aucune correction possible/i)).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Correction exceptionnelle — entretien' })).toBeInTheDocument()
+  })
+})

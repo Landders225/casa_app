@@ -7,7 +7,7 @@ import { apiClient } from '../../../lib/apiClient.js'
 import { ApiError } from '../../../lib/ApiError.js'
 import { FicheCandidat } from '../FicheCandidat.jsx'
 
-vi.mock('../../../lib/apiClient.js', () => ({ apiClient: { get: vi.fn(), put: vi.fn() } }))
+vi.mock('../../../lib/apiClient.js', () => ({ apiClient: { get: vi.fn(), put: vi.fn(), post: vi.fn() } }))
 vi.mock('../../../auth/useAuth.js', () => ({ useAuth: vi.fn() }))
 
 function dossier(over = {}) {
@@ -160,5 +160,69 @@ describe('FicheCandidat — vérification : reflet EN DIRECT de la Resource fra�
     await user.click(screen.getByRole('button', { name: 'Vérification' }))
     expect(screen.getByText(/n'est modifiable que lorsque le dossier est/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /enregistrer la vérification/i })).toBeDisabled()
+  })
+})
+
+describe('FicheCandidat — élimination manuelle (Lot 8d-3, administrateur uniquement)', () => {
+  it('évaluateur (non admin) : aucun bouton « Éliminer ce dossier »', async () => {
+    apiClient.get.mockResolvedValueOnce({ data: dossier() })
+    renderFiche()
+    await screen.findByRole('heading', { name: 'Awa Konan' })
+    expect(screen.queryByRole('button', { name: /éliminer ce dossier/i })).not.toBeInTheDocument()
+  })
+
+  it('admin : bouton désactivé si déjà non éligible (précondition reflétée)', async () => {
+    useAuth.mockReturnValue({ user: { profil: { prenom: 'Admin', nom: 'Test' } }, role: 'administrateur', logout: vi.fn() })
+    apiClient.get.mockResolvedValueOnce({ data: dossier({ statut_eligibilite_interne: 'non_eligible' }) })
+    renderFiche()
+    await screen.findByRole('heading', { name: 'Awa Konan' })
+    expect(screen.getByRole('button', { name: /éliminer ce dossier/i })).toBeDisabled()
+  })
+
+  it('admin : motif obligatoire (bouton bloqué en dessous de 3 caractères), succès -> POST puis rechargement de la fiche', async () => {
+    useAuth.mockReturnValue({ user: { profil: { prenom: 'Admin', nom: 'Test' } }, role: 'administrateur', logout: vi.fn() })
+    apiClient.get.mockResolvedValueOnce({ data: dossier() })
+    renderFiche()
+    await screen.findByRole('heading', { name: 'Awa Konan' })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /éliminer ce dossier/i }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Éliminer ce dossier ?' })
+    expect(within(dialog).getByText(/sera marqué non éligible.*irréversible/i)).toBeInTheDocument()
+    const confirmBtn = within(dialog).getByRole('button', { name: 'Éliminer' })
+    expect(confirmBtn).toBeDisabled()
+    await user.type(within(dialog).getByLabelText(/motif/i), 'ok')
+    expect(confirmBtn).toBeDisabled()
+    await user.type(within(dialog).getByLabelText(/motif/i), ' pièce falsifiée')
+    expect(confirmBtn).toBeEnabled()
+
+    apiClient.post.mockResolvedValueOnce({ data: { numero_dossier: 'CASA-2026-000001', statut_eligibilite_interne: 'non_eligible' } })
+    apiClient.get.mockResolvedValueOnce({ data: dossier({ statut_eligibilite_interne: 'non_eligible' }) })
+    await user.click(confirmBtn)
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith(
+      '/admin/candidatures/c-1/elimination',
+      { motif: 'ok pièce falsifiée' },
+    ))
+    expect(await screen.findByText('Non éligible')).toBeInTheDocument() // panneau Éligibilité rechargé
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('422 (motif jugé insuffisant côté backend) -> message affiché verbatim, le modal reste ouvert', async () => {
+    useAuth.mockReturnValue({ user: { profil: { prenom: 'Admin', nom: 'Test' } }, role: 'administrateur', logout: vi.fn() })
+    apiClient.get.mockResolvedValueOnce({ data: dossier() })
+    apiClient.post.mockRejectedValueOnce(new ApiError('validation', { status: 422, message: 'Le motif doit contenir au moins 3 caractères.' }))
+    renderFiche()
+    await screen.findByRole('heading', { name: 'Awa Konan' })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /éliminer ce dossier/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Éliminer ce dossier ?' })
+    await user.type(within(dialog).getByLabelText(/motif/i), 'Motif suffisant')
+    await user.click(within(dialog).getByRole('button', { name: 'Éliminer' }))
+
+    expect(await screen.findByText(/le motif doit contenir au moins 3 caractères/i)).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Éliminer ce dossier ?' })).toBeInTheDocument()
   })
 })

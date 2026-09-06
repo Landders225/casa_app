@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -190,5 +190,75 @@ describe('EvaluationDossier — préconditions reflétées côté UI', () => {
     await screen.findByText('18.5')
     expect(screen.getByText(/n'est pas \(ou plus\) « en cours d'instruction »/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Enregistrer' })).not.toBeInTheDocument()
+  })
+})
+
+describe('EvaluationDossier — correction exceptionnelle (Lot 8d-3, administrateur uniquement)', () => {
+  it('précondition : le bouton n’apparaît que verrouillé + administrateur', async () => {
+    mockGet(dossier(), evaluationApercu({ mo04_note_etoiles: 4 })) // non verrouillé
+    renderScreen()
+    await screen.findByText('18.5')
+    expect(screen.queryByRole('button', { name: /correction exceptionnelle/i })).not.toBeInTheDocument()
+  })
+
+  it('évaluateur (non admin) : même verrouillée, aucun bouton de correction', async () => {
+    mockGet(dossier(), evaluationSnapshot())
+    renderScreen()
+    await screen.findByText('🔒 ÉVALUATION VALIDÉE')
+    expect(screen.queryByRole('button', { name: /correction exceptionnelle/i })).not.toBeInTheDocument()
+  })
+
+  it('admin + verrouillée -> bannière "vous rouvrez une évaluation validée", motif obligatoire, POST puis re-GET (dossier + évaluation)', async () => {
+    useAuth.mockReturnValue({ user: { profil: { prenom: 'Admin', nom: 'Test' } }, role: 'administrateur', logout: vi.fn() })
+    mockGet(dossier(), evaluationSnapshot())
+    renderScreen()
+    await screen.findByText('🔒 ÉVALUATION VALIDÉE')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /correction exceptionnelle/i }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Correction exceptionnelle — dossier' })
+    expect(within(dialog).getByText(/vous rouvrez une évaluation validée/i)).toBeInTheDocument()
+
+    // Motif obligatoire : le bouton de confirmation reste désactivé tant que < 3 caractères.
+    const confirmBtn = within(dialog).getByRole('button', { name: 'Enregistrer la correction' })
+    expect(confirmBtn).toBeDisabled()
+    await user.type(within(dialog).getByLabelText(/motif de la correction/i), 'ok')
+    expect(confirmBtn).toBeDisabled()
+    await user.type(within(dialog).getByLabelText(/motif de la correction/i), ' diplôme réexaminé')
+    expect(confirmBtn).toBeEnabled()
+
+    apiClient.post.mockResolvedValueOnce({
+      data: { numero_dossier: 'CASA-2026-000001', score_dossier: '48.0', statut_eligibilite_interne: 'eligible', champs_modifies: ['mo04_note_etoiles'] },
+    })
+    // Après le POST, l'écran recharge dossier + évaluation via `reload()` (forme différente de la réponse POST).
+    mockGet(dossier(), evaluationSnapshot({ mo04_note_etoiles: 2, score_total: '48.0' }))
+    await user.click(confirmBtn)
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith(
+      '/admin/candidatures/c-1/correction/dossier',
+      expect.objectContaining({ motif: expect.stringContaining('diplôme réexaminé') }),
+    ))
+    expect(await screen.findByText('48.0')).toBeInTheDocument() // le nouveau snapshot rechargé, pas la réponse POST injectée telle quelle
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('409 (campagne déjà publiée) -> message backend affiché verbatim, le modal reste ouvert', async () => {
+    useAuth.mockReturnValue({ user: { profil: { prenom: 'Admin', nom: 'Test' } }, role: 'administrateur', logout: vi.fn() })
+    mockGet(dossier(), evaluationSnapshot())
+    apiClient.post.mockRejectedValueOnce(
+      new ApiError('http', { status: 409, message: 'Les résultats de cette campagne sont déjà publiés : plus aucune correction possible.' }),
+    )
+    renderScreen()
+    await screen.findByText('🔒 ÉVALUATION VALIDÉE')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /correction exceptionnelle/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Correction exceptionnelle — dossier' })
+    await user.type(within(dialog).getByLabelText(/motif de la correction/i), 'Motif suffisant')
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer la correction' }))
+
+    expect(await screen.findByText(/déjà publiés.*plus aucune correction possible/i)).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Correction exceptionnelle — dossier' })).toBeInTheDocument()
   })
 })

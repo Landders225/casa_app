@@ -7,9 +7,11 @@ import { FullPageSpinner } from '../../components/ui/Spinner.jsx'
 import { formatDateFr } from '../../lib/formatDate.js'
 import { evaluateurDossierPath, evaluateurEvaluationPath, retourListeLabel, retourListePath } from '../../routing/routes.js'
 import { ConfirmDialog } from './ConfirmDialog.jsx'
+import { CorrectionEntretienModal } from './CorrectionEntretienModal.jsx'
 import './Notation.css'
 import { PointPicker } from './PointPicker.jsx'
 import { ScoreRing } from './ScoreRing.jsx'
+import { useCorrection } from './useCorrection.js'
 import { useEntretien } from './useEntretien.js'
 import { useFicheCandidat } from './useFicheCandidat.js'
 
@@ -39,7 +41,7 @@ export function Entretien() {
   const { id } = useParams()
   const { role } = useAuth()
   const { status: ficheStatus, dossier } = useFicheCandidat(id)
-  const { status, dossierVerrouille, entretien, saving, validating, error, save, validate } = useEntretien(id)
+  const { status, dossierVerrouille, entretien, saving, validating, error, save, validate, reload: reloadEntretien } = useEntretien(id)
   const retour = retourListePath(role)
 
   if (ficheStatus === 'loading' || status === 'loading') return <FullPageSpinner />
@@ -89,7 +91,17 @@ export function Entretien() {
       ) : entretien === null ? (
         <Planification dossier={dossier} saving={saving} error={error} onSave={save} />
       ) : (
-        <EntretienNotation dossier={dossier} entretien={entretien} saving={saving} validating={validating} error={error} onSave={save} onValidate={validate} />
+        <EntretienNotation
+          dossier={dossier}
+          entretien={entretien}
+          saving={saving}
+          validating={validating}
+          error={error}
+          onSave={save}
+          onValidate={validate}
+          isAdmin={role === 'administrateur'}
+          onCorrected={reloadEntretien}
+        />
       )}
     </AppShell>
   )
@@ -155,7 +167,7 @@ function Planification({ dossier, saving, error, onSave }) {
   )
 }
 
-function EntretienNotation({ dossier, entretien, saving, validating, error, onSave, onValidate }) {
+function EntretienNotation({ dossier, entretien, saving, validating, error, onSave, onValidate, isAdmin, onCorrected }) {
   const [presence, setPresence] = useState(entretien.presence)
   const [notes, setNotes] = useState(() =>
     Object.fromEntries((entretien.sous_notes || []).map((sn) => [sn.code, Number(sn.points_attribues) || 0])),
@@ -163,6 +175,8 @@ function EntretienNotation({ dossier, entretien, saving, validating, error, onSa
   const [observation, setObservation] = useState(entretien.observation || '')
   const [saved, setSaved] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [correcting, setCorrecting] = useState(false)
+  const { corrigerEntretien, correcting: savingCorrection, error: correctionError, resetError: resetCorrectionError } = useCorrection()
 
   const editable = !entretien.verrouille
   const isAbsent = presence === 'absent'
@@ -191,6 +205,16 @@ function EntretienNotation({ dossier, entretien, saving, validating, error, onSa
       await onValidate()
     } catch {
       // `error` est déjà posé par le hook.
+    }
+  }
+
+  const submitCorrection = async (payload) => {
+    try {
+      await corrigerEntretien(dossier.id, payload)
+      setCorrecting(false)
+      onCorrected()
+    } catch {
+      // `correctionError` est déjà posé par le hook — le modal reste ouvert.
     }
   }
 
@@ -224,6 +248,16 @@ function EntretienNotation({ dossier, entretien, saving, validating, error, onSa
               {entretien.valide_par ? ` par ${entretien.valide_par.prenom} ${entretien.valide_par.nom}` : ''}.
             </div>
           </div>
+          {isAdmin ? (
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ marginLeft: 'auto' }}
+              onClick={() => { resetCorrectionError(); setCorrecting(true) }}
+            >
+              <i className="fa-solid fa-user-shield" aria-hidden="true" /> Correction exceptionnelle
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -335,6 +369,16 @@ function EntretienNotation({ dossier, entretien, saving, validating, error, onSa
           loading={validating}
           onCancel={() => setConfirming(false)}
           onConfirm={submitValidation}
+        />
+      ) : null}
+
+      {correcting ? (
+        <CorrectionEntretienModal
+          entretien={entretien}
+          saving={savingCorrection}
+          error={correctionError}
+          onCancel={() => setCorrecting(false)}
+          onSave={submitCorrection}
         />
       ) : null}
     </>

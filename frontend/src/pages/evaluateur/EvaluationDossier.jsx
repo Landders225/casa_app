@@ -7,10 +7,12 @@ import { FullPageSpinner } from '../../components/ui/Spinner.jsx'
 import { formatDateFr } from '../../lib/formatDate.js'
 import { evaluateurDossierPath, evaluateurEntretienPath, retourListeLabel, retourListePath } from '../../routing/routes.js'
 import { ConfirmDialog } from './ConfirmDialog.jsx'
+import { CorrectionDossierModal } from './CorrectionDossierModal.jsx'
 import { EligibilitePanel } from './EligibilitePanel.jsx'
 import './Notation.css'
 import { ScoreRing } from './ScoreRing.jsx'
 import { StarPicker } from './StarPicker.jsx'
+import { useCorrection } from './useCorrection.js'
 import { useEvaluationDossier } from './useEvaluationDossier.js'
 import { useFicheCandidat } from './useFicheCandidat.js'
 
@@ -40,8 +42,8 @@ export function EvaluationDossier() {
   const { role } = useAuth()
   // Identité, lettre MO.04, éligibilité, statut de vérification — déjà fourni
   // par l'endpoint fiche (8c-1), aucun appel réseau supplémentaire nécessaire.
-  const { status: ficheStatus, dossier } = useFicheCandidat(id)
-  const { status, evaluation, saving, validating, error, save, validate } = useEvaluationDossier(id)
+  const { status: ficheStatus, dossier, reload: reloadFiche } = useFicheCandidat(id)
+  const { status, evaluation, saving, validating, error, save, validate, reload: reloadEvaluation } = useEvaluationDossier(id)
   const retour = retourListePath(role)
 
   if (ficheStatus === 'loading' || status === 'loading') return <FullPageSpinner />
@@ -92,7 +94,20 @@ export function EvaluationDossier() {
         </div>
       </div>
 
-      <EvaluationForm dossier={dossier} evaluation={evaluation} saving={saving} validating={validating} error={error} onSave={save} onValidate={validate} />
+      <EvaluationForm
+        dossier={dossier}
+        evaluation={evaluation}
+        saving={saving}
+        validating={validating}
+        error={error}
+        onSave={save}
+        onValidate={validate}
+        isAdmin={role === 'administrateur'}
+        onCorrected={() => {
+          reloadEvaluation()
+          reloadFiche()
+        }}
+      />
     </AppShell>
   )
 }
@@ -102,11 +117,13 @@ function verificationComplete(dossier) {
   return !!v && v.nationalite_confirmee !== null && v.diplome_verifie !== null
 }
 
-function EvaluationForm({ dossier, evaluation, saving, validating, error, onSave, onValidate }) {
+function EvaluationForm({ dossier, evaluation, saving, validating, error, onSave, onValidate, isAdmin, onCorrected }) {
   const [etoiles, setEtoiles] = useState(evaluation.mo04_note_etoiles)
   const [commentaire, setCommentaire] = useState(evaluation.commentaire_evaluateur || '')
   const [saved, setSaved] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [correcting, setCorrecting] = useState(false)
+  const { corrigerDossier, correcting: savingCorrection, error: correctionError, resetError: resetCorrectionError } = useCorrection()
 
   const enInstruction = dossier.statut_interne === 'en_instruction'
   const editable = !evaluation.verrouille && enInstruction
@@ -130,6 +147,16 @@ function EvaluationForm({ dossier, evaluation, saving, validating, error, onSave
       await onValidate()
     } catch {
       // `error` est déjà posé par le hook.
+    }
+  }
+
+  const submitCorrection = async (payload) => {
+    try {
+      await corrigerDossier(dossier.id, payload)
+      setCorrecting(false)
+      onCorrected()
+    } catch {
+      // `correctionError` est déjà posé par le hook — le modal reste ouvert.
     }
   }
 
@@ -215,9 +242,21 @@ function EvaluationForm({ dossier, evaluation, saving, validating, error, onSave
         </div>
 
         {evaluation.verrouille ? (
-          <Link to={evaluateurEntretienPath(dossier.id)} className="btn btn-primary btn-block" style={{ marginTop: 'var(--space-6)' }}>
-            <i className="fa-solid fa-comments" aria-hidden="true" /> Entretien
-          </Link>
+          <>
+            <Link to={evaluateurEntretienPath(dossier.id)} className="btn btn-primary btn-block" style={{ marginTop: 'var(--space-6)' }}>
+              <i className="fa-solid fa-comments" aria-hidden="true" /> Entretien
+            </Link>
+            {isAdmin ? (
+              <button
+                type="button"
+                className="btn btn-outline btn-block"
+                style={{ marginTop: 'var(--space-3)' }}
+                onClick={() => { resetCorrectionError(); setCorrecting(true) }}
+              >
+                <i className="fa-solid fa-user-shield" aria-hidden="true" /> Correction exceptionnelle
+              </button>
+            ) : null}
+          </>
         ) : editable ? (
           <div className="flex gap-3" style={{ marginTop: 'var(--space-6)' }}>
             <button type="button" className="btn btn-outline btn-block" disabled={saving} onClick={submit}>
@@ -238,6 +277,17 @@ function EvaluationForm({ dossier, evaluation, saving, validating, error, onSave
           loading={validating}
           onCancel={() => setConfirming(false)}
           onConfirm={submitValidation}
+        />
+      ) : null}
+
+      {correcting ? (
+        <CorrectionDossierModal
+          dossier={dossier}
+          evaluation={evaluation}
+          saving={savingCorrection}
+          error={correctionError}
+          onCancel={() => setCorrecting(false)}
+          onSave={submitCorrection}
         />
       ) : null}
     </div>

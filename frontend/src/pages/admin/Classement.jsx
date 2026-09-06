@@ -9,11 +9,13 @@ import './Classement.css'
 import { DepartageBadges } from './DepartageBadges.jsx'
 import { MotifModal } from './MotifModal.jsx'
 import { PublishConfirmDialog } from './PublishConfirmDialog.jsx'
+import { RemplacementModal } from './RemplacementModal.jsx'
 import { useCampagnes } from './useCampagnes.js'
 import { useClassement } from './useClassement.js'
+import { useRemplacement } from './useRemplacement.js'
 
-const DECISION_BADGE = { retenu: 'badge-success', liste_attente: 'badge-warning', non_retenu: 'badge-danger' }
-const DECISION_LABEL = { retenu: 'Retenu', liste_attente: 'Liste d’attente', non_retenu: 'Non retenu' }
+const DECISION_BADGE = { retenu: 'badge-success', liste_attente: 'badge-warning', non_retenu: 'badge-danger', indisponible: 'badge-neutral' }
+const DECISION_LABEL = { retenu: 'Retenu', liste_attente: 'Liste d’attente', non_retenu: 'Non retenu', indisponible: 'Indisponible' }
 const MEDAL_CLASS = { 1: 'gold', 2: 'silver', 3: 'bronze' }
 
 /**
@@ -27,15 +29,24 @@ const MEDAL_CLASS = { 1: 'gold', 2: 'silver', 3: 'bronze' }
  * Zone la PLUS confidentielle du système (rang, score final, motif interne) —
  * administrateur strict absolu, jamais de pont vers un autre rôle (garde
  * noBridge déjà symétrique depuis le 8d-1).
+ *
+ * Remplacement (Lot 8d-3, post-publication) : « Déclarer indisponible »
+ * n'apparaît que sur les lignes `retenu` une fois `publie:true`. Le candidat
+ * promu affiché AVANT confirmation est un APERÇU (premier `liste_attente` déjà
+ * trié par le serveur dans cette filière, cf. `RemplacementModal.jsx`) ; le
+ * résultat RÉEL vient de la réponse `POST /remplacements`, affiché ensuite.
  */
 export function Classement() {
   const { campagneId } = useParams()
   const navigate = useNavigate()
   const { status: campagnesStatus, items: campagnes } = useCampagnes()
-  const { status, data, calculating, publishing, savingMotif, error, calculer, publier, enregistrerMotifs } = useClassement(campagneId)
+  const { status, data, calculating, publishing, savingMotif, error, calculer, publier, enregistrerMotifs, reload } = useClassement(campagneId)
   const [activeCode, setActiveCode] = useState(null)
   const [motifLigne, setMotifLigne] = useState(null)
   const [confirmingPublish, setConfirmingPublish] = useState(false)
+  const [remplacementCible, setRemplacementCible] = useState(null)
+  const [dernierRemplacement, setDernierRemplacement] = useState(null)
+  const { remplacer, replacing, error: remplacementError, resetError: resetRemplacementError } = useRemplacement()
 
   // Pas de campagne dans l'URL : redirige vers la plus récente (déjà triée
   // serveur par `useCampagnes`, `orderByDesc(date_ouverture)` — aucun tri client).
@@ -68,6 +79,15 @@ export function Classement() {
   }
 
   const filiereActive = data.filieres.find((f) => f.filiere.code === activeCode) ?? data.filieres[0]
+  // Aperçu du candidat promu (Étape 1, Q4) : une LECTURE du premier
+  // `liste_attente` déjà trié par rang par le serveur dans la filière ACTIVE
+  // (le modal ne s'ouvre que pour une ligne de cet onglet) — pas un recalcul,
+  // `RemplacementController` sélectionne exactement de la même façon (même
+  // filière, `orderBy('rang')`). Le résultat définitif vient de la réponse
+  // POST (`confirmerRemplacement`), affiché ensuite.
+  const promuPreview = remplacementCible
+    ? filiereActive.lignes.find((l) => l.decision === 'liste_attente') ?? null
+    : null
 
   const lancerCalcul = async () => {
     try {
@@ -89,6 +109,19 @@ export function Classement() {
   const enregistrerMotif = async (motifs) => {
     await enregistrerMotifs(motifLigne.candidature_id, motifs)
     setMotifLigne(null)
+  }
+
+  const confirmerRemplacement = async (motif) => {
+    try {
+      const resultat = await remplacer(remplacementCible.candidature_id, motif)
+      setRemplacementCible(null)
+      setDernierRemplacement(resultat) // {indisponible, promu} — le résultat RÉEL, pas l'aperçu.
+      // La réponse POST /remplacements n'a pas la forme d'un ClassementResource
+      // (pas de `filieres`) — on recharge pour refléter indisponible/retenu.
+      reload()
+    } catch {
+      // `remplacementError` est déjà posé par le hook — le modal reste ouvert.
+    }
   }
 
   return (
@@ -143,6 +176,15 @@ export function Classement() {
               classement reste visible en consultation, mais ne peut plus être recalculé ni modifié.
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {dernierRemplacement ? (
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <Alert variant="success">
+            Remplacement effectué : {dernierRemplacement.indisponible} → indisponible ;{' '}
+            {dernierRemplacement.promu ? `${dernierRemplacement.promu} → retenu` : "aucun candidat en liste d'attente à promouvoir"}.
+          </Alert>
         </div>
       ) : null}
 
@@ -255,6 +297,15 @@ export function Classement() {
                               Motif
                             </button>
                           ) : null}
+                          {data.publie && l.decision === 'retenu' ? (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-danger"
+                              onClick={() => { resetRemplacementError(); setRemplacementCible(l) }}
+                            >
+                              Déclarer indisponible
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -288,6 +339,17 @@ export function Classement() {
           loading={publishing}
           onCancel={() => setConfirmingPublish(false)}
           onConfirm={confirmerPublication}
+        />
+      ) : null}
+
+      {remplacementCible ? (
+        <RemplacementModal
+          ligne={remplacementCible}
+          promuPreview={promuPreview}
+          saving={replacing}
+          error={remplacementError}
+          onCancel={() => setRemplacementCible(null)}
+          onConfirm={confirmerRemplacement}
         />
       ) : null}
     </AppShell>

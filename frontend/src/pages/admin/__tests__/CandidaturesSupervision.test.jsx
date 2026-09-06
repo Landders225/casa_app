@@ -138,3 +138,52 @@ describe('CandidaturesSupervision — affectation en masse (atomique)', () => {
     expect(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i })).toBeChecked()
   })
 })
+
+describe('CandidaturesSupervision — élimination manuelle mono-cible (Lot 8d-3, D-6b-4)', () => {
+  it('précondition : bouton désactivé si déjà non éligible', async () => {
+    mockGet({ candidatures: [candidature({ statut_eligibilite_interne: 'non_eligible' })] })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+    expect(screen.getByRole('button', { name: 'Éliminer' })).toBeDisabled()
+  })
+
+  it('motif obligatoire (bouton bloqué), succès -> POST mono-cible puis liste rechargée', async () => {
+    mockGet()
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Éliminer' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Éliminer ce dossier ?' })
+    const confirmBtn = within(dialog).getByRole('button', { name: 'Éliminer' })
+    expect(confirmBtn).toBeDisabled()
+    await user.type(within(dialog).getByLabelText(/motif/i), 'Pièce falsifiée')
+    expect(confirmBtn).toBeEnabled()
+
+    apiClient.post.mockResolvedValueOnce({ data: { numero_dossier: 'CASA-2026-000001', statut_eligibilite_interne: 'non_eligible' } })
+    const getCallsAvant = apiClient.get.mock.calls.filter(([p]) => p.startsWith('/admin/candidatures')).length
+    await user.click(confirmBtn)
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/candidatures/c-1/elimination', { motif: 'Pièce falsifiée' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // Mono-cible (D-6b-4) : un seul candidat visé par le POST, pas d'endpoint bulk.
+    await waitFor(() => expect(apiClient.get.mock.calls.filter(([p]) => p.startsWith('/admin/candidatures')).length).toBeGreaterThan(getCallsAvant))
+  })
+
+  it('422 backend -> message affiché verbatim, le modal reste ouvert', async () => {
+    mockGet()
+    apiClient.post.mockRejectedValueOnce(new ApiError('validation', { status: 422, message: 'Le motif doit contenir au moins 3 caractères.' }))
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Éliminer' }))
+    const dialog = screen.getByRole('dialog', { name: 'Éliminer ce dossier ?' })
+    await user.type(within(dialog).getByLabelText(/motif/i), 'Motif suffisant')
+    await user.click(within(dialog).getByRole('button', { name: 'Éliminer' }))
+
+    expect(await screen.findByText(/le motif doit contenir au moins 3 caractères/i)).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Éliminer ce dossier ?' })).toBeInTheDocument()
+  })
+})

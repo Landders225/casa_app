@@ -8,6 +8,8 @@ import { formatDateFr } from '../../lib/formatDate.js'
 import { evaluateurEntretienPath, evaluateurEvaluationPath, retourListeLabel, retourListePath } from '../../routing/routes.js'
 import { EligibilitePanel } from './EligibilitePanel.jsx'
 import './FicheCandidat.css'
+import { MotifConfirmDialog } from './MotifConfirmDialog.jsx'
+import { useElimination } from './useElimination.js'
 import { useFicheCandidat } from './useFicheCandidat.js'
 import { VerificationForm } from './VerificationForm.jsx'
 import {
@@ -110,8 +112,10 @@ function PieceLink({ label, piece }) {
 export function FicheCandidat() {
   const { id } = useParams()
   const { role } = useAuth()
-  const { status, dossier, saving, verifError, updateVerification } = useFicheCandidat(id)
+  const { status, dossier, saving, verifError, updateVerification, reload } = useFicheCandidat(id)
   const [tab, setTab] = useState('profil')
+  const [eliminating, setEliminating] = useState(false)
+  const { eliminer, eliminating: savingElimination, error: eliminationError, resetError: resetEliminationError } = useElimination()
   const retour = retourListePath(role)
 
   if (status === 'loading') return <FullPageSpinner />
@@ -142,6 +146,17 @@ export function FicheCandidat() {
   const r = dossier.reponses || {}
   const statutInfo = STATUT_INTERNE_LABELS[dossier.statut_interne] ?? { label: dossier.statut_interne, badge: 'badge-neutral' }
   const piecesParType = Object.fromEntries((dossier.pieces_dossier || []).map((p) => [p.type_document_code, p]))
+  const dejaNonEligible = dossier.statut_eligibilite_interne === 'non_eligible'
+
+  const submitElimination = async (motif) => {
+    try {
+      await eliminer(dossier.id, motif)
+      setEliminating(false)
+      reload()
+    } catch {
+      // `eliminationError` est déjà posé par le hook — le modal reste ouvert.
+    }
+  }
 
   return (
     <AppShell title="Fiche candidat" space="evaluateur">
@@ -184,6 +199,17 @@ export function FicheCandidat() {
             <Link to={evaluateurEntretienPath(dossier.id)} className="btn btn-outline btn-sm">
               <i className="fa-solid fa-comments" aria-hidden="true" /> Entretien
             </Link>
+          ) : null}
+          {role === 'administrateur' ? (
+            <button
+              type="button"
+              className="btn btn-danger btn-sm"
+              disabled={dejaNonEligible}
+              title={dejaNonEligible ? 'Déjà non éligible.' : undefined}
+              onClick={() => { resetEliminationError(); setEliminating(true) }}
+            >
+              <i className="fa-solid fa-ban" aria-hidden="true" /> Éliminer ce dossier
+            </button>
           ) : null}
         </div>
       </div>
@@ -320,6 +346,18 @@ export function FicheCandidat() {
 
         <EligibilitePanel dossier={dossier} />
       </div>
+
+      {eliminating ? (
+        <MotifConfirmDialog
+          title="Éliminer ce dossier ?"
+          message={`${dossier.candidat?.prenom} ${dossier.candidat?.nom} (${dossier.numero_dossier}) sera marqué non éligible. Cette action est irréversible.`}
+          confirmLabel="Éliminer"
+          loading={savingElimination}
+          error={eliminationError}
+          onCancel={() => setEliminating(false)}
+          onConfirm={submitElimination}
+        />
+      ) : null}
     </AppShell>
   )
 }

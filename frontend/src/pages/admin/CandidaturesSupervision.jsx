@@ -7,18 +7,21 @@ import { apiClient } from '../../lib/apiClient.js'
 import { formatDateFr } from '../../lib/formatDate.js'
 import { evaluateurDossierPath } from '../../routing/routes.js'
 import { AssignModal } from './AssignModal.jsx'
+import { MotifConfirmDialog } from './MotifConfirmDialog.jsx'
 import { DECISION_LABELS, ELIGIBILITE_LABELS, STATUT_INTERNE_LABELS } from './optionLabels.js'
 import { useAffectation } from './useAffectation.js'
 import { useCampagnes } from './useCampagnes.js'
 import { useCandidaturesAdmin } from './useCandidaturesAdmin.js'
+import { useElimination } from './useElimination.js'
 import { useEvaluateurs } from './useEvaluateurs.js'
 
 const STATUTS = ['soumis', 'en_instruction', 'evalue', 'non_eligible']
 
 /**
- * Supervision des candidatures + affectation en masse (Lot 8d-1). C'est la
- * vue reportée du 8c-1 (`candidatures.html`, hors « Marquer éliminé » — acte
- * exceptionnel, 8d-3). `CandidatureAdminResource` (statut interne,
+ * Supervision des candidatures + affectation en masse (Lot 8d-1) + élimination
+ * manuelle mono-cible (Lot 8d-3 — le backend n'a pas d'endpoint bulk, D-6b-4 :
+ * contrairement au bouton « Marquer éliminé » EN MASSE de `candidatures.html`,
+ * une seule candidature à la fois). `CandidatureAdminResource` (statut interne,
  * éligibilité, scores figés, décision) est LÉGITIME ici, jamais recalculée.
  *
  * Le lien « Voir » renvoie vers la fiche évaluateur EXISTANTE
@@ -34,6 +37,7 @@ export function CandidaturesSupervision() {
   const [filieres, setFilieres] = useState([])
   const [selected, setSelected] = useState(() => new Set())
   const [showAssign, setShowAssign] = useState(false)
+  const [eliminationCible, setEliminationCible] = useState(null)
 
   const { status, items, meta, reload } = useCandidaturesAdmin({
     statutInterne, filiere, evaluateur: evaluateurFiltre, campagne: campagneFiltre, page,
@@ -41,6 +45,7 @@ export function CandidaturesSupervision() {
   const { items: evaluateurs } = useEvaluateurs()
   const { items: campagnes } = useCampagnes()
   const { assign, assigning, error: assignError, resetError } = useAffectation()
+  const { eliminer, eliminating, error: eliminationError, resetError: resetEliminationError } = useElimination()
 
   useEffect(() => {
     apiClient.get('/filieres').then((res) => setFilieres(res.data ?? [])).catch(() => {})
@@ -68,6 +73,16 @@ export function CandidaturesSupervision() {
       // Le message atomique (422, liste des refusées) reste affiché dans le
       // modal — la sélection n'est PAS vidée, l'utilisateur peut ajuster.
       return null
+    }
+  }
+
+  const confirmElimination = async (motif) => {
+    try {
+      await eliminer(eliminationCible.id, motif)
+      setEliminationCible(null)
+      reload()
+    } catch {
+      // `eliminationError` est déjà posé par le hook — le modal reste ouvert.
     }
   }
 
@@ -189,7 +204,18 @@ export function CandidaturesSupervision() {
                       <td>{decisionInfo ? <span className={`badge ${decisionInfo.badge}`}>{decisionInfo.label}</span> : <span className="caption">—</span>}</td>
                       <td className="caption">{formatDateFr(c.date_soumission)}</td>
                       <td>
-                        <Link to={evaluateurDossierPath(c.id)} className="btn btn-sm btn-outline">Voir</Link>
+                        <div className="flex gap-2">
+                          <Link to={evaluateurDossierPath(c.id)} className="btn btn-sm btn-outline">Voir</Link>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-danger"
+                            disabled={c.statut_eligibilite_interne === 'non_eligible'}
+                            title={c.statut_eligibilite_interne === 'non_eligible' ? 'Déjà non éligible.' : undefined}
+                            onClick={() => { resetEliminationError(); setEliminationCible(c) }}
+                          >
+                            Éliminer
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -220,6 +246,18 @@ export function CandidaturesSupervision() {
           error={assignError}
           onCancel={() => setShowAssign(false)}
           onConfirm={confirmAssign}
+        />
+      ) : null}
+
+      {eliminationCible ? (
+        <MotifConfirmDialog
+          title="Éliminer ce dossier ?"
+          message={`${eliminationCible.candidat?.prenom} ${eliminationCible.candidat?.nom} (${eliminationCible.numero_dossier}) sera marqué non éligible. Cette action est irréversible.`}
+          confirmLabel="Éliminer"
+          loading={eliminating}
+          error={eliminationError}
+          onCancel={() => setEliminationCible(null)}
+          onConfirm={confirmElimination}
         />
       ) : null}
     </AppShell>
