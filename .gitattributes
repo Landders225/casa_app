@@ -5,3 +5,4 @@
 *.conf               text eol=lf
 docker-compose*.yml  text eol=lf
 docker/**            text eol=lf
+.github/**           text eol=lf

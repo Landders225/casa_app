@@ -1,0 +1,75 @@
+# Points ouverts — inventaire vivant
+
+> **Rôle de ce fichier.** Tout ce qui a été **consciemment reporté** au fil des
+> ~40 lots, réuni au même endroit, avec un statut et un pointeur vers la trace
+> détaillée. Il est **vivant** : on le met à jour quand un point est traité ou
+> qu'un nouveau apparaît. Le **journal figé** des décisions reste `docs/ADR.md`
+> (on n'y réécrit pas l'histoire) ; ici on tient le **présent**.
+>
+> Dernière revue : **Lot 9c** (2026-09-06).
+
+## Légende de statut
+
+| Statut | Sens |
+|---|---|
+| 🔴 Bloquant prod | à traiter avant une vraie mise en service auprès de candidats réels |
+| 🟠 Ouvert | fonctionnalité ou durcissement attendus, non bloquants pour une première prod pilote |
+| 🟡 Décidé — opt-in | tranché, volontairement non activé par défaut ; activation documentée |
+| 🟢 Traité | résolu ; ligne gardée pour l'historique, avec le lot de résolution |
+
+---
+
+## Institutionnel / contenu
+
+| Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
+|---|---|---|---|---|
+| **Relecture des textes candidats par les partenaires** (FAQ publiques évaluation & égalité de score ; textes de résultat / non-retenue / clôture ; libellés de la vitrine) | 🔴 Bloquant prod | Rédaction faite côté dev pour ne rien révéler de la grille (ADR-02) ; la formulation institutionnelle doit être validée par CCI-CI / FADV / AICS | ADR sur 8b-1 et 8b-3 (README, section Avancement) ; composants `pages/public/*`, `pages/candidat/MaCandidature.jsx` | Revue partenaires, puis ajustement de chaînes uniquement |
+
+## Fonctionnalités candidat / inscription
+
+| Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
+|---|---|---|---|---|
+| **Vérification d'e-mail à l'inscription** (lien ou code) | 🟠 Ouvert | Aucune infra d'envoi d'e-mail dans le projet (`MAIL_MAILER=log`) | ADR — Points ouverts (D-7-2) | Choix d'un fournisseur SMTP + file d'attente + écran de confirmation |
+| **Changement d'adresse e-mail** (identifiant de connexion) | 🟠 Ouvert | Flux dédié (ré-authentification + confirmation) non couvert au Lot 7 ; `PATCH /candidat/profil` interdit `email` (ADR-07) | ADR — Points ouverts (D-7-2) | Dépend de la vérification d'e-mail ci-dessus |
+| **Durcissement mot de passe — `Password::uncompromised()` (HIBP)** | 🟠 Ouvert | Écarté en v1 : appel réseau (api.pwnedpasswords.com) sur le chemin d'inscription | ADR — Points ouverts | Une ligne dans `RegisterRequest` + tolérance à l'indispo du service |
+| ~~Inscription / profil candidat self-service~~ | 🟢 Traité (Lot 7) | — | ADR-16 | — |
+| ~~Éligibilité initiale (tranche d'âge, résidence CI) à l'inscription~~ | 🟢 Traité (Lot 7) | `ServiceEligibiliteInitiale` (ferme D-3c-1) | ADR-16 | — |
+
+## Espace administrateur
+
+| Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
+|---|---|---|---|---|
+| **Création / édition de campagne et de filière** (dates, quotas, nom, description) | 🟠 Ouvert | Aucun endpoint d'écriture ; en prod ça se fait par `tinker` / SQL (documenté `DEPLOIEMENT.md` § 11.9). Le garde-fou « une seule campagne ouverte » est déjà appliqué | ADR — Points ouverts (**D-6a-2**) ; ADR sur 8d-1 | Endpoints CRUD + écrans + validations (fenêtres de dates, quotas ≥ retenus déjà décidés) |
+| **Correction exceptionnelle des auto-déclarations candidat** (SC/SE/DI, langues, expériences) | 🟠 Ouvert | Le **backend l'accepte déjà** intégralement (`CorrigerDossierRequest::reponses()`) ; l'UI (Lot 8d-3) ne construit que nationalité / SC.04 diplôme / MO.04 étoiles / commentaire | **ADR-25** (point ouvert explicite) ; `CorrectionDossierModal.jsx` | UI de formulaire pilotée par la structure de la grille — pas de backend à faire |
+| **Export réel des rapports** (Excel / PDF) | 🟠 Ouvert | La maquette a un bouton « Exporter » sans endpoint ; non implémenté | ADR — Points ouverts ; ADR sur 8d-2 | Décision de format + génération serveur + respect strict de la confidentialité (jamais de 🔴 vers un rôle non autorisé) |
+
+## Notifications
+
+| Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
+|---|---|---|---|---|
+| **Notifications réelles (e-mail / SMS)** — accusé d'inscription, dossier affecté, publication des résultats | 🟠 Ouvert | La maquette les simule ; aucune infra d'envoi. `MAIL_MAILER=log` en prod | ADR — Points ouverts ; ADR-27 (« infra mail hors CASA ») | Fournisseur e-mail + passerelle SMS + file d'attente (`QUEUE_CONNECTION=database` déjà prêt) + templates |
+
+## Sécurité / conformité
+
+| Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
+|---|---|---|---|---|
+| **HSTS `preload`** | 🟡 Décidé — opt-in | Soumettre le domaine à hstspreload.org est engageant et lent à défaire ; on garde `max-age=1 an + includeSubDomains` par défaut, `preload` activable consciemment une fois la prod stable | **ADR-27** (point ouvert) → **ADR-28** (décision) ; commentaire dans `docker/nginx/casa.prod.conf` | Ajouter ` preload` à l'en-tête + reload nginx + soumission sur hstspreload.org |
+| **Matrice complète policies Laravel × endpoints** (rôle × action) | 🟠 Ouvert | L'autorisation est testée endpoint par endpoint (403/422/409 dans les suites `Feature/*`) mais pas formalisée en un seul tableau de référence | ADR — Points ouverts | Document de synthèse + éventuels tests de couverture croisée |
+| **Rate limiting / anti-bruteforce** au-delà du login | 🟠 Ouvert | `throttle:5,1` sur `/login` (par e-mail+IP) et `throttle:register` sur l'inscription ; pas de politique globale au-delà | ADR — Points ouverts | Revue des routes sensibles + limites par profil |
+| **Politique de rétention des pièces justificatives** après clôture de campagne | 🟠 Ouvert | Les pièces restent indéfiniment dans `documents_data` ; pas de purge ni de durée légale définie | ADR — Points ouverts | Décision juridique (durée) + commande de purge + sauvegarde préalable |
+| **`config:cache` et multi-réplicas** | 🟡 Décidé — mono-nœud | L'entrypoint refait les caches à chaque `up`/`--force-recreate` (ADR-28) : correct pour **un** nœud backend. Plusieurs réplicas derrière une LB demanderaient une orchestration du recreate | ADR-27 (renvoi runbook) → ADR-28 ; `docker/backend/entrypoint.sh` | Orchestrateur (Swarm/K8s) + rolling update ; hors périmètre actuel |
+| ~~Cause exacte du `419 CSRF` en enchaînement `curl`~~ | 🟢 Traité (Lot 9a) | Artefact `curl` (décodage bash du token), **pas un bug d'auth** — prouvé par bisection | **ADR-26** ; `scratchpad/csrf419.sh` | — |
+
+## Intégration continue / déploiement
+
+| Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
+|---|---|---|---|---|
+| **Activer la CI** (`.github/workflows/ci.yml`, `nightly.yml`) | 🟠 Ouvert | Le dépôt n'a **pas de remote**. Les workflows sont écrits et chaque étape a été prouvée en local (Lot 9c) | **ADR-28** ; en-tête de `ci.yml` | `git remote add origin <url>` + `git push` ; GitHub exécute alors les workflows tels quels |
+| **E2E d'intégration dans la CI de PR** | 🟡 Décidé — nightly | Trop long (~15 min) pour bloquer chaque PR ; tourne en `nightly.yml` (03:00 UTC) + `workflow_dispatch` | ADR-28 ; `nightly.yml` | — |
+
+## Divers (traçabilité de conception)
+
+| Sujet | Statut | Détail | Où c'est tracé |
+|---|---|---|---|
+| ~~Résidence CI (`residence_ci`)~~ | 🟢 Traité (Lot 7) | Portée à l'inscription | ADR-16 ; `docs/mld.md` |
+| Règle « 1 expérience = 1 justificatif » | 🟢 Traité (Lot 3c) | Validée **à la soumission**, pas au niveau colonne (`experience_professionnelle.piece_justificative_id` nullable) | ADR — Points ouverts ; `docs/mld.md` |

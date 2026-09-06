@@ -27,7 +27,7 @@ import { expect, test } from '@playwright/test'
  * après chaque describe.
  */
 
-const APP = 'c:/Users/isaacaka/Desktop/CCI/Projet Arbre de Vie/casa-app'
+const APP = fileURLToPath(new URL('../..', import.meta.url))
 const artisan = (cmd) =>
   execSync(`docker compose exec -T backend php artisan ${cmd}`, { cwd: APP, stdio: 'pipe' }).toString()
 const psql = (sql) =>

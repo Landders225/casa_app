@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
 
 /**
@@ -10,7 +11,8 @@ import { expect, test } from '@playwright/test'
  * `non_retenu` réel sans avoir à épuiser un quota (quota=24 > 6 candidats).
  */
 
-const APP = 'c:/Users/isaacaka/Desktop/CCI/Projet Arbre de Vie/casa-app'
+// Racine du dépôt — portable (CI Linux comprise), plus de chemin Windows en dur.
+const APP = fileURLToPath(new URL('../..', import.meta.url))
 const artisan = (cmd) =>
   execSync(`docker compose exec -T backend php artisan ${cmd}`, { cwd: APP, stdio: 'pipe' }).toString()
 

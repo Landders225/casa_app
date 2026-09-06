@@ -22,6 +22,11 @@
 #   - postgres: mot de passe obligatoire (pas de valeur par défaut faible).
 # =============================================================================
 
+# Nom de projet FIXE en prod (indépendant du nom du dossier de déploiement) :
+# le réseau devient `casa_casa`, les conteneurs `casa-<service>-1`. Rend les
+# commandes de docs/DEPLOIEMENT.md déterministes quel que soit le chemin du clone.
+name: casa
+
 services:
   postgres:
     environment:
@@ -31,10 +36,19 @@ services:
 
   backend:
     # Le code vient de l'IMAGE (pas de bind-mount ./backend). On garde uniquement
-    # le volume des pièces (hors webroot, ADR-11) et la surcharge PHP.
+    # le volume des pièces (hors webroot, ADR-11), la surcharge PHP et l'entrypoint.
     volumes: !override
       - documents_data:/var/www/html/storage/app/private
       - ./docker/php/casa.ini:/usr/local/etc/php/conf.d/zz-casa.ini:ro
+      - ./docker/backend/entrypoint.sh:/usr/local/bin/casa-entrypoint.sh:ro
+    # Reconstruit config:cache / route:cache / event:cache / view:cache à chaque
+    # démarrage → toujours cohérents avec l'env courant (Lot 9c, ADR-28). Les
+    # migrations restent une étape MANUELLE (docs/DEPLOIEMENT.md).
+    entrypoint: ["sh", "/usr/local/bin/casa-entrypoint.sh"]
+    # ⚠️ Compose REMET le CMD de l'image à null dès qu'on surcharge `entrypoint`.
+    # On redéclare donc explicitement la commande (= `CMD ["php-fpm"]` du
+    # Dockerfile) pour que l'entrypoint ait quelque chose à `exec "$@"`.
+    command: ["php-fpm"]
     # Config Laravel : lue depuis ce fichier (aucun .env dans l'image —
     # .dockerignore l'exclut). `env()` résout depuis l'environnement du conteneur.
     env_file:

@@ -1,0 +1,77 @@
+# =============================================================================
+#  CASA — E2E complète nocturne (Lot 9c, ADR-28).
+#
+#  Ce que ci.yml NE fait PAS à chaque PR (trop long) :
+#    - E2E par-espace sur les DEUX projets (desktop + mobile)
+#    - E2E d'intégration bout-en-bout (@integration, base jetable, ~15 min)
+#
+#  Déclenché la nuit (03:00 UTC) et à la demande. Ne bloque aucune PR.
+# =============================================================================
+name: Nightly E2E
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  e2e-full:
+    name: E2E — desktop + mobile + intégration
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Fichiers .env
+        run: |
+          cp .env.example .env
+          cp backend/.env.example backend/.env
+          cp frontend/.env.example frontend/.env
+
+      - name: Démarrage de la stack Docker
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 60); do
+            healthy=$(docker compose ps --format '{{.Health}}' | grep -cx healthy || true)
+            [ "$healthy" -ge 4 ] && { echo "OK ($healthy/4)"; break; }
+            sleep 5
+          done
+          docker compose ps
+
+      - name: APP_KEY + migrate + seed
+        run: |
+          docker compose exec -T backend php artisan key:generate --force
+          docker compose exec -T backend php artisan migrate:fresh --seed --force
+
+      - name: Dépendances Playwright
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: E2E par-espace (desktop + mobile)
+        working-directory: frontend
+        run: npm run e2e
+
+      - name: E2E intégration bout-en-bout (@integration)
+        working-directory: frontend
+        run: npm run e2e:integration
+
+      - name: Logs de la stack (si échec)
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Rapport Playwright (si échec)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-nightly
+          path: frontend/playwright-report
+          retention-days: 14
+          if-no-files-found: ignore

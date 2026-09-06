@@ -20,20 +20,55 @@ Monorepo de l'application de production CASA (sélection de bénéficiaires — 
 >   **8d-1** espace admin — supervision & gestion courante, dernier espace du frontend. **2 trous d'API comblés** (Étape 1) : `GET /admin/campagnes` et `GET /admin/evaluateurs` (nouveaux, non paginés, liste blanche verrouillée par test — jamais l'e-mail évaluateur, jamais la description de campagne) alimentent à la fois leurs écrans et les filtres de la vue supervision. **Candidatures + affectation en masse** (la vue reportée du 8c-1) : `CandidatureAdminResource` (statut interne, éligibilité, scores figés, décision) légitimement affichée ; l'affectation est **ATOMIQUE côté serveur** — le 422 (liste des dossiers refusés, verbatim) s'affiche **sans fermer le modal ni vider la sélection**. Lien « Voir » → fiche évaluateur **existante** (recouvrement ADR-10, pas de fiche admin dédiée) ; **continuité de navigation** : le breadcrumb « retour » de la fiche/notation (8c-1/8c-2) dépend désormais du **rôle réel** (`retourListePath`) — un admin venant de `/admin/candidatures` y revient, il ne se retrouve plus dans l'espace évaluateur. **Filières** : réutilise `GET /api/filieres` public (pas de second point de lecture), seul le switch actif/inactif est réel. **Campagnes** : liste (nouvel endpoint) + Ouvrir/Clôturer selon `statut` API seul, confirmation avant la clôture (irréversible), 409/422 verbatim. **Audit** : zone 🔴 affichée telle quelle (légitime) ; `recherche` (bornée serveur à action+objet, placeholder **honnête** — contrairement à la maquette qui laisse croire qu'elle couvre l'auteur) et `auteur` (e-mail exact) sont deux champs **séparés**, aucun filtre client sur `ancienne_valeur`/`nouvelle_valeur`/`motif`. **Dashboard** sobre (4 KPI réels, pas de Chart.js, pas de taux calculés, même choix qu'au 8c-1). **Garde de non-pont rendue symétrique sur les 3 arbres** (candidat/évaluateur/admin s'interdisent désormais mutuellement, pas seulement évaluateur→candidat). Preuve : `php artisan test` (302, +6), `vitest` (241, +58), E2E (évaluateur rejeté → dashboard → affecter → toggle filière → consulter l'audit) + captures 390/1280, smoke `curl` (listes blanches, affectation atomique avec non-affectation confirmée après le 422, garde-fou campagne 409/422, recherche bornée, 403 sur les 4 endpoints pour évaluateur et candidat).
 >   **8d-2** classement & publication — l'écran le plus lourd de conséquences de l'application. `score_final`/`rang`/`departage` (🔴 absolu) viennent **toujours** de `ClassementResource` — `useClassement` remplace intégralement son état à chaque réponse, `lignes[]` arrivent **déjà triées** serveur (aucun `.sort()` client, garanti par un test statique). Score dossier/entretien affichés **sans dénominateur codé en dur** (leurs maxima ne sont pas dans la réponse) ; seule exception assumée, `/100` pour `score_final` — un plafond fixe du système, pas un poids de grille. **Départage affiché en clair** (résumé compact mixité/vulnérabilité/secteur/motivation, visible en permanence, pas au survol). **Distinction motif interne 🔴 (confidentiel) / communicable 🟡 (visible après publication)** rendue impossible à confondre, étendue à `liste_attente` en plus de `non_retenu` (le contrat backend ne restreint aucune décision). **Publication avec friction délibérée** : taper le nom exact de la campagne active le bouton « Publier définitivement » (pattern GitHub/Stripe pour un acte irréversible touchant potentiellement des centaines de candidats) — un `ConfirmDialog` standard aurait mis cet acte au niveau d'un toggle de filière. **État « déjà publié » = consultation stricte** : Calculer/Publier/Motif disparaissent, bandeau 🔒 avec date et auteur. **Petit complément backend** : `publiee_le`/`publiee_par` ajoutés à `GET .../classement` (liste blanche : le nom, jamais l'e-mail) pour que la traçabilité de l'acte survive à un rechargement de page, pas seulement à la réponse immédiate du `POST .../publier`. Pas de « Déclarer indisponible » (acte exceptionnel, 8d-3) ni d'« Exporter » (aucun endpoint, point ouvert). Preuve : `php artisan test` (303, +1), `vitest` (280, +39), E2E sur **base jetable** (`migrate:fresh` avant/après — la publication est irréversible) : calculer → motif → publier avec friction → état publié, **y compris après un F5** + captures 390/1280, smoke `curl` (bundle de production sans formule de classement, idempotence + motifs préservés au recalcul, 422/409 sur la publication, 403 sur les 4 endpoints).
 >   **8d-3** actes exceptionnels — correction, remplacement, élimination (**dernier sous-lot fonctionnel du frontend**). Backend **entièrement livré au Lot 6b** (26 tests `Feature/Admin/*`, rejoués en régression, toujours verts) : ce lot n'ajoute aucun endpoint, seulement l'UI. **Motif obligatoire réellement bloquant** sur les 3 actes — `MotifConfirmDialog.jsx` désactive la confirmation sous 3 caractères (miroir du `min:3` serveur), le 422 restant le dernier rempart ; dupliqué admin/évaluateur (l'élimination s'ouvre depuis les deux arbres) plutôt que remonté en pont. **Correction exceptionnelle** : bandeau explicite (« vous rouvrez une évaluation/un entretien validé… ») avant tout champ, réservée à l'administrateur depuis les écrans de notation verrouillés ; réponse POST de forme différente d'une Resource de notation → l'écran **recharge** plutôt que d'injecter, même patron que la publication au 8d-2 ; **aucune pré-vérification de publication côté client**, le 409 s'affiche verbatim si la campagne est déjà publiée. Portée **volontairement ciblée** sur le dossier (nationalité, diplôme SC.04, étoiles MO.04, commentaire) — **point ouvert explicite** : le backend accepte déjà toute auto-déclaration candidat (SC/SE/DI/langues/expériences), l'UI ne la construit pas encore (cf. ADR-25) ; l'entretien, lui, a une parité complète (12 sous-notes + observation). **Remplacement** : bouton uniquement sur un `retenu` d'un classement **publié** ; le candidat promu est montré AVANT confirmation — une **lecture** (pas un recalcul) du 1er `liste_attente` déjà trié serveur, présentée « sous réserve » ; le résultat définitif vient de la réponse POST, affiché ensuite, l'écran rechargeant faute de forme `ClassementResource`. **Élimination** : mono-cible partout (aucun endpoint bulk, contrairement au bouton « Marquer éliminé » en masse de la maquette), désactivée si déjà non éligible. **Aucune fuite** vers le candidat (garantie serveur au 6b, reconfirmée ici par un test dédié : la bannière admin elle-même ne mentionne jamais rang ni score). Preuve : `vitest` (321, +23), 3 gardes `noBridge` toujours vertes, les **26 tests backend `Feature/Admin/*` du Lot 6b rejoués en régression** (403/422/409/promotion/non-fuite), E2E `actes-exceptionnels.spec.js` sur **base jetable** (quota réduit par SQL pour obtenir une liste d'attente réelle) : correction dossier → correction entretien → calcul + publication + remplacement (candidate promue, capturé) → nouvelle correction **après publication** (409 verbatim) → élimination + captures 390/1280. Smoke `curl` d'abord reporté (419 systématique en script enchaîné), **élucidé et clos au Lot 9a — artefact `curl`** (idiome bash `printf %b` de décodage URL du token, fragile au quoting ; pattern `perl` de tous les autres lots = OK) : `smoke8d3.sh` refait, **34 OK / 0 FAIL** (cf. ADR points ouverts).
-> - **Lot 9** — intégration & déploiement : **9a** (fait) — (1) **419 CSRF élucidé** : artefact `curl` prouvé par bisection (`csrf419.sh`), rien à corriger côté auth, `smoke8d3.sh` restauré vert (cf. ADR-26) ; (2) **parcours d'intégration bout-en-bout** (`frontend/e2e/integration.spec.js`, tag `@integration`, on-demande via `npm run e2e:integration`, base jetable) prouvant que la chaîne entière (~30 lots) tient : **A.** un vrai candidat frais — inscription → wizard 10 étapes → soumission → affectation → vérification + notation dossier /65 + entretien /35 → verrouillage → calcul du classement → publication (friction) → **résultat « retenu »** ; en parallèle Sekou (non-éligible seedé) → **non-retenu générique indiscernable** (`innerHTML` byte-vérifié), avant comme après publication — la **règle reine** sur la chaîne complète ; **B.** remplacement post-publication **vu côté candidat** — le sortant voit « clôturée », le promu « retenue », sans fuite. **Friction découverte** (l'objet du lot) : `parcours-candidature.spec.js` soumettait un dossier **silencieusement non-éligible** (`sc05='oui'` = critère éliminatoire, masqué par la réponse neutre de `/soumettre`) — aucun E2E n'avait jamais prouvé un chemin jusqu'à `retenu` ; trou de couverture comblé (pas un bug). **Bilan de santé, stack Docker, tout vert (697 tests)** : `php artisan test` 303 · `vitest` 321 · E2E par-espace `npm run e2e` 64 · E2E intégration `npm run e2e:integration` 9. — **9b** (fait) — **durcissement sécurité + config de production paramétrable** (cf. section « Configuration de production » + ADR-27) : `docker-compose.prod.yml` en **override** (dev inchangé), **TLS dans nginx** (conf de prod, `server_name _`, chemins de cert fixes côté conteneur pilotés par `${TLS_DIR}`, 301 http→https, bootstrap self-signed + certbot hôte Ubuntu `--webroot`), **6 en-têtes de sécurité** + **CSP stricte** (`script-src 'self'` ; seuls relâchements `style-src 'unsafe-inline'` pour `style={{…}}` et `font-src data:` pour les sous-jeux Vite < 4 Ko — aucun vecteur d'exécution), Sanctum prod **100 % piloté par `env()`** (rien à toucher côté code — juste `SESSION_DOMAIN`/`SANCTUM_STATEFUL_DOMAINS`/`SESSION_SECURE_COOKIE=true`), `bootstrap/app.php` gagne `trustProxies` (durcissement/pré-LB, no-op en dev), `APP_DEBUG=false` (500 sans fuite), `backend/.dockerignore` (aucun secret/test dans l'image), secrets gitignorés. **Preuve prod-like** (`DOMAIN=casa.localhost`, self-signed) : `prodlike9b.sh` **31/0** + test navigateur **zéro violation CSP**. Non-régression : lint + auth (front 26, back 36). — **9c** (CI + doc de déploiement pas-à-pas) à venir.
+> - **Lot 9** — intégration & déploiement : **9a** (fait) — (1) **419 CSRF élucidé** : artefact `curl` prouvé par bisection (`csrf419.sh`), rien à corriger côté auth, `smoke8d3.sh` restauré vert (cf. ADR-26) ; (2) **parcours d'intégration bout-en-bout** (`frontend/e2e/integration.spec.js`, tag `@integration`, on-demande via `npm run e2e:integration`, base jetable) prouvant que la chaîne entière (~30 lots) tient : **A.** un vrai candidat frais — inscription → wizard 10 étapes → soumission → affectation → vérification + notation dossier /65 + entretien /35 → verrouillage → calcul du classement → publication (friction) → **résultat « retenu »** ; en parallèle Sekou (non-éligible seedé) → **non-retenu générique indiscernable** (`innerHTML` byte-vérifié), avant comme après publication — la **règle reine** sur la chaîne complète ; **B.** remplacement post-publication **vu côté candidat** — le sortant voit « clôturée », le promu « retenue », sans fuite. **Friction découverte** (l'objet du lot) : `parcours-candidature.spec.js` soumettait un dossier **silencieusement non-éligible** (`sc05='oui'` = critère éliminatoire, masqué par la réponse neutre de `/soumettre`) — aucun E2E n'avait jamais prouvé un chemin jusqu'à `retenu` ; trou de couverture comblé (pas un bug). **Bilan de santé, stack Docker, tout vert (697 tests)** : `php artisan test` 303 · `vitest` 321 · E2E par-espace `npm run e2e` 64 · E2E intégration `npm run e2e:integration` 9. — **9b** (fait) — **durcissement sécurité + config de production paramétrable** (cf. section « Configuration de production » + ADR-27) : `docker-compose.prod.yml` en **override** (dev inchangé), **TLS dans nginx** (conf de prod, `server_name _`, chemins de cert fixes côté conteneur pilotés par `${TLS_DIR}`, 301 http→https, bootstrap self-signed + certbot hôte Ubuntu `--webroot`), **6 en-têtes de sécurité** + **CSP stricte** (`script-src 'self'` ; seuls relâchements `style-src 'unsafe-inline'` pour `style={{…}}` et `font-src data:` pour les sous-jeux Vite < 4 Ko — aucun vecteur d'exécution), Sanctum prod **100 % piloté par `env()`** (rien à toucher côté code — juste `SESSION_DOMAIN`/`SANCTUM_STATEFUL_DOMAINS`/`SESSION_SECURE_COOKIE=true`), `bootstrap/app.php` gagne `trustProxies` (durcissement/pré-LB, no-op en dev), `APP_DEBUG=false` (500 sans fuite), `backend/.dockerignore` (aucun secret/test dans l'image), secrets gitignorés. **Preuve prod-like** (`DOMAIN=casa.localhost`, self-signed) : `prodlike9b.sh` **31/0** + test navigateur **zéro violation CSP**. Non-régression : lint + auth (front 26, back 36). — **9c** (fait, **dernier lot**) — **CI + documentation de déploiement** (cf. ADR-28) : adoption de **Laravel Pint** (`backend/pint.json`, reformat cosmétique isolé — commit séparé `f4b1910`) devenu barrière CI ; **`.github/workflows/ci.yml`** (4 jobs à `push`/PR : `backend` = `casa:test-db` + `php artisan test` + `pint --test` sur un vrai Postgres ; `frontend` = lint + vitest + build ; `prod-config` = `docker compose … config -q` ; `e2e` = stack Docker + `npm run e2e --project=desktop`) + **`nightly.yml`** (E2E desktop **+ mobile** + `@integration`, 03:00 UTC) ; **chemin Windows en dur supprimé** des 7 specs E2E (`fileURLToPath` → projet testable par n'importe qui) ; **2 commandes de déploiement testées** — `casa:seed-referentiel` (référentiel **sans** les comptes démo à mot de passe public) et `casa:create-admin` (premier admin en prod : mot de passe validé, e-mail unique, transaction + audit) ; **`docker/backend/entrypoint.sh`** reconstruit les caches Laravel à chaque démarrage (résout le piège « `config:cache` fige l'env » ; migrations restées manuelles) ; **HSTS `preload`** tranché — non par défaut, opt-in commenté ; **`docs/DEPLOIEMENT.md`** (Ubuntu vierge → prod, chaque commande en entier, checklist post-déploiement, maintenance/sauvegardes/rollback/« si X casse »), suivi en prod-like de bout en bout ; **`docs/POINTS-OUVERTS.md`** (inventaire vivant de tout ce qui a été reporté). **Bilan final tout vert** : `php artisan test` **310** · `vitest` **321** · E2E `npm run e2e` **64** · `npm run e2e:integration` **9**.
+
+## État du projet (livraison finale — Lot 9c)
+
+Le projet est **fonctionnellement complet** et **déployable**. La chaîne entière
+(inscription candidat → wizard → soumission → affectation → vérification →
+notation dossier /65 + entretien /35 → verrouillage → classement → publication →
+résultat candidat, plus les actes exceptionnels) est implémentée, testée unité +
+intégration, et prouvée bout-en-bout sur la stack Docker.
+
+| Volet | Chiffre | Commande |
+|---|---|---|
+| Tests backend (PostgreSQL réel) | **310** (1634 assertions) | `docker compose exec backend php artisan test` |
+| Style backend | barrière verte | `docker compose exec backend vendor/bin/pint --test` |
+| Tests frontend (composants + hooks) | **321** | `cd frontend && npm run test` |
+| E2E par-espace (desktop + mobile) | **64** | `cd frontend && npm run e2e` |
+| E2E intégration bout-en-bout | **9** | `cd frontend && npm run e2e:integration` |
+| CI | écrite, prouvée en local | `.github/workflows/{ci,nightly}.yml` (nécessite un `git remote`) |
+
+**Reste avant une vraie mise en service** (détail et statut :
+[`docs/POINTS-OUVERTS.md`](docs/POINTS-OUVERTS.md)) :
+- 🔴 **relecture des textes candidats par les partenaires institutionnels**
+  (CCI-CI / FADV / AICS) — seul point bloquant ;
+- 🟠 non bloquants pour une prod pilote : création/édition de campagne en UI
+  (aujourd'hui par SQL, cf. `DEPLOIEMENT.md` § 11.9), correction des
+  auto-déclarations candidat, notifications e-mail/SMS, export de rapports,
+  vérification d'e-mail à l'inscription ;
+- 🟡 tranchés, opt-in : HSTS `preload`, `config:cache` multi-réplicas.
+
+**Déploiement** : suivre [`docs/DEPLOIEMENT.md`](docs/DEPLOIEMENT.md) (Ubuntu
+vierge → instance en production).
 
 ## Structure
 
 ```
 casa-app/
 ├── backend/     Laravel 12 (API REST), Sanctum SPA, métier complet (Lots 0-7)
+│   └── app/Console/Commands/  casa:test-db, casa:seed-referentiel, casa:create-admin
 ├── frontend/    React 19 + Vite : client API (cycle Sanctum), contexte auth, routing
-│               par rôle, accueil public + inscription, wizard de candidature (Lot 8a/8b)
+│   │           par rôle, tous les espaces (public, candidat, évaluateur, admin)
+│   └── e2e/     Playwright — par-espace + intégration bout-en-bout (@integration)
 ├── docker/
-│   └── nginx/default.conf   reverse proxy unique : /api -> backend, / -> frontend
-├── docs/        conception (dictionnaire de données, MCD, MLD, UML, ADR)
-├── docker-compose.yml
-└── .env.example
+│   ├── nginx/   default.conf (dev) · casa.prod.conf (TLS + en-têtes + CSP) · scripts cert
+│   └── backend/ entrypoint.sh (reconstruit les caches Laravel au boot, prod)
+├── docs/        conception (dictionnaire, MCD, MLD, UML) · ADR.md · DEPLOIEMENT.md · POINTS-OUVERTS.md
+├── .github/workflows/   ci.yml (push/PR) · nightly.yml (E2E complète)
+├── docker-compose.yml            (dev, jamais modifié)
+├── docker-compose.prod.yml       (override prod — ADR-27/28)
+├── .env.example  ·  .env.production.example  ·  backend/.env.production.example
 ```
 
 ## Stack
@@ -64,9 +99,11 @@ docker compose ps
 
 **Point d'entrée unique** : http://localhost:8080 (frontend). API : http://localhost:8080/api/\*. Sonde de santé backend : http://localhost:8080/up.
 
-## Configuration de production (Lot 9b — ADR-27)
+## Configuration de production (Lot 9b/9c — ADR-27, ADR-28)
 
-Le dev (ci-dessus) reste **strictement inchangé**. La prod ajoute un **override** qui n'exprime que les différences (TLS, en-têtes de sécurité, CSP, image figée) — `docker-compose.yml` n'est jamais modifié. **Rien n'est codé en dur** : domaine, chemins de certificats et secrets sont tous des variables.
+> **Guide pas-à-pas complet : [`docs/DEPLOIEMENT.md`](docs/DEPLOIEMENT.md)** — d'un Ubuntu vierge à une instance qui tourne, chaque commande en entier, checklist post-déploiement et maintenance. La section ci-dessous en est le résumé.
+
+Le dev (ci-dessus) reste **strictement inchangé**. La prod ajoute un **override** qui n'exprime que les différences (TLS, en-têtes de sécurité, CSP, image figée, entrypoint qui reconstruit les caches) — `docker-compose.yml` n'est jamais modifié. **Rien n'est codé en dur** : domaine, chemins de certificats et secrets sont tous des variables.
 
 ```bash
 # 1. Fichiers d'environnement de prod (GITIGNORÉS)
@@ -80,11 +117,18 @@ docker compose --env-file .env.production \
 #    a besoin de nginx en marche → œuf/poule)
 TLS_DIR=./docker/nginx/tls DOMAIN=casa.example.org ./docker/nginx/gen-selfsigned.sh
 
-# 3. Build + démarrage
+# 3. Build + démarrage (l'entrypoint reconstruit les caches Laravel au boot — ADR-28)
 docker compose --env-file .env.production \
   -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-docker compose --env-file .env.production \
-  -f docker-compose.yml -f docker-compose.prod.yml exec backend php artisan migrate --seed --force
+
+# 3b. Base : migrations NON destructives (jamais migrate:fresh), puis référentiel
+#     SANS les comptes démo, puis premier administrateur.
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml \
+  exec backend php artisan migrate --force
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml \
+  exec backend php artisan casa:seed-referentiel
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml \
+  exec backend php artisan casa:create-admin coordination@casa.example.org
 
 # 4. Vrai certificat Let's Encrypt (hôte Ubuntu ; nginx sert déjà /.well-known/acme-challenge/)
 sudo apt install certbot
@@ -129,7 +173,7 @@ Sanctum en mode SPA (cookie de session same-origin, **jamais** de token Bearer �
 | GET | `/api/ping-evaluateur` | `evaluateur` **ou** `administrateur` (ADR-10) | idem. |
 | GET | `/api/ping-admin` | `administrateur` strict | idem. |
 
-**Comptes de démonstration** (seedés, mot de passe `Demo2026!`) : `candidat@casa-demo.ci`, `evaluateur@casa-demo.ci`, `admin@casa-demo.ci`.
+**Comptes de démonstration** (seedés en **dev uniquement** par `ComptesDemoSeeder`, mot de passe `Demo2026!`) : `candidat@casa-demo.ci`, `evaluateur@casa-demo.ci`, `admin@casa-demo.ci`. En **production** ces comptes ne sont jamais créés (`casa:seed-referentiel` ne joue pas `ComptesDemoSeeder`) ; le premier administrateur se crée avec `casa:create-admin` (cf. `docs/DEPLOIEMENT.md` § 9).
 
 ## Tests
 
@@ -139,10 +183,13 @@ Le schéma est spécifique à PostgreSQL (trigger append-only, `CHECK`, `uuid`) 
 # 1. Créer la base de test (reproductible ; --fresh pour la recréer)
 docker compose exec backend php artisan casa:test-db
 
-# 2. Lancer la suite (RefreshDatabase applique les migrations réelles)
+# 2. Lancer la suite (RefreshDatabase applique les migrations réelles) — 310 tests
 docker compose exec backend php artisan test
 
-# Frontend — composants + hooks
+# 2b. Style (barrière CI depuis le Lot 9c)
+docker compose exec backend vendor/bin/pint --test
+
+# Frontend — composants + hooks — 321 tests
 cd frontend && npm run test
 
 # E2E (stack Docker :8080) — filet quotidien, par-espace (~15 min)
@@ -173,7 +220,9 @@ casa-app-nginx-1      Up (healthy)
 | `mld.md` | Modèle Logique de Données — DDL PostgreSQL prêt à traduire en migrations Laravel (pas des migrations réelles dans ce lot). |
 | `uml-cas-usage.md` | 3 diagrammes de cas d'usage (Candidat / Évaluateur / Administrateur), PlantUML. |
 | `uml-sequences.md` | 3 séquences critiques (soumission+éligibilité serveur ; verrouillage+correction ; publication et visibilité candidat avant/après), Mermaid. |
-| `ADR.md` | Décisions d'architecture (contexte → décision → conséquence), y compris la dérivation serveur du statut public (ADR-03). |
+| `ADR.md` | Décisions d'architecture (contexte → décision → conséquence), y compris la dérivation serveur du statut public (ADR-03). ADR-01 → ADR-28. |
+| `DEPLOIEMENT.md` | Déploiement pas-à-pas : Ubuntu vierge → instance en production (prérequis, TLS, migrations, premier admin, checklist, maintenance). |
+| `POINTS-OUVERTS.md` | Inventaire **vivant** de tout ce qui a été consciemment reporté (statut 🔴/🟠/🟡/🟢, trace, effort). |
 
 ## Rappels de règles non négociables (détail : `docs/ADR.md`)
 
@@ -184,6 +233,10 @@ casa-app-nginx-1      Up (healthy)
 5. Journal d'audit persistant et immuable (applicatif).
 6. Barème en base, versionné — jamais codé en dur.
 
-## Prochains lots (hors périmètre de celui-ci)
+## Après ce projet
 
-Migrations réelles + seeders (grille officielle en données), modèles Eloquent + policies, endpoints API (auth, candidature, évaluation, entretien, classement, publication, audit), écrans React par rôle, tests automatisés (dont un test dédié à la non-fuite de données confidentielles vers le rôle candidat).
+Le périmètre des 40 lots est **livré**. La suite éventuelle est cataloguée et
+priorisée dans [`docs/POINTS-OUVERTS.md`](docs/POINTS-OUVERTS.md) : d'abord la
+relecture institutionnelle des textes candidats (bloquant), puis les
+fonctionnalités non bloquantes (création de campagne en UI, correction des
+auto-déclarations, notifications, export) et les durcissements différés.
