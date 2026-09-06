@@ -49,6 +49,11 @@ export default defineConfig({
       // reste bien celui du mobile.
       name: 'mobile',
       use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 }, isMobile: false },
+      // Le parcours d'intégration (Lot 9a) tourne sur `desktop` uniquement — son
+      // helper `shots()` bascule déjà le viewport 390/1280 pour les captures, et
+      // ses variables de module partagées (freshEmail/freshId) ne survivraient
+      // pas à un 2e passage projet.
+      testIgnore: ['**/integration.spec.js'],
     },
   ],
 })

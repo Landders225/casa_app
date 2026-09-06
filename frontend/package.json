@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test",
+    "e2e": "playwright test --grep-invert @integration",
+    "e2e:integration": "playwright test --grep @integration",
     "e2e:report": "playwright show-report"
   },
   "dependencies": {
