@@ -69,21 +69,21 @@ return new class extends Migration
         // CHECK d'énumération — un NULL passe (sémantique SQL standard : CHECK
         // n'échoue que sur FALSE), cohérent avec le remplissage progressif.
         $enums = [
-            'sc01_scolarise_actuellement'          => ['oui', 'non'],
-            'sc02_derniere_classe'                 => ['avant_3e', 'cap', '3e', 'seconde', '1ere', 'terminale', 'bt_bep'],
-            'sc03_document_justifiant_niveau'      => ['oui', 'non'],
+            'sc01_scolarise_actuellement' => ['oui', 'non'],
+            'sc02_derniere_classe' => ['avant_3e', 'cap', '3e', 'seconde', '1ere', 'terminale', 'bt_bep'],
+            'sc03_document_justifiant_niveau' => ['oui', 'non'],
             'sc05_beneficiaire_formation_actuelle' => ['oui', 'non'],
-            'se01_vit_avec'                        => ['pere', 'mere', 'les_deux', 'aucun'],
-            'se02_orphelin'                        => ['oui', 'non'],
-            'se03_situation_emploi'                => ['sans_emploi', 'stage', 'interim', 'temps_partiel', 'temps_plein'],
-            'se04_source_revenu'                   => ['parent', 'conjoint', 'agr', 'aucune'],
-            'se05_personnes_a_charge'              => ['0', '1-2', '3+'],
-            'se06_soutien_menage'                  => ['oui', 'non'],
-            'acces_plateau'                        => ['oui', 'non'],
-            'acces_deux_plateaux_vallons'          => ['oui', 'non'],
-            'di01_disponible_lun_ven'             => ['oui', 'non'],
-            'di02_contraintes'                     => ['aucune', 'gerable', 'bloquante'],
-            'di03_engagement_complet'             => ['oui', 'non'],
+            'se01_vit_avec' => ['pere', 'mere', 'les_deux', 'aucun'],
+            'se02_orphelin' => ['oui', 'non'],
+            'se03_situation_emploi' => ['sans_emploi', 'stage', 'interim', 'temps_partiel', 'temps_plein'],
+            'se04_source_revenu' => ['parent', 'conjoint', 'agr', 'aucune'],
+            'se05_personnes_a_charge' => ['0', '1-2', '3+'],
+            'se06_soutien_menage' => ['oui', 'non'],
+            'acces_plateau' => ['oui', 'non'],
+            'acces_deux_plateaux_vallons' => ['oui', 'non'],
+            'di01_disponible_lun_ven' => ['oui', 'non'],
+            'di02_contraintes' => ['aucune', 'gerable', 'bloquante'],
+            'di03_engagement_complet' => ['oui', 'non'],
         ];
         foreach ($enums as $col => $vals) {
             $list = implode(', ', array_map(fn ($v) => "'".$v."'", $vals));

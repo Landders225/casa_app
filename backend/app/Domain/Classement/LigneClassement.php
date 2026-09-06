@@ -27,6 +27,5 @@ final class LigneClassement
         public readonly float $scoreEntretien,
         public readonly array $departage,
         public readonly bool $nonEligible,
-    ) {
-    }
+    ) {}
 }

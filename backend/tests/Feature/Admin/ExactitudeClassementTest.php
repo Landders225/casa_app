@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Domain\Classement\LigneClassement;
 use App\Domain\Classement\ServiceClassement;
 use App\Models\Campagne;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -30,7 +32,9 @@ class ExactitudeClassementTest extends TestCase
     use RefreshDatabase;
 
     private Campagne $campagne;
+
     private User $evaluateur;
+
     private ServiceClassement $service;
 
     protected function setUp(): void
@@ -44,9 +48,9 @@ class ExactitudeClassementTest extends TestCase
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, \App\Domain\Classement\LigneClassement>
+     * @return Collection<int, LigneClassement>
      */
-    private function lignesCuisine(): \Illuminate\Support\Collection
+    private function lignesCuisine(): Collection
     {
         return collect($this->service->calculer($this->campagne->fresh())->lignes)
             ->where('filiereCode', 'cuisine')

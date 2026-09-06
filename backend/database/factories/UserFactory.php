@@ -2,10 +2,11 @@
 
 namespace Database\Factories;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<\App\Models\User>
+ * @extends Factory<User>
  *
  * Aligné sur la table `utilisateur` (docs/mld.md §1) : e-mail /
  * `mot_de_passe_hash` / `role` / `actif`. Pas de `name`, `password`,

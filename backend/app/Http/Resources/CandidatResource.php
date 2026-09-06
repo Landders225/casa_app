@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Candidat;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,7 +10,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Profil candidat — liste blanche (ADR-02). Toutes les colonnes de `candidat`
  * sont 🟢 ; renvoyées uniquement à l'utilisateur lui-même (via /api/me).
  *
- * @mixin \App\Models\Candidat
+ * @mixin Candidat
  */
 class CandidatResource extends JsonResource
 {

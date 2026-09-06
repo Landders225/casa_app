@@ -37,9 +37,7 @@ use Illuminate\Support\Facades\DB;
  */
 class EvaluationController extends Controller
 {
-    public function __construct(private readonly ServiceScoring $scoring)
-    {
-    }
+    public function __construct(private readonly ServiceScoring $scoring) {}
 
     /**
      * Aperçu (dossier non verrouillé) ou snapshot figé (verrouillé).

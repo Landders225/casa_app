@@ -25,6 +25,7 @@ final class ServiceEligibilite
 
     /** Bornes d'âge (scoring.js). */
     private const AGE_MIN = 18;
+
     private const AGE_MAX = 30;
 
     /** Seuil de français : moyenne écrit/parlé/compréhension >= 2 (échelle 0-3). */

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -41,7 +42,7 @@ class RoleAccessTest extends TestCase
     /**
      * @param  array<string,int>  $attendus
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('matrice')]
+    #[DataProvider('matrice')]
     public function test_role_matrix(string $role, array $attendus): void
     {
         $user = User::factory()->state(['role' => $role])->create();

@@ -19,9 +19,7 @@ use Illuminate\Support\Facades\DB;
  */
 class PieceDossierController extends Controller
 {
-    public function __construct(private readonly StockagePieces $stockage)
-    {
-    }
+    public function __construct(private readonly StockagePieces $stockage) {}
 
     /**
      * POST /api/candidatures/{candidature}/pieces/{type}

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\ExperienceProfessionnelle;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -10,7 +11,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * brut n'est pas exposé ; `justificatif` porte les métadonnées de la pièce
  * (Lot 3b) ou null.
  *
- * @mixin \App\Models\ExperienceProfessionnelle
+ * @mixin ExperienceProfessionnelle
  */
 class ExperienceResource extends JsonResource
 {

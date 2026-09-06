@@ -22,9 +22,13 @@ class CorrectionExceptionnelleTest extends TestCase
     use RefreshDatabase;
 
     private Campagne $campagne;
+
     private User $admin;
+
     private User $evaluateur;
+
     private User $candidatUser;
+
     private Candidature $candidature;
 
     protected function setUp(): void

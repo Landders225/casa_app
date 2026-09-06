@@ -6,6 +6,7 @@ use App\Models\Candidature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -18,7 +19,9 @@ class IsolationEvaluateurTest extends TestCase
     use RefreshDatabase;
 
     private User $evalA;
+
     private User $evalB;
+
     private Candidature $dossierDeB;
 
     protected function setUp(): void
@@ -61,7 +64,7 @@ class IsolationEvaluateurTest extends TestCase
     public function test_dossier_inexistant_404(): void
     {
         $this->actingAs($this->evalA)
-            ->getJson('/api/evaluateur/candidatures/'.\Illuminate\Support\Str::uuid())
+            ->getJson('/api/evaluateur/candidatures/'.Str::uuid())
             ->assertStatus(404);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Evaluateur;
 
+use App\Models\ExperienceProfessionnelle;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,7 +10,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Expérience professionnelle déclarée, vue par l'évaluateur (avec le
  * justificatif rattaché).
  *
- * @mixin \App\Models\ExperienceProfessionnelle
+ * @mixin ExperienceProfessionnelle
  */
 class ExperienceEvaluateurResource extends JsonResource
 {

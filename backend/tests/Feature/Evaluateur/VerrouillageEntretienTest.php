@@ -20,6 +20,7 @@ class VerrouillageEntretienTest extends TestCase
     use RefreshDatabase;
 
     private User $evaluateur;
+
     private Candidature $candidature;
 
     /** @var array<string,int> Cas « fort » → 33,0 */

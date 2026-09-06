@@ -37,10 +37,11 @@ final class ServiceEligibiliteInitiale
 
     /** Bornes d'âge (scoring.js). */
     private const AGE_MIN = 18;
+
     private const AGE_MAX = 30;
 
     /**
-     * @return list<string>  motifs de refus ; liste vide == éligible à l'inscription
+     * @return list<string> motifs de refus ; liste vide == éligible à l'inscription
      */
     public function evaluer(
         CarbonInterface $dateNaissance,

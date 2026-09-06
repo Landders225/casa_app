@@ -18,6 +18,5 @@ final class SousNoteScore
         public readonly string $rubriqueCode,
         public readonly float $max,
         public readonly float $points,
-    ) {
-    }
+    ) {}
 }

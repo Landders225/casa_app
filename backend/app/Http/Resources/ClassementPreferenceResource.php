@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\ClassementFilierePreference;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,7 +10,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Une ligne de classement de préférence (filière + rang). Toutes données 🟢
  * (préférence exprimée par le candidat lui-même).
  *
- * @mixin \App\Models\ClassementFilierePreference
+ * @mixin ClassementFilierePreference
  */
 class ClassementPreferenceResource extends JsonResource
 {

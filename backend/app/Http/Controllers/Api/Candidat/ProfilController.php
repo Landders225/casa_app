@@ -28,9 +28,7 @@ use Illuminate\Http\Request;
  */
 class ProfilController extends Controller
 {
-    public function __construct(private readonly ServiceEligibiliteInitiale $eligibiliteInitiale)
-    {
-    }
+    public function __construct(private readonly ServiceEligibiliteInitiale $eligibiliteInitiale) {}
 
     public function show(Request $request): CandidatResource
     {

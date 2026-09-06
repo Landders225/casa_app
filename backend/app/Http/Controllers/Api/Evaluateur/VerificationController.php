@@ -29,9 +29,7 @@ use Illuminate\Support\Str;
  */
 class VerificationController extends Controller
 {
-    public function __construct(private readonly ServiceEligibilite $eligibilite)
-    {
-    }
+    public function __construct(private readonly ServiceEligibilite $eligibilite) {}
 
     public function update(VerifierDossierRequest $request, Candidature $candidature): CandidatureEvaluateurResource
     {

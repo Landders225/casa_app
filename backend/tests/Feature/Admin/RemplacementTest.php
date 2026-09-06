@@ -22,10 +22,15 @@ class RemplacementTest extends TestCase
     use RefreshDatabase;
 
     private Campagne $campagne;
+
     private User $admin;
+
     private User $evaluateur;
+
     private Candidature $retenu;
+
     private Candidature $premiereAttente;
+
     private Candidature $secondeAttente;
 
     protected function setUp(): void

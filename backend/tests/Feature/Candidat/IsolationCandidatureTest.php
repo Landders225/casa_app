@@ -3,6 +3,7 @@
 namespace Tests\Feature\Candidat;
 
 use App\Models\Candidature;
+use App\Models\Filiere;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -17,8 +18,11 @@ class IsolationCandidatureTest extends TestCase
     use RefreshDatabase;
 
     private User $a;
+
     private User $b;
+
     private string $candidatureB;
+
     private string $experienceB;
 
     protected function setUp(): void
@@ -74,7 +78,7 @@ class IsolationCandidatureTest extends TestCase
 
     public function test_A_ne_peut_pas_modifier_le_classement_de_B(): void
     {
-        $ordre = \App\Models\Filiere::orderBy('code')->pluck('id')->all();
+        $ordre = Filiere::orderBy('code')->pluck('id')->all();
 
         $this->actingAs($this->a)->putJson(
             "/api/candidatures/{$this->candidatureB}/classement",

@@ -16,6 +16,5 @@ final class RubriqueScore
         public readonly string $label,
         public readonly float $max,
         public readonly float $score,
-    ) {
-    }
+    ) {}
 }

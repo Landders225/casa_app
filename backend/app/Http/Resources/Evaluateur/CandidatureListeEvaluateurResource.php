@@ -2,13 +2,14 @@
 
 namespace App\Http\Resources\Evaluateur;
 
+use App\Models\Candidature;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Ligne de la liste « mes dossiers » de l'évaluateur (vue allégée).
  *
- * @mixin \App\Models\Candidature
+ * @mixin Candidature
  */
 class CandidatureListeEvaluateurResource extends JsonResource
 {

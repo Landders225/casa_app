@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Evaluateur;
 
+use App\Models\PieceJustificative;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -10,7 +11,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * téléchargement ÉVALUATEUR (pas la route candidat). `chemin_stockage` n'est
  * jamais exposé (🔴).
  *
- * @mixin \App\Models\PieceJustificative
+ * @mixin PieceJustificative
  */
 class PieceEvaluateurResource extends JsonResource
 {

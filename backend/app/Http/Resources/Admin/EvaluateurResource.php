@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Admin;
 
+use App\Models\MembreEquipe;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,7 +15,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * jamais `email` ni aucune donnée liée au compte `utilisateur` — ce n'est ni un
  * annuaire ni une fiche de compte.
  *
- * @mixin \App\Models\MembreEquipe
+ * @mixin MembreEquipe
  */
 class EvaluateurResource extends JsonResource
 {

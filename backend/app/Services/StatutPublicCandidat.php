@@ -21,6 +21,5 @@ final class StatutPublicCandidat
         public readonly string $statutPublic,
         public readonly ?string $decision = null,
         public readonly ?string $motifCommunicable = null,
-    ) {
-    }
+    ) {}
 }

@@ -15,7 +15,9 @@ class JustificatifExperienceTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private string $candidatureId;
+
     private string $experienceId;
 
     protected function setUp(): void

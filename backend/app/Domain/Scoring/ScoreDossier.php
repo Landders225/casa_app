@@ -20,8 +20,7 @@ final class ScoreDossier
         public readonly float $total,
         public readonly float $voletMax,
         public readonly array $rubriques,
-    ) {
-    }
+    ) {}
 
     public function rubrique(string $code): RubriqueScore
     {

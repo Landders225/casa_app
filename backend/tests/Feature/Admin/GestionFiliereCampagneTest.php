@@ -4,9 +4,11 @@ namespace Tests\Feature\Admin;
 
 use App\Models\Campagne;
 use App\Models\Filiere;
+use App\Models\JournalAudit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Tests\Feature\Evaluateur\CreeContexteEvaluation;
 use Tests\TestCase;
 
@@ -29,7 +31,7 @@ class GestionFiliereCampagneTest extends TestCase
         $this->admin = $this->creerAdmin('admin@casa-demo.ci');
     }
 
-    private function creerCandidature(string $filiere = 'cuisine'): \Illuminate\Testing\TestResponse
+    private function creerCandidature(string $filiere = 'cuisine'): TestResponse
     {
         return $this->actingAs($this->creerCandidat())
             ->postJson('/api/candidatures', ['filiere_id' => $this->idFiliere($filiere)]);
@@ -76,7 +78,7 @@ class GestionFiliereCampagneTest extends TestCase
 
         $this->actingAs($this->admin)->patchJson("/api/admin/filieres/{$filiere->id}", ['actif' => true])->assertOk();
 
-        $this->assertSame(0, \App\Models\JournalAudit::where('module', 'Filières')->count());
+        $this->assertSame(0, JournalAudit::where('module', 'Filières')->count());
     }
 
     public function test_gestion_filiere_admin_only(): void

@@ -24,8 +24,7 @@ final class ScoreEntretien
         public readonly float $voletMax,
         public readonly array $rubriques,
         public readonly array $sousNotes,
-    ) {
-    }
+    ) {}
 
     public function rubrique(string $code): RubriqueScore
     {

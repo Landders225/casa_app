@@ -37,9 +37,7 @@ use Illuminate\Support\Facades\DB;
  */
 class EntretienController extends Controller
 {
-    public function __construct(private readonly ServiceScoring $scoring)
-    {
-    }
+    public function __construct(private readonly ServiceScoring $scoring) {}
 
     public function show(Candidature $candidature): EntretienResource
     {

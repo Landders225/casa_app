@@ -15,8 +15,7 @@ final class ResultatClassement
     public function __construct(
         public readonly array $lignes,
         public readonly array $filieres,
-    ) {
-    }
+    ) {}
 
     /**
      * @return list<string>

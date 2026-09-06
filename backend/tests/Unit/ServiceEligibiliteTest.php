@@ -61,14 +61,14 @@ class ServiceEligibiliteTest extends TestCase
     public static function criteresProvider(): array
     {
         return [
-            'SC.01 scolarisé'              => [['sc01_scolarise_actuellement' => 'oui'], 'SC.01'],
-            'SC.02 avant la 3e'            => [['sc02_derniere_classe' => 'avant_3e'], 'SC.02'],
-            'SC.05 formation en cours'     => [['sc05_beneficiaire_formation_actuelle' => 'oui'], 'SC.05'],
-            'SE.03 temps partiel'          => [['se03_situation_emploi' => 'temps_partiel'], 'SE.03'],
-            'SE.03 temps plein'            => [['se03_situation_emploi' => 'temps_plein'], 'SE.03'],
-            'français moyenne < 2'         => [['langue_ecrit' => 1, 'langue_parle' => 1, 'langue_comprehension' => 2], 'francais'],
-            'DI.01 non disponible'         => [['di01_disponible_lun_ven' => 'non'], 'DI.01'],
-            'DI.03 pas d engagement'       => [['di03_engagement_complet' => 'non'], 'DI.03'],
+            'SC.01 scolarisé' => [['sc01_scolarise_actuellement' => 'oui'], 'SC.01'],
+            'SC.02 avant la 3e' => [['sc02_derniere_classe' => 'avant_3e'], 'SC.02'],
+            'SC.05 formation en cours' => [['sc05_beneficiaire_formation_actuelle' => 'oui'], 'SC.05'],
+            'SE.03 temps partiel' => [['se03_situation_emploi' => 'temps_partiel'], 'SE.03'],
+            'SE.03 temps plein' => [['se03_situation_emploi' => 'temps_plein'], 'SE.03'],
+            'français moyenne < 2' => [['langue_ecrit' => 1, 'langue_parle' => 1, 'langue_comprehension' => 2], 'francais'],
+            'DI.01 non disponible' => [['di01_disponible_lun_ven' => 'non'], 'DI.01'],
+            'DI.03 pas d engagement' => [['di03_engagement_complet' => 'non'], 'DI.03'],
         ];
     }
 

@@ -15,6 +15,7 @@ class VerificationDossierTest extends TestCase
     use RefreshDatabase;
 
     private User $evaluateur;
+
     private Candidature $candidature;
 
     protected function setUp(): void

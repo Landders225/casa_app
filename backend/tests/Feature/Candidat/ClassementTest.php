@@ -5,6 +5,7 @@ namespace Tests\Feature\Candidat;
 use App\Models\Filiere;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ClassementTest extends TestCase
@@ -13,6 +14,7 @@ class ClassementTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private string $candidatureId;
 
     protected function setUp(): void
@@ -66,7 +68,7 @@ class ClassementTest extends TestCase
     public function test_classement_avec_filiere_inconnue_rejete(): void
     {
         $ordre = Filiere::orderBy('code')->limit(4)->pluck('id')->all();
-        $ordre[] = (string) \Illuminate\Support\Str::uuid();
+        $ordre[] = (string) Str::uuid();
 
         $this->actingAs($this->user)->putJson(
             "/api/candidatures/{$this->candidatureId}/classement",

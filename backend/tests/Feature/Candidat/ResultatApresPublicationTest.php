@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Tests\Feature\Admin\CreeContexteClassement;
 use Tests\TestCase;
 
@@ -30,7 +31,9 @@ class ResultatApresPublicationTest extends TestCase
     use RefreshDatabase;
 
     private Campagne $campagne;
+
     private User $admin;
+
     private User $evaluateur;
 
     protected function setUp(): void
@@ -60,7 +63,7 @@ class ResultatApresPublicationTest extends TestCase
         return User::findOrFail($candidature->candidat->utilisateur_id);
     }
 
-    private function resultat(Candidature $candidature): \Illuminate\Testing\TestResponse
+    private function resultat(Candidature $candidature): TestResponse
     {
         return $this->actingAs($this->utilisateur($candidature))->getJson('/api/candidature')->assertOk();
     }

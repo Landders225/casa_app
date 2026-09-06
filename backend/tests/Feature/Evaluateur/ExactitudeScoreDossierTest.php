@@ -45,7 +45,7 @@ class ExactitudeScoreDossierTest extends TestCase
     /**
      * Construit une candidature scorable avec des réponses maîtrisées.
      *
-     * @param  array<string, mixed>  $reponses     colonnes de `reponse_formulaire` (+ `mo04_note_etoiles`)
+     * @param  array<string, mixed>  $reponses  colonnes de `reponse_formulaire` (+ `mo04_note_etoiles`)
      * @param  list<array{0:string,1:string}>  $experiences  [domaine, duree_categorie]
      */
     private function candidature(array $reponses, ?string $diplome = null, array $experiences = []): Candidature

@@ -22,9 +22,13 @@ class NonFuiteClassementTest extends TestCase
     use RefreshDatabase;
 
     private Campagne $campagne;
+
     private User $admin;
+
     private User $evaluateur;
+
     private User $candidat;
+
     private Candidature $candidature;
 
     protected function setUp(): void

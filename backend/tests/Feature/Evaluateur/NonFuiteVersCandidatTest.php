@@ -22,7 +22,9 @@ class NonFuiteVersCandidatTest extends TestCase
     use RefreshDatabase;
 
     private User $candidat;
+
     private User $evaluateur;
+
     private Candidature $candidature;
 
     protected function setUp(): void

@@ -20,9 +20,7 @@ use Illuminate\Support\Facades\DB;
  */
 class JustificatifExperienceController extends Controller
 {
-    public function __construct(private readonly StockagePieces $stockage)
-    {
-    }
+    public function __construct(private readonly StockagePieces $stockage) {}
 
     /**
      * POST /api/candidatures/{candidature}/experiences/{experience}/justificatif

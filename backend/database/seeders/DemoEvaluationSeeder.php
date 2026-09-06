@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Campagne;
 use App\Models\Candidat;
 use App\Models\Candidature;
 use App\Models\Filiere;
@@ -34,7 +35,7 @@ class DemoEvaluationSeeder extends Seeder
         $candidat = Candidat::where('utilisateur_id', $candidatUser->id)->firstOrFail();
         $membreEquipe = $evaluateurUser->membreEquipe;
 
-        $campagne = \App\Models\Campagne::where('statut', 'ouverte')->firstOrFail();
+        $campagne = Campagne::where('statut', 'ouverte')->firstOrFail();
         $filiere = Filiere::where('code', 'accueil-reception')->firstOrFail();
 
         $candidature = Candidature::firstOrCreate(

@@ -32,8 +32,7 @@ class SoumissionController extends Controller
         private readonly ValidateurCompletude $completude,
         private readonly ServiceEligibilite $eligibilite,
         private readonly StatutPublicResolver $statutPublic,
-    ) {
-    }
+    ) {}
 
     public function __invoke(Request $request, Candidature $candidature): JsonResponse
     {

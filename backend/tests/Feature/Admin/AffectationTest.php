@@ -7,6 +7,7 @@ use App\Models\JournalAudit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Tests\Feature\Evaluateur\CreeContexteEvaluation;
 use Tests\TestCase;
 
@@ -20,6 +21,7 @@ class AffectationTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $evaluateur;
 
     protected function setUp(): void
@@ -45,7 +47,7 @@ class AffectationTest extends TestCase
         return $candidature->fresh();
     }
 
-    private function affecter(array $ids, ?string $evaluateurId = null): \Illuminate\Testing\TestResponse
+    private function affecter(array $ids, ?string $evaluateurId = null): TestResponse
     {
         return $this->actingAs($this->admin)->postJson('/api/admin/affectations', [
             'evaluateur_id' => $evaluateurId ?? $this->evaluateur->membreEquipe->id,

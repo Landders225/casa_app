@@ -33,9 +33,7 @@ use Illuminate\Support\Facades\DB;
  */
 class RegisterController extends Controller
 {
-    public function __construct(private readonly ServiceEligibiliteInitiale $eligibiliteInitiale)
-    {
-    }
+    public function __construct(private readonly ServiceEligibiliteInitiale $eligibiliteInitiale) {}
 
     public function store(RegisterRequest $request): JsonResponse
     {

@@ -6,6 +6,7 @@ use App\Models\PieceJustificative;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Tests\TestCase;
 
@@ -15,6 +16,7 @@ class TelechargementPieceTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private string $candidatureId;
 
     protected function setUp(): void
@@ -66,7 +68,7 @@ class TelechargementPieceTest extends TestCase
     public function test_download_d_un_id_inexistant_404(): void
     {
         $this->actingAs($this->user)
-            ->getJson('/api/pieces/'.\Illuminate\Support\Str::uuid().'/download')
+            ->getJson('/api/pieces/'.Str::uuid().'/download')
             ->assertStatus(404);
     }
 }

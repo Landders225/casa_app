@@ -14,6 +14,7 @@ class PieceDossierTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private string $candidatureId;
 
     protected function setUp(): void

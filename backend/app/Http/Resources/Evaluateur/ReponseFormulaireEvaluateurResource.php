@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Evaluateur;
 
+use App\Models\ReponseFormulaire;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,7 +14,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Resource DISTINCTE de ReponseFormulaireResource (candidat) — jamais réutilisée
  * en croisé.
  *
- * @mixin \App\Models\ReponseFormulaire
+ * @mixin ReponseFormulaire
  */
 class ReponseFormulaireEvaluateurResource extends JsonResource
 {

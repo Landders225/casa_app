@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Filiere;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,7 +18,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * N'expose toujours JAMAIS : `quota` (attribut de `campagne_filiere`), `icone`,
  * ni rien d'autre du modèle interne. `actif` -> « Actuellement fermé ».
  *
- * @mixin \App\Models\Filiere
+ * @mixin Filiere
  */
 class FiliereResource extends JsonResource
 {

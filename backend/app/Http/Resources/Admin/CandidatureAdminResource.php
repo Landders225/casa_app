@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Admin;
 
+use App\Models\Candidature;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,7 +17,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * évaluateur, jamais réutilisée en croisé. Utilisée uniquement par
  * `CandidatureSupervisionController` (route `role:administrateur`).
  *
- * @mixin \App\Models\Candidature
+ * @mixin Candidature
  */
 class CandidatureAdminResource extends JsonResource
 {

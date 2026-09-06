@@ -4,6 +4,7 @@ namespace Tests\Feature\Candidat;
 
 use App\Models\Candidature;
 use App\Models\CritereEliminatoireDeclenche;
+use App\Models\Filiere;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -15,6 +16,7 @@ class SoumissionTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Candidature $candidature;
 
     protected function setUp(): void
@@ -93,7 +95,7 @@ class SoumissionTest extends TestCase
             ->assertStatus(409);
         $this->actingAs($this->user)->postJson("/api/candidatures/{$id}/experiences", ['domaine' => 'commerce', 'duree_categorie' => 'moins_6'])
             ->assertStatus(409);
-        $this->actingAs($this->user)->putJson("/api/candidatures/{$id}/classement", ['ordre' => \App\Models\Filiere::pluck('id')->all()])
+        $this->actingAs($this->user)->putJson("/api/candidatures/{$id}/classement", ['ordre' => Filiere::pluck('id')->all()])
             ->assertStatus(409);
         $this->actingAs($this->user)->post("/api/candidatures/{$id}/pieces/cni", ['fichier' => $this->fichierPdf()])
             ->assertStatus(409);

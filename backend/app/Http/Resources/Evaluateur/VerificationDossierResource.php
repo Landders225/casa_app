@@ -2,13 +2,14 @@
 
 namespace App\Http\Resources\Evaluateur;
 
+use App\Models\VerificationDossier;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Vérification du dossier (🔴 — rôle évaluateur/admin uniquement, jamais candidat).
  *
- * @mixin \App\Models\VerificationDossier
+ * @mixin VerificationDossier
  */
 class VerificationDossierResource extends JsonResource
 {

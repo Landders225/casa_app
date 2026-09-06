@@ -13,6 +13,7 @@ class ConsultationDossierTest extends TestCase
     use RefreshDatabase;
 
     private User $evaluateur;
+
     private User $candidat;
 
     protected function setUp(): void

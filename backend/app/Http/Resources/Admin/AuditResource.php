@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Admin;
 
+use App\Models\JournalAudit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,7 +15,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * `role:administrateur`) ; aucun autre rôle ne lit `journal_audit` (les autres
  * n'y font qu'écrire via `JournalAudit::create`).
  *
- * @mixin \App\Models\JournalAudit
+ * @mixin JournalAudit
  */
 class AuditResource extends JsonResource
 {

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Candidat;
 
 use App\Models\Candidature;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -69,7 +70,7 @@ class InscriptionVersCandidatureTest extends TestCase
     {
         // Un compte candidat SANS profil (cas résiduel : ne devrait plus arriver
         // via /register, mais le garde-fou 3a reste un filet de sécurité).
-        $user = \App\Models\User::factory()->create(['role' => 'candidat']);
+        $user = User::factory()->create(['role' => 'candidat']);
 
         $this->actingAs($user)->postJson('/api/candidatures', ['filiere_id' => $this->idFiliere('cuisine')])
             ->assertStatus(422);

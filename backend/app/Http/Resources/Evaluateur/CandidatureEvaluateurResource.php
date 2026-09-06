@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Evaluateur;
 
+use App\Models\Candidature;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,7 +23,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * ⚠️ Resource DISTINCTE de CandidatureCandidatResource — jamais réutilisée en
  * croisé. Aucun de ces champs ne doit remonter au candidat.
  *
- * @mixin \App\Models\Candidature
+ * @mixin Candidature
  */
 class CandidatureEvaluateurResource extends JsonResource
 {

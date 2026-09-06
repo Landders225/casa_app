@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Evaluateur;
 
+use App\Models\CritereEliminatoireDeclenche;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,7 +10,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Critère éliminatoire déclenché (🔴). L'évaluateur doit voir pourquoi un
  * dossier est non éligible ; le candidat, jamais.
  *
- * @mixin \App\Models\CritereEliminatoireDeclenche
+ * @mixin CritereEliminatoireDeclenche
  */
 class CritereEliminatoireResource extends JsonResource
 {

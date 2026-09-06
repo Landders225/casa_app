@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -12,7 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * `utilisateur`). On énumère les champs un par un — pas de `parent::toArray()`,
  * pas de `$this->resource->toArray()`.
  *
- * @mixin \App\Models\User
+ * @mixin User
  */
 class UserResource extends JsonResource
 {

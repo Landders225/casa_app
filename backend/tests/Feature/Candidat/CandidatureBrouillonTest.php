@@ -3,7 +3,9 @@
 namespace Tests\Feature\Candidat;
 
 use App\Models\Candidature;
+use App\Models\ReponseFormulaire;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class CandidatureBrouillonTest extends TestCase
@@ -58,7 +60,7 @@ class CandidatureBrouillonTest extends TestCase
     {
         $user = $this->creerCandidat();
 
-        $this->actingAs($user)->postJson('/api/candidatures', ['filiere_id' => (string) \Illuminate\Support\Str::uuid()])
+        $this->actingAs($user)->postJson('/api/candidatures', ['filiere_id' => (string) Str::uuid()])
             ->assertStatus(422);
     }
 
@@ -111,7 +113,7 @@ class CandidatureBrouillonTest extends TestCase
             'dossier_verrouille' => true,
             'commentaire_evaluateur' => 'NE DOIT PAS FUITER',
         ]);
-        \App\Models\ReponseFormulaire::where('candidature_id', $id)->update(['mo04_note_etoiles' => 4]);
+        ReponseFormulaire::where('candidature_id', $id)->update(['mo04_note_etoiles' => 4]);
 
         $body = $this->actingAs($user)->getJson("/api/candidatures/{$id}")->assertOk()->getContent();
 

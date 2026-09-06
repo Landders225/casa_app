@@ -12,6 +12,7 @@ use App\Models\CritereEliminatoireDeclenche;
 use App\Models\Grille;
 use App\Models\JournalAudit;
 use App\Models\ScoreRubriqueDossier;
+use App\Models\SousCritereEntretien;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,8 +43,7 @@ class CorrectionController extends Controller
     public function __construct(
         private readonly ServiceScoring $scoring,
         private readonly ServiceEligibilite $eligibilite,
-    ) {
-    }
+    ) {}
 
     public function dossier(CorrigerDossierRequest $request, Candidature $candidature): JsonResponse
     {
@@ -84,7 +84,7 @@ class CorrectionController extends Controller
         $grille = Grille::active();
 
         DB::transaction(function () use (
-            $request, $candidature, $reponse, $verification, $reponsesPatch, $verifPatch,
+            $request, $candidature, $verification, $reponsesPatch, $verifPatch,
             $commentaireFourni, $membreId, $grille, $evaluation, &$changements,
             $scoreAvant, $eligibiliteAvant,
         ) {
@@ -280,7 +280,7 @@ class CorrectionController extends Controller
     }
 
     /**
-     * @return array<string, \App\Models\SousCritereEntretien>
+     * @return array<string, SousCritereEntretien>
      */
     private function sousCriteresEntretien(Grille $grille): array
     {

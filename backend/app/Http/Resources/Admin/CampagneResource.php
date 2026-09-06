@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Admin;
 
+use App\Models\Campagne;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -12,7 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * BLANCHE volontairement limitée aux champs de GESTION (ouvrir/clôturer,
  * suivi) : ni `description`, ni timestamps, ni relation `filieres`/`publication`.
  *
- * @mixin \App\Models\Campagne
+ * @mixin Campagne
  */
 class CampagneResource extends JsonResource
 {

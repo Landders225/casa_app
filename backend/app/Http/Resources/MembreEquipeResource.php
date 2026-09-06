@@ -2,13 +2,14 @@
 
 namespace App\Http\Resources;
 
+use App\Models\MembreEquipe;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Profil membre d'équipe — liste blanche (ADR-02).
  *
- * @mixin \App\Models\MembreEquipe
+ * @mixin MembreEquipe
  */
 class MembreEquipeResource extends JsonResource
 {

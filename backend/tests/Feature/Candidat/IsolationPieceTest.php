@@ -18,10 +18,15 @@ class IsolationPieceTest extends TestCase
     use RefreshDatabase;
 
     private User $a;
+
     private User $b;
+
     private string $candidatureB;
+
     private string $experienceB;
+
     private string $pieceDossierB;   // id piece CNI de B
+
     private string $pieceExpB;       // id justificatif d'expérience de B
 
     protected function setUp(): void

@@ -22,7 +22,9 @@ class EliminationManuelleTest extends TestCase
     use RefreshDatabase;
 
     private Campagne $campagne;
+
     private User $admin;
+
     private User $evaluateur;
 
     protected function setUp(): void

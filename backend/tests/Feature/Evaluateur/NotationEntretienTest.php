@@ -19,6 +19,7 @@ class NotationEntretienTest extends TestCase
     use RefreshDatabase;
 
     private User $evaluateur;
+
     private Candidature $candidature;
 
     /** @var array<string,int> Cas « fort » de scoring.js → 33,0 */

@@ -4,6 +4,7 @@ namespace Tests\Feature\Candidat;
 
 use App\Models\Candidat;
 use App\Models\Candidature;
+use App\Models\Filiere;
 use App\Models\PieceJustificative;
 use App\Models\User;
 use Database\Seeders\CampagneSeeder;
@@ -70,7 +71,7 @@ trait CreeContexteCandidature
 
     protected function idFiliere(string $code): string
     {
-        return \App\Models\Filiere::where('code', $code)->value('id');
+        return Filiere::where('code', $code)->value('id');
     }
 
     // --- Fichiers de test : vrai UploadedFile, vrais magic bytes ---

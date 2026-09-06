@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\PieceJustificative;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -11,7 +12,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * N'expose JAMAIS `chemin_stockage` (🔴, chemin interne sur le disque privé).
  * `url` est une route applicative authentifiée (streaming), pas un lien statique.
  *
- * @mixin \App\Models\PieceJustificative
+ * @mixin PieceJustificative
  */
 class PieceJustificativeResource extends JsonResource
 {

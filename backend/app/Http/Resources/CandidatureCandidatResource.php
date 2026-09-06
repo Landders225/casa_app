@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Candidature;
 use App\Services\StatutPublicResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -20,7 +21,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * `decision_candidature` pour un candidat) : avant publication `decision` et
  * `motif_communicable` valent `null` (Lot 5b, ADR-03, séquence (c)).
  *
- * @mixin \App\Models\Candidature
+ * @mixin Candidature
  */
 class CandidatureCandidatResource extends JsonResource
 {

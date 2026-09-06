@@ -15,7 +15,9 @@ class TelechargementPieceEvaluateurTest extends TestCase
     use RefreshDatabase;
 
     private User $evaluateur;
+
     private Candidature $candidature;
+
     private string $pieceId;
 
     protected function setUp(): void
@@ -29,7 +31,7 @@ class TelechargementPieceEvaluateurTest extends TestCase
         $id = $this->actingAs($candidat)
             ->postJson('/api/candidatures', ['filiere_id' => $this->idFiliere('cuisine')])
             ->json('data.id');
-        $this->candidature = \App\Models\Candidature::findOrFail($id);
+        $this->candidature = Candidature::findOrFail($id);
 
         // pièce déposée par le candidat AVANT affectation (dossier encore en brouillon)
         $this->pieceId = $this->actingAs($candidat)->post(

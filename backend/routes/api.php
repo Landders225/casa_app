@@ -14,14 +14,12 @@ use App\Http\Controllers\Api\Admin\PublicationController;
 use App\Http\Controllers\Api\Admin\RemplacementController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Candidat\CandidatureController;
-use App\Http\Controllers\Api\Candidat\ProfilController;
-use App\Http\Controllers\Api\RegisterController;
-use App\Http\Controllers\Api\FiliereController;
 use App\Http\Controllers\Api\Candidat\ClassementController;
 use App\Http\Controllers\Api\Candidat\ExperienceController;
 use App\Http\Controllers\Api\Candidat\JustificatifExperienceController;
 use App\Http\Controllers\Api\Candidat\PieceController;
 use App\Http\Controllers\Api\Candidat\PieceDossierController;
+use App\Http\Controllers\Api\Candidat\ProfilController;
 use App\Http\Controllers\Api\Candidat\ReponseFormulaireController;
 use App\Http\Controllers\Api\Candidat\SoumissionController;
 use App\Http\Controllers\Api\Evaluateur\DossierController;
@@ -29,7 +27,9 @@ use App\Http\Controllers\Api\Evaluateur\EntretienController;
 use App\Http\Controllers\Api\Evaluateur\EvaluationController;
 use App\Http\Controllers\Api\Evaluateur\PieceEvaluateurController;
 use App\Http\Controllers\Api\Evaluateur\VerificationController;
+use App\Http\Controllers\Api\FiliereController;
 use App\Http\Controllers\Api\PingController;
+use App\Http\Controllers\Api\RegisterController;
 use Illuminate\Support\Facades\Route;
 
 /*
