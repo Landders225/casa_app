@@ -6,14 +6,23 @@
 /frontend/node_modules/
 node_modules/
 
-# --- Environnement réel (jamais versionné) ---
+# --- Environnement réel (jamais versionné ; les *.env.production.example RESTENT suivis) ---
 .env
 /.env
+/.env.production
+/.env.prod
 /backend/.env
 /backend/.env.backup
 /backend/.env.production
+/backend/.env.prod
 /frontend/.env
 *.env.local
+
+# --- TLS de production : certificats & clés, jamais versionnés (Lot 9b) ---
+/docker/nginx/tls/*
+!/docker/nginx/tls/.gitkeep
+/docker/nginx/acme-webroot/*
+!/docker/nginx/acme-webroot/.gitkeep
 
 # --- Laravel : caches, clés, storage privé ---
 /backend/bootstrap/cache/*.php

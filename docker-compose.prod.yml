@@ -1,0 +1,58 @@
+# =============================================================================
+#  CASA — Override de PRODUCTION (Lot 9b, ADR-27).
+#
+#  N'exprime QUE les différences avec docker-compose.yml (dev). Le fichier dev
+#  reste strictement inchangé et utilisable pour le développement.
+#
+#  Lancement :
+#    docker compose --env-file .env.production \
+#      -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+#  Pré-requis :
+#   - .env.production            (racine — vars compose : POSTGRES_PASSWORD, TLS_DIR, …)
+#   - backend/.env.production    (Laravel — APP_KEY régénéré, APP_DEBUG=false, domaine, …)
+#   - un certificat dans ${TLS_DIR} : `docker/nginx/gen-selfsigned.sh` pour amorcer,
+#     puis le vrai cert Let's Encrypt (voir README « Configuration de production »).
+#
+#  Différences vs dev :
+#   - backend : plus de bind-mount du code (image figée) ; env injecté par
+#     backend/.env.production ; APP_ENV/APP_DEBUG viennent de ce fichier.
+#   - nginx   : TLS (80 + 443), conf de prod (en-têtes de sécurité + CSP + HTTPS),
+#     montage des certificats et du webroot ACME.
+#   - postgres: mot de passe obligatoire (pas de valeur par défaut faible).
+# =============================================================================
+
+services:
+  postgres:
+    environment:
+      # Pas de fallback : `docker compose config` échoue si POSTGRES_PASSWORD
+      # n'est pas fourni par .env.production.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis en production}
+
+  backend:
+    # Le code vient de l'IMAGE (pas de bind-mount ./backend). On garde uniquement
+    # le volume des pièces (hors webroot, ADR-11) et la surcharge PHP.
+    volumes: !override
+      - documents_data:/var/www/html/storage/app/private
+      - ./docker/php/casa.ini:/usr/local/etc/php/conf.d/zz-casa.ini:ro
+    # Config Laravel : lue depuis ce fichier (aucun .env dans l'image —
+    # .dockerignore l'exclut). `env()` résout depuis l'environnement du conteneur.
+    env_file:
+      - ./backend/.env.production
+
+  nginx:
+    ports: !override
+      - "80:80"
+      - "443:443"
+    volumes: !override
+      # Conf de prod PAR-DESSUS la conf dev (même cible → celle-ci l'emporte).
+      - ./docker/nginx/casa.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      # nginx doit voir public/ pour try_files avant de déléguer en fastcgi.
+      - ./backend/public:/var/www/html/public:ro
+      # Certificats TLS — contenu piloté par le montage, chemins FIXES côté conteneur.
+      - ${TLS_DIR:-./docker/nginx/tls}:/etc/nginx/tls:ro
+      # Webroot du challenge ACME (certbot --webroot, renouvellement à chaud).
+      - ./docker/nginx/acme-webroot:/var/www/acme:ro
+    healthcheck:
+      # La sonde interne passe par HTTPS (self-signed accepté avec --no-check-certificate).
+      test: ["CMD", "wget", "--spider", "-q", "--no-check-certificate", "https://127.0.0.1/up"]

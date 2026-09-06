@@ -19,6 +19,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // Sanctum SPA : cookies same-origin, pas de token Bearer (ADR-01).
         $middleware->statefulApi();
 
+        // Reverse-proxy nginx unique devant l'app (Lot 9b, ADR-27). Derrière
+        // TLS, `$request->secure()` est déjà correct (fastcgi_param HTTPS=on) ;
+        // ceci sécurise en plus l'IP client et le schéma si une LB/CDN vient un
+        // jour en amont. `TRUSTED_PROXIES` : « * » sûr ici (backend:9000 non
+        // publié, nginx écrase X-Forwarded-For) — à resserrer au sous-réseau
+        // Docker en prod (cf. backend/.env.production.example). Absent = « * ».
+        $middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'));
+
         // Contrôle de rôle réutilisable (ADR-10) : role:candidat /
         // role:evaluateur,administrateur / role:administrateur
         $middleware->alias([

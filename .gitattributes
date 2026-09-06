@@ -1,0 +1,7 @@
+# CASA — fins de ligne.
+# Les scripts et configs de déploiement s'exécutent sur Ubuntu : LF obligatoire
+# (un `#!/usr/bin/env bash\r` ou une conf nginx en CRLF casse au runtime).
+*.sh                 text eol=lf
+*.conf               text eol=lf
+docker-compose*.yml  text eol=lf
+docker/**            text eol=lf

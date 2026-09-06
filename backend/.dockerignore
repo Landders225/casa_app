@@ -1,0 +1,44 @@
+# CASA backend — exclusions du contexte de build de l'image (Lot 9b).
+# Objectif : aucun secret, aucune dépendance installée, aucun test dans l'image.
+
+# --- Secrets & environnement (JAMAIS dans l'image) ---
+.env
+.env.*
+!.env.example
+
+# --- Dépendances (réinstallées dans le Dockerfile) ---
+vendor/
+node_modules/
+
+# --- VCS & outillage ---
+.git/
+.gitignore
+.gitattributes
+.github/
+.editorconfig
+.styleci.yml
+.phpunit.result.cache
+.phpunit.cache
+.phpactor.json
+
+# --- Tests (pas exécutés dans l'image de prod) ---
+tests/
+phpunit.xml
+
+# --- Storage : caches, sessions, logs, pièces (montés en volume à l'exécution) ---
+storage/app/private/*
+!storage/app/private/.gitignore
+storage/app/public/*
+!storage/app/public/.gitignore
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+storage/logs/*
+bootstrap/cache/*.php
+
+# --- Divers ---
+*.md
+Homestead.*
+.vagrant/
+docker-compose*.yml
