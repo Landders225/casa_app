@@ -40,12 +40,16 @@ use Illuminate\Support\Facades\Route;
 | passent par EnsureFrontendRequestsAreStateful (statefulApi()).
 */
 
-// Sonde applicative publique (indépendante de /up).
-Route::get('/health', fn () => response()->json(['status' => 'ok', 'app' => 'CASA']));
+// Routes PUBLIQUES (non authentifiées) — throttle par IP (Lot 10, T1) : elles
+// sont hors du filet global `casa-api` (qui suppose une session).
+Route::middleware('throttle:casa-public')->group(function () {
+    // Sonde applicative publique (indépendante de /up).
+    Route::get('/health', fn () => response()->json(['status' => 'ok', 'app' => 'CASA']));
 
-// Catalogue des filières — PUBLIC (Lot 6a). Liste blanche stricte : code, nom,
-// description, actif (le front affiche « Actuellement fermé » si actif=false).
-Route::get('/filieres', [FiliereController::class, 'index']);
+    // Catalogue des filières — PUBLIC (Lot 6a). Liste blanche stricte : code, nom,
+    // description, actif (le front affiche « Actuellement fermé » si actif=false).
+    Route::get('/filieres', [FiliereController::class, 'index']);
+});
 
 // Authentification.
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
@@ -54,7 +58,8 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:lo
 // (utilisateur role=candidat + candidat) ; la candidature reste POST /api/candidatures.
 Route::post('/register', [RegisterController::class, 'store'])->middleware('throttle:register');
 
-Route::middleware('auth:sanctum')->group(function () {
+// `throttle:casa-api` — filet global 120 req/min/utilisateur (Lot 10, T1).
+Route::middleware(['auth:sanctum', 'throttle:casa-api'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
@@ -142,7 +147,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/candidat/profil', [ProfilController::class, 'update']);
 
         Route::get('/candidature', [CandidatureController::class, 'courante']);
-        Route::post('/candidatures', [CandidatureController::class, 'store']);
+        // Anti-spam de brouillons : 12 créations / min (Lot 10, T1).
+        Route::post('/candidatures', [CandidatureController::class, 'store'])
+            ->middleware('throttle:casa-candidatures');
 
         // Lot 3b — téléchargement d'une pièce (dossier ou justificatif d'expérience).
         // Route à plat : l'id de pièce est global, la propriété est vérifiée par
@@ -172,12 +179,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
                 // Pièces justificatives (upload sécurisé, hors webroot). POST pour
                 // l'upload (PHP ne parse le multipart que sur POST) ; UPSERT.
+                // `throttle:casa-uploads` : 40 dépôts / min (Lot 10, T1) — finfo +
+                // écriture disque à chaque requête.
                 Route::post('/pieces/{type}', [PieceDossierController::class, 'deposer'])
+                    ->middleware('throttle:casa-uploads')
                     ->whereIn('type', ContraintesFichier::TYPES_DOSSIER);
                 Route::delete('/pieces/{type}', [PieceDossierController::class, 'destroy'])
                     ->whereIn('type', ContraintesFichier::TYPES_DOSSIER);
 
-                Route::post('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'deposer']);
+                Route::post('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'deposer'])
+                    ->middleware('throttle:casa-uploads');
                 Route::delete('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'destroy']);
             });
         });

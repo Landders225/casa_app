@@ -7,17 +7,17 @@ import { ApiError } from '../../lib/ApiError.js'
 import { roleHome } from '../../routing/routes.js'
 import './LoginPage.css'
 
-const DEMO_ACCOUNTS = [
-  { key: 'candidat', label: 'Candidat', email: 'candidat@casa-demo.ci' },
-  { key: 'evaluateur', label: 'Évaluateur', email: 'evaluateur@casa-demo.ci' },
-  { key: 'admin', label: 'Administrateur', email: 'admin@casa-demo.ci' },
-]
-const DEMO_PASSWORD = 'Demo2026!'
-
 /**
  * Écran de connexion transverse. Consomme POST /api/login via AuthContext
  * (cycle Sanctum géré par apiClient), affiche le message d'erreur GÉNÉRIQUE du
  * backend, puis redirige vers l'espace du rôle (ou l'URL initialement demandée).
+ *
+ * ⚠️ Lot 10 (sécurité) : AUCUN compte de démonstration n'est affiché ici. Les
+ * comptes de démo sont des comptes privilégiés seedés en dev uniquement
+ * (ComptesDemoSeeder) ; les exposer sur une page publique — donc dans un bundle
+ * JS téléchargeable — était une divulgation. Un scan de source
+ * (__tests__/noDemoCreds.test.js) et un grep du bundle en CI l'interdisent
+ * désormais.
  */
 export function LoginPage() {
   const { login } = useAuth()
@@ -29,12 +29,6 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
-
-  const fillDemo = (account) => {
-    setEmail(account.email)
-    setPassword(DEMO_PASSWORD)
-    setError(null)
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -146,27 +140,6 @@ export function LoginPage() {
               Se connecter <i className="fa-solid fa-arrow-right" aria-hidden="true" />
             </button>
           </form>
-
-          <div className="demo-accounts">
-            <div className="eyebrow" style={{ marginBottom: 'var(--space-3)' }}>
-              <i className="fa-solid fa-flask" aria-hidden="true" /> Comptes de démonstration
-            </div>
-            {DEMO_ACCOUNTS.map((account) => (
-              <div className="demo-row" key={account.key}>
-                <span>
-                  <strong>{account.label}</strong>
-                  <br />
-                  {account.email}
-                </span>
-                <button type="button" className="btn btn-sm btn-outline" onClick={() => fillDemo(account)}>
-                  Utiliser
-                </button>
-              </div>
-            ))}
-            <p className="caption" style={{ marginTop: 'var(--space-3)' }}>
-              Mot de passe pour les 3 comptes : <code>{DEMO_PASSWORD}</code>
-            </p>
-          </div>
         </div>
       </div>
     </div>

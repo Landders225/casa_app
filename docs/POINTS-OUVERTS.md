@@ -6,7 +6,8 @@
 > qu'un nouveau apparaît. Le **journal figé** des décisions reste `docs/ADR.md`
 > (on n'y réécrit pas l'histoire) ; ici on tient le **présent**.
 >
-> Dernière revue : **Lot 9c** (2026-09-06).
+> Dernière revue : **Lot 10** (2026-09-07) — revue de sécurité défensive, voir
+> [`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md).
 
 ## Légende de statut
 
@@ -31,7 +32,7 @@
 |---|---|---|---|---|
 | **Vérification d'e-mail à l'inscription** (lien ou code) | 🟠 Ouvert | Aucune infra d'envoi d'e-mail dans le projet (`MAIL_MAILER=log`) | ADR — Points ouverts (D-7-2) | Choix d'un fournisseur SMTP + file d'attente + écran de confirmation |
 | **Changement d'adresse e-mail** (identifiant de connexion) | 🟠 Ouvert | Flux dédié (ré-authentification + confirmation) non couvert au Lot 7 ; `PATCH /candidat/profil` interdit `email` (ADR-07) | ADR — Points ouverts (D-7-2) | Dépend de la vérification d'e-mail ci-dessus |
-| **Durcissement mot de passe — `Password::uncompromised()` (HIBP)** | 🟠 Ouvert | Écarté en v1 : appel réseau (api.pwnedpasswords.com) sur le chemin d'inscription | ADR — Points ouverts | Une ligne dans `RegisterRequest` + tolérance à l'indispo du service |
+| **Durcissement mot de passe — `Password::uncompromised()` (HIBP)** | 🟠 Ouvert | Écarté en v1 : appel réseau (api.pwnedpasswords.com) sur le chemin d'inscription | ADR — Points ouverts ; **AUDIT-SECURITE.md R2** | Une ligne dans `RegisterRequest` + tolérance à l'indispo du service |
 | ~~Inscription / profil candidat self-service~~ | 🟢 Traité (Lot 7) | — | ADR-16 | — |
 | ~~Éligibilité initiale (tranche d'âge, résidence CI) à l'inscription~~ | 🟢 Traité (Lot 7) | `ServiceEligibiliteInitiale` (ferme D-3c-1) | ADR-16 | — |
 
@@ -54,9 +55,14 @@
 | Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
 |---|---|---|---|---|
 | **HSTS `preload`** | 🟡 Décidé — opt-in | Soumettre le domaine à hstspreload.org est engageant et lent à défaire ; on garde `max-age=1 an + includeSubDomains` par défaut, `preload` activable consciemment une fois la prod stable | **ADR-27** (point ouvert) → **ADR-28** (décision) ; commentaire dans `docker/nginx/casa.prod.conf` | Ajouter ` preload` à l'en-tête + reload nginx + soumission sur hstspreload.org |
-| **Matrice complète policies Laravel × endpoints** (rôle × action) | 🟠 Ouvert | L'autorisation est testée endpoint par endpoint (403/422/409 dans les suites `Feature/*`) mais pas formalisée en un seul tableau de référence | ADR — Points ouverts | Document de synthèse + éventuels tests de couverture croisée |
-| **Rate limiting / anti-bruteforce** au-delà du login | 🟠 Ouvert | `throttle:5,1` sur `/login` (par e-mail+IP) et `throttle:register` sur l'inscription ; pas de politique globale au-delà | ADR — Points ouverts | Revue des routes sensibles + limites par profil |
-| **Politique de rétention des pièces justificatives** après clôture de campagne | 🟠 Ouvert | Les pièces restent indéfiniment dans `documents_data` ; pas de purge ni de durée légale définie | ADR — Points ouverts | Décision juridique (durée) + commande de purge + sauvegarde préalable |
+| ~~**Matrice complète policies Laravel × endpoints** (rôle × action)~~ | 🟢 Traité (Lot 10) | `Security/MatriceAutorisationTest` introspecte la table de routage et vérifie **chaque** route `role:`-gardée × chaque mauvais rôle (403/404) + invité (401) + 403 exact sur les actes sensibles | **AUDIT-SECURITE.md** § Autorisation | — |
+| ~~**Rate limiting / anti-bruteforce** au-delà du login~~ | 🟢 Traité (Lot 10) | 4 limiteurs : `casa-public` 60/min/IP, `casa-api` 120/min/user (filet global), `casa-uploads` 40/min, `casa-candidatures` 12/min. Calibrés pour ne gêner aucun usage légitime (`RateLimitingTest`) | **AUDIT-SECURITE.md** n°2 | — |
+| **HSTS `preload`** — voir ci-dessus (opt-in) | 🟡 | — | — | — |
+| **Politique de rétention des pièces justificatives** après clôture de campagne | 🟠 Ouvert | Les pièces restent indéfiniment dans `documents_data` ; pas de purge ni de durée légale définie | ADR — Points ouverts ; AUDIT-SECURITE.md | Décision juridique (durée) + commande de purge + sauvegarde préalable |
+| **Comptes de démonstration sur la page de connexion** | 🟢 Traité (Lot 10) | Retirés du code ; absence prouvée dans `src/` (`noDemoCreds.test.js`) et dans `dist/` (CI) | **AUDIT-SECURITE.md** n°1 | — |
+| **En-têtes révélant les versions PHP/nginx** | 🟢 Traité (Lot 10) | `expose_php = Off`, `server_tokens off` | **AUDIT-SECURITE.md** n°4 | — |
+| **Trigger d'immuabilité du journal d'audit non testé** | 🟢 Traité (Lot 10) | `Security/JournalAuditImmuableTest` (UPDATE/DELETE/TRUNCATE rejetés) | **AUDIT-SECURITE.md** n°3 | — |
+| **Vérification d'e-mail à l'inscription** | 🟠 Ouvert | — voir « Fonctionnalités candidat » ci-dessus | **AUDIT-SECURITE.md R3** | — |
 | **`config:cache` et multi-réplicas** | 🟡 Décidé — mono-nœud | L'entrypoint refait les caches à chaque `up`/`--force-recreate` (ADR-28) : correct pour **un** nœud backend. Plusieurs réplicas derrière une LB demanderaient une orchestration du recreate | ADR-27 (renvoi runbook) → ADR-28 ; `docker/backend/entrypoint.sh` | Orchestrateur (Swarm/K8s) + rolling update ; hors périmètre actuel |
 | ~~Cause exacte du `419 CSRF` en enchaînement `curl`~~ | 🟢 Traité (Lot 9a) | Artefact `curl` (décodage bash du token), **pas un bug d'auth** — prouvé par bisection | **ADR-26** ; `scratchpad/csrf419.sh` | — |
 

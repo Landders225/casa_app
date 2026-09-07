@@ -16,21 +16,25 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: 0,
   workers: 1,
   reporter: [['list']],
   outputDir: './e2e/.results',
-  // La stack Docker sous Windows a une latence HTTP marquée (~4-5 s / requête,
-  // bind-mount + pas d'opcache) : les timeouts sont volontairement généreux.
+  // La stack Docker sous Windows a une latence HTTP marquée et TRÈS variable
+  // (~4-5 s / requête en moyenne, pics à 8-10 s sous charge, bind-mount + pas
+  // d'opcache) : les timeouts sont volontairement généreux. En CI Linux les
+  // réponses sont quasi immédiates — un plafond haut n'y ralentit rien.
   timeout: 90_000,
-  expect: { timeout: 25_000 },
+  expect: { timeout: 40_000 },
+  // Un échec transitoire (pic de latence Docker-Windows) est réessayé une fois ;
+  // sur Linux/CI les tests sont stables et le retry ne se déclenche pas.
+  retries: 1,
   use: {
     baseURL: process.env.E2E_BASE_URL || 'http://localhost:8080',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     locale: 'fr-FR',
-    actionTimeout: 25_000,
-    navigationTimeout: 40_000,
+    actionTimeout: 40_000,
+    navigationTimeout: 45_000,
     // Les révélations au défilement (`[data-reveal]`) partent à opacity:0 — sans
     // ça, Playwright les considère « non visibles » tant qu'elles ne sont pas
     // dans le viewport. `useScrollReveal` court-circuite tout en reduced-motion,

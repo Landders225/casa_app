@@ -499,36 +499,6 @@
   color: var(--casa-primary-700); display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 
-/* ---------------------------------------------------------------------------
-   Widget "Mode démonstration"
---------------------------------------------------------------------------- */
-#casa-demo-fab {
-  position: fixed; bottom: var(--space-6); right: var(--space-6); z-index: var(--z-toast);
-  width: 54px; height: 54px; border-radius: 50%; background: var(--casa-primary-700); color: #fff;
-  display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
-  box-shadow: var(--shadow-lg); transition: all var(--dur-fast);
-}
-#casa-demo-fab:hover { background: var(--casa-primary-800); transform: translateY(-2px) rotate(15deg); }
-#casa-demo-panel {
-  position: fixed; bottom: calc(var(--space-6) + 68px); right: var(--space-6); z-index: var(--z-toast);
-  width: 264px; background: var(--casa-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl);
-  border: 1px solid var(--casa-border); padding: var(--space-4);
-  opacity: 0; transform: translateY(12px) scale(0.97); pointer-events: none;
-  transition: all var(--dur-base) var(--ease-out);
-}
-#casa-demo-panel.is-open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
-.csw-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.csw-head button { color: var(--casa-text-tertiary); }
-.csw-link {
-  display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: 0.65rem 0.7rem;
-  border-radius: var(--radius-md); font-size: var(--fs-body-sm); font-weight: var(--fw-medium);
-  color: var(--casa-text-primary); margin-bottom: 4px;
-}
-.csw-link i { width: 1.1em; color: var(--casa-primary-600); }
-.csw-link:hover { background: var(--casa-primary-50); color: var(--casa-primary-700); }
-.csw-link.csw-danger { color: var(--casa-danger-600); }
-.csw-link.csw-danger i { color: var(--casa-danger-500); }
-@media (max-width: 520px) {
-  #casa-demo-panel { right: var(--space-4); left: var(--space-4); width: auto; }
-  #casa-demo-fab { right: var(--space-4); }
-}
+/* Le widget « Mode démonstration » de la maquette (FAB + panneau de navigation
+   rapide entre espaces) a été retiré au Lot 10 : jamais rendu par l'app React,
+   et sans objet en production. */

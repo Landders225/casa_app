@@ -123,6 +123,9 @@ async function parcoursWizardNominal(page) {
   await expect(page).toHaveURL(/\/candidat$/, { timeout: 40_000 })
 
   // --- Wizard ---
+  // Le tableau de bord charge GET /api/candidature (404 -> CTA « Commencer »).
+  // Attente explicite : la latence Docker-Windows peut dépasser l'actionTimeout.
+  await expect(page.getByRole('link', { name: 'Commencer' })).toBeVisible({ timeout: 60_000 })
   await page.getByRole('link', { name: 'Commencer' }).click()
   await expect(page).toHaveURL(/\/candidat\/candidature$/)
 
@@ -164,7 +167,9 @@ async function parcoursWizardNominal(page) {
   await page.getByLabel('Durée').selectOption('6_12')
   await expect(page.getByRole('button', { name: 'Déposer' })).toBeVisible({ timeout: 30_000 })
   await page.locator('input[type=file]').first().setInputFiles(PDF)
-  await expect(page.getByLabel(/Retirer Justificatif/)).toBeVisible({ timeout: 30_000 })
+  // Upload multipart : plus lent (finfo + écriture disque) — marge généreuse pour
+  // la latence Docker-sur-Windows du poste de dev ; en CI Linux c'est < 2 s.
+  await expect(page.getByLabel(/Retirer Justificatif/)).toBeVisible({ timeout: 60_000 })
   await page.getByRole('button', { name: 'Suivant' }).click()
 
   // 6 — langues & informatique
@@ -206,7 +211,9 @@ async function parcoursWizardNominal(page) {
     // eslint-disable-next-line no-await-in-loop
     await page.locator('input[type=file]').nth(i).setInputFiles(PNG)
     // eslint-disable-next-line no-await-in-loop
-    await expect(page.getByLabel(`Retirer ${PIECES[i]}`)).toBeVisible({ timeout: 30_000 })
+    // 60 s : 6 uploads multipart d'affilée sur Docker-Windows peuvent traîner ;
+    // le backend répond bien 201 (cf. Lot 10), c'est la latence du poste.
+    await expect(page.getByLabel(`Retirer ${PIECES[i]}`)).toBeVisible({ timeout: 60_000 })
   }
   await page.getByRole('button', { name: 'Suivant' }).click()
 

@@ -42,23 +42,3 @@
   width: 100%;
   max-width: 400px;
 }
-
-.demo-accounts {
-  background: var(--casa-primary-50);
-  border: 1px solid var(--casa-primary-200);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  margin-top: var(--space-8);
-}
-.demo-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-2) 0;
-  border-bottom: 1px dashed var(--casa-border);
-  font-size: var(--fs-caption);
-  gap: var(--space-3);
-}
-.demo-row:last-child {
-  border-bottom: none;
-}

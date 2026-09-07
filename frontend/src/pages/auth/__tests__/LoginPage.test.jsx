@@ -23,21 +23,23 @@ function renderLogin() {
 describe('LoginPage', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('rend le formulaire et les comptes de démonstration', () => {
+  it('rend le formulaire de connexion', () => {
     useAuth.mockReturnValue({ login: vi.fn() })
     renderLogin()
     expect(screen.getByRole('heading', { name: /accéder à mon espace/i })).toBeInTheDocument()
-    expect(screen.getByText('candidat@casa-demo.ci')).toBeInTheDocument()
-    expect(screen.getByText('evaluateur@casa-demo.ci')).toBeInTheDocument()
-    expect(screen.getByText('admin@casa-demo.ci')).toBeInTheDocument()
+    expect(screen.getByLabelText('Adresse e-mail')).toBeInTheDocument()
+    expect(screen.getByLabelText('Mot de passe')).toBeInTheDocument()
   })
 
-  it('« Utiliser » pré-remplit les identifiants de démo', async () => {
+  it('n’expose AUCUN compte de démonstration (Lot 10 — sécurité)', () => {
     useAuth.mockReturnValue({ login: vi.fn() })
-    renderLogin()
-    await userEvent.click(screen.getAllByRole('button', { name: 'Utiliser' })[0])
-    expect(screen.getByLabelText('Adresse e-mail')).toHaveValue('candidat@casa-demo.ci')
-    expect(screen.getByLabelText('Mot de passe')).toHaveValue('Demo2026!')
+    const { container } = renderLogin()
+    // Ni e-mail privilégié, ni mot de passe, ni bouton « Utiliser » : la page
+    // publique ne divulgue rien (le bundle JS est téléchargeable).
+    expect(container.textContent).not.toMatch(/casa-demo\.ci/i)
+    expect(container.textContent).not.toMatch(/Demo2026/)
+    expect(screen.queryByText(/comptes de démonstration/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Utiliser' })).not.toBeInTheDocument()
   })
 
   it('connexion réussie -> redirige vers l’espace du rôle', async () => {
@@ -45,11 +47,11 @@ describe('LoginPage', () => {
     useAuth.mockReturnValue({ login })
     renderLogin()
 
-    await userEvent.type(screen.getByLabelText('Adresse e-mail'), 'admin@casa-demo.ci')
-    await userEvent.type(screen.getByLabelText('Mot de passe'), 'Demo2026!')
+    await userEvent.type(screen.getByLabelText('Adresse e-mail'), 'prisca.yeo@cci.ci')
+    await userEvent.type(screen.getByLabelText('Mot de passe'), 'UnMotDePasse2026')
     await userEvent.click(screen.getByRole('button', { name: /se connecter/i }))
 
-    expect(login).toHaveBeenCalledWith('admin@casa-demo.ci', 'Demo2026!')
+    expect(login).toHaveBeenCalledWith('prisca.yeo@cci.ci', 'UnMotDePasse2026')
     expect(await screen.findByText('espace admin')).toBeInTheDocument()
   })
 
@@ -67,5 +69,17 @@ describe('LoginPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('E-mail ou mot de passe incorrect.')
     expect(screen.queryByText('espace candidat')).not.toBeInTheDocument()
     expect(screen.queryByText('espace admin')).not.toBeInTheDocument()
+  })
+
+  it('429 -> message « trop de tentatives »', async () => {
+    const login = vi.fn().mockRejectedValue(new ApiError('rate_limited', { status: 429 }))
+    useAuth.mockReturnValue({ login })
+    renderLogin()
+
+    await userEvent.type(screen.getByLabelText('Adresse e-mail'), 'x@y.ci')
+    await userEvent.type(screen.getByLabelText('Mot de passe'), 'faux')
+    await userEvent.click(screen.getByRole('button', { name: /se connecter/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/trop de tentatives/i)
   })
 })
