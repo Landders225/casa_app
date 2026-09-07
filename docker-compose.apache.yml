@@ -1,0 +1,46 @@
+# =============================================================================
+#  CASA — Override « DERRIÈRE UN APACHE EXISTANT » (Lot 11).
+#
+#  Pour un serveur qui héberge déjà d'autres applications, avec Apache en façade
+#  sur 80/443. CASA ne prend PAS 80/443 et ne termine PAS le TLS : Apache fait le
+#  reverse-proxy HTTPS → CASA en HTTP local sur un port dédié.
+#
+#  Se superpose à docker-compose.prod.yml (dont il reprend backend + postgres +
+#  entrypoint), en ne redéfinissant QUE le service nginx :
+#
+#    docker compose --env-file .env.production \
+#      -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.apache.yml up -d
+#
+#  Différences vs docker-compose.prod.yml :
+#   - nginx n'écoute qu'en HTTP, sur 127.0.0.1:${CASA_HTTP_PORT} (JAMAIS exposé
+#     publiquement — c'est Apache qui l'atteint en local) ;
+#   - pas de bloc :443, pas de certificat, pas de montage TLS ni webroot ACME
+#     (docker/nginx/casa.apache.conf, HTTP seul) ;
+#   - sonde de santé en HTTP.
+#
+#  Variables (.env.production, racine) :
+#   - CASA_HTTP_PORT   port local exposé par nginx (défaut 8090)
+#   - CASA_BIND_ADDR   interface d'écoute (défaut 127.0.0.1 — NE PAS mettre
+#                      0.0.0.0 sauf si Apache est sur une AUTRE machine, auquel
+#                      cas restreindre par pare-feu).
+# =============================================================================
+
+name: casa
+
+services:
+  nginx:
+    # HTTP seul, lié à la loopback : injoignable de l'extérieur, seul Apache
+    # (même hôte) tape dessus. `!override` sinon on hériterait du 80:80 + 443:443
+    # de docker-compose.prod.yml.
+    ports: !override
+      - "${CASA_BIND_ADDR:-127.0.0.1}:${CASA_HTTP_PORT:-8090}:80"
+
+    # `!override` : on remplace la liste de prod.yml (conf TLS + montages
+    # cert/ACME) par la conf HTTP dédiée + public/ pour try_files.
+    volumes: !override
+      - ./docker/nginx/casa.apache.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./backend/public:/var/www/html/public:ro
+
+    # Sonde en HTTP (prod.yml l'avait passée en HTTPS).
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/up"]

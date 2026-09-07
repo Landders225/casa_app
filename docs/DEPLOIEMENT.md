@@ -13,6 +13,15 @@
 
 ## 0. Vue d'ensemble
 
+**Deux modes de déploiement** — choisir selon le serveur :
+
+| Mode | Quand | Sections |
+|---|---|---|
+| **A — Autonome** (défaut) | serveur dédié à CASA, CASA prend 80/443 et termine le TLS lui-même | § 1 → § 12 |
+| **B — Derrière un Apache existant** | le serveur héberge déjà d'autres apps, Apache est en façade sur 80/443 ; CASA tourne en HTTP local sur un port dédié, Apache proxifie | **§ 13** (+ § 4, § 8, § 9 communes) |
+
+Le reste de ce tableau et les sections 1–12 décrivent le **mode A**.
+
 | Élément | Choix | Où c'est défini |
 |---|---|---|
 | Orchestration | Docker Compose, **override de prod** (le fichier dev n'est jamais modifié) | `docker-compose.prod.yml` (ADR-27) |
@@ -501,6 +510,207 @@ dcp stop                # arrête les conteneurs, garde les données
 dcp down                # supprime les conteneurs + le réseau, garde les volumes
 dcp down -v             # ⚠️ SUPPRIME AUSSI LES VOLUMES = perte de la base et des pièces
 ```
+
+---
+
+## 13. Déploiement derrière un Apache existant (multi-apps, port dédié)
+
+> **Contexte.** Le serveur Ubuntu héberge déjà d'autres applications, avec
+> **Apache** en façade sur les ports 80/443. CASA **ne peut pas** prendre 80/443
+> ni terminer le TLS. Solution : CASA tourne en **HTTP local sur un port dédié**
+> (8090 par défaut, lié à `127.0.0.1`), et **Apache fait le reverse-proxy
+> HTTPS → CASA**. Apache garde la maîtrise du certificat (`certbot`).
+>
+> **En mots simples, ce que fait Apache** : quand quelqu'un ouvre
+> `https://casa.mon-domaine.ci`, Apache déchiffre le HTTPS, ajoute un en-tête
+> qui dit à CASA « la requête d'origine était en HTTPS », puis transmet la
+> demande à CASA sur `http://127.0.0.1:8090`. CASA répond, Apache renvoie au
+> visiteur. CASA n'est jamais joignable directement de l'extérieur.
+
+```
+Navigateur ──HTTPS──▶ Apache :443 ──HTTP + X-Forwarded-Proto:https──▶ nginx CASA 127.0.0.1:8090 ──▶ backend/frontend
+```
+
+### 13.1 Prérequis
+
+Comme § 1 (Docker + Compose ≥ 2.24, Git), **plus** :
+
+- Apache 2.4 déjà installé et en service.
+- Un **port TCP local libre** pour CASA (ce guide : `8090`). Vérifier :
+  ```bash
+  sudo ss -tlnp | grep -E ':8090\b' || echo "8090 libre"
+  ```
+- Modules Apache : `proxy`, `proxy_http`, `headers`, `rewrite`, `ssl`.
+  ```bash
+  sudo a2enmod proxy proxy_http headers rewrite ssl
+  sudo systemctl reload apache2
+  ```
+- Un **sous-domaine** (`casa.mon-domaine.ci`) avec un enregistrement DNS **A**
+  pointant vers l'IP **publique** du serveur, et les ports 80/443 accessibles
+  depuis Internet (nécessaire pour que Let's Encrypt valide le domaine).
+
+### 13.2 Récupération du code + configuration
+
+Identiques au **mode A** :
+
+- **§ 3** — cloner le dépôt (ici on suppose `/opt/casa`).
+- **§ 4** — créer et remplir les deux `.env.production`. Différences pour ce mode :
+  - `.env.production` (racine) : **pas besoin de `TLS_DIR`** (CASA ne gère pas de
+    certificat). Ajouter :
+    ```
+    CASA_HTTP_PORT=8090
+    CASA_BIND_ADDR=127.0.0.1
+    ```
+  - `backend/.env.production` : **exactement comme en mode A** —
+    `APP_URL=https://casa.mon-domaine.ci`, `SESSION_DOMAIN=casa.mon-domaine.ci`,
+    `SANCTUM_STATEFUL_DOMAINS=casa.mon-domaine.ci`, `SESSION_SECURE_COOKIE=true`,
+    `TRUSTED_PROXIES=*` (voir § 13.5). Le HTTPS est réel côté visiteur (assuré
+    par Apache) — les cookies `Secure` sont donc corrects.
+
+Alias de commande pour ce mode :
+
+```bash
+cd /opt/casa
+alias dca='docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.apache.yml'
+```
+
+### 13.3 Démarrage de CASA (HTTP local)
+
+```bash
+dca up -d --build
+watch -n 3 'dca ps'        # attendre 4× (healthy), Ctrl-C
+```
+
+`nginx` de CASA écoute maintenant sur **`127.0.0.1:8090`** uniquement — rien
+n'est exposé publiquement. Test local :
+
+```bash
+curl -s http://127.0.0.1:8090/up | head -c 40 ; echo      # page "up" Laravel
+curl -sI http://127.0.0.1:8090/ | grep -i "^HTTP"         # 200 (SPA)
+```
+
+Base de données + référentiel + premier admin : **identiques aux § 8 et § 9**
+(remplacer `dcp` par `dca`) :
+
+```bash
+dca exec backend php artisan migrate --force
+dca exec backend php artisan casa:seed-referentiel
+dca exec backend php artisan casa:create-admin coordination@mon-domaine.ci
+```
+
+### 13.4 VirtualHost Apache
+
+Le fichier `docker/apache/casa.vhost.conf` est prêt à l'emploi. Seules **3 lignes**
+sont à changer (les `Define` en tête).
+
+```bash
+sudo cp /opt/casa/docker/apache/casa.vhost.conf /etc/apache2/sites-available/casa.conf
+sudo nano /etc/apache2/sites-available/casa.conf
+#   Define CASA_DOMAIN        casa.mon-domaine.ci
+#   Define CASA_ADMIN_EMAIL   coordination@mon-domaine.ci
+#   Define CASA_UPSTREAM      http://127.0.0.1:8090      (= CASA_BIND_ADDR:CASA_HTTP_PORT)
+
+sudo a2ensite casa
+sudo apache2ctl configtest          # doit afficher "Syntax OK"
+sudo systemctl reload apache2
+```
+
+Ce que contient le vhost :
+- un `<VirtualHost *:80>` qui **proxifie tout** vers `http://127.0.0.1:8090`,
+  ajoute `X-Forwarded-Proto` / `X-Forwarded-Port` / `X-Forwarded-For` (via
+  `mod_headers` + `mod_proxy_http`), `ProxyPreserveHost On` (le `Host:` d'origine
+  arrive à CASA — indispensable pour Sanctum) ;
+- un `<VirtualHost *:443>` **encadré par `<IfFile>`** : il ne s'active **que
+  lorsque le certificat existe**. Il ajoute l'en-tête HSTS (Apache possède le
+  TLS). Tant qu'il n'y a pas de certificat, seul le `:80` répond.
+
+À ce stade, `http://casa.mon-domaine.ci/up` répond déjà (en clair). ⚠️ **Le
+login ne marchera qu'en HTTPS** (cookies `Secure`) — passer au § 13.6.
+
+### 13.5 `trustProxies` — pourquoi ça reste cohérent
+
+`bootstrap/app.php` : `$middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'))`.
+Les en-têtes `X-Forwarded-*` sont dans la liste de confiance par défaut de
+Laravel. Résultat :
+
+| Ce qu'Apache envoie | Ce que Laravel en déduit |
+|---|---|
+| `X-Forwarded-Proto: https` | `$request->isSecure() === true` → cookies posés avec `Secure`, URLs générées en `https://` |
+| `X-Forwarded-Host: casa.mon-domaine.ci` (via `ProxyPreserveHost`) | `$request->getHost()` correct → `SANCTUM_STATEFUL_DOMAINS` matche l'`Origin` du navigateur |
+| `X-Forwarded-For: <IP client>` | IP réelle tracée à l'audit (ADR-12) et pour le rate-limiting |
+
+**Chaîne à 2 proxys** (Apache → nginx CASA → PHP-FPM) : les deux sont sur des
+réseaux privés/loopback, `TRUSTED_PROXIES=*` est acceptable (nginx CASA n'écoute
+que sur `127.0.0.1`, injoignable de l'extérieur). Pour resserrer : mettre le
+sous-réseau Docker de CASA **et** `127.0.0.1/8`
+(`TRUSTED_PROXIES=127.0.0.1/8,172.18.0.0/16` — adapter le second via
+`docker network inspect casa_casa`).
+
+Rien à changer dans la config Sanctum : `config/session.php` et
+`config/sanctum.php` lisent tout via `env()`, et les valeurs sont **les mêmes
+qu'en mode A**.
+
+### 13.6 Certificat Let's Encrypt
+
+```bash
+sudo apt install -y certbot
+sudo certbot certonly --apache -d casa.mon-domaine.ci \
+     -m coordination@mon-domaine.ci --agree-tos --no-eff-email
+sudo systemctl reload apache2       # <IfFile> détecte le cert -> :443 s'active + :80 redirige
+```
+
+Rechargement automatique d'Apache au renouvellement (une fois) :
+
+```bash
+echo 'systemctl reload apache2' | sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-apache.sh
+sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-apache.sh
+sudo certbot renew --dry-run
+```
+
+### 13.7 Vérifications
+
+```bash
+# 1. Redirection + certificat
+curl -sI http://casa.mon-domaine.ci/  | grep -iE '^HTTP|^location'   # 301 -> https
+curl -sI https://casa.mon-domaine.ci/ | grep -i '^HTTP'              # 200
+
+# 2. CASA voit bien du HTTPS (schéma transmis) : la sonde /up passe et le
+#    /api renvoie du JSON, pas une redirection
+curl -s https://casa.mon-domaine.ci/up | head -c 20 ; echo
+curl -s https://casa.mon-domaine.ci/api/filieres | head -c 60 ; echo
+
+# 3. En-têtes : HSTS vient d'Apache, les 5 autres du nginx de CASA
+curl -sI https://casa.mon-domaine.ci/ | grep -iE 'strict-transport|content-security|x-frame|x-content-type|referrer-policy|permissions-policy'
+
+# 4. Login admin (nécessite l'en-tête Origin, cf. § 10.9) — objet utilisateur, jamais de hash
+curl -sc /tmp/j https://casa.mon-domaine.ci/sanctum/csrf-cookie -o /dev/null
+XSRF=$(awk '/XSRF-TOKEN/{print $7}' /tmp/j | perl -pe 's/%([0-9A-Fa-f]{2})/chr hex $1/ge')
+curl -s -b /tmp/j -c /tmp/j -X POST https://casa.mon-domaine.ci/api/login \
+  -H 'Content-Type: application/json' -H 'Origin: https://casa.mon-domaine.ci' \
+  -H "X-XSRF-TOKEN: $XSRF" -d '{"email":"coordination@mon-domaine.ci","password":"VOTRE_MOT_DE_PASSE"}' | head -c 200
+```
+
+Puis, **dans un navigateur** : ouvrir `https://casa.mon-domaine.ci`, se connecter,
+vérifier l'absence d'erreur CSP dans la console.
+
+### 13.8 Ce qui change pour la maintenance (§ 11)
+
+- **Mise à jour** : `git fetch --tags && git checkout <tag> && dca up -d --build`
+  puis `dca exec backend php artisan migrate --force`.
+- **Sauvegardes / restauration / logs** : identiques au § 11, en remplaçant
+  `dcp` par `dca`.
+- **Après un changement d'`.env.production`** : `dca up -d --force-recreate backend`.
+- **Cohabitation** : le projet Compose s'appelle `casa` (réseau `casa_casa`,
+  conteneurs `casa-*`) — aucun risque de collision avec les autres piles Docker
+  du serveur. Seul le port `8090` (loopback) est pris ; Apache et les autres
+  apps ne sont pas touchés.
+- **« Si CASA ne répond plus via Apache »** :
+  | Symptôme | Cause | Correctif |
+  |---|---|---|
+  | Apache renvoie **502 Bad Gateway** | CASA (`:8090`) est arrêté ou pas `healthy` | `dca ps` ; `dca up -d` ; `dca logs -f nginx` |
+  | Login en **boucle** / **419** | `SESSION_DOMAIN` / `SANCTUM_STATEFUL_DOMAINS` ≠ domaine servi, ou `X-Forwarded-Proto` absent (module `headers` non activé) | vérifier les 2 vars = `casa.mon-domaine.ci` ; `a2enmod headers` ; `--force-recreate backend` |
+  | Page blanche, **erreurs CSP** | une lib front charge une ressource externe | ajuster la CSP dans `docker/nginx/casa.apache.conf` puis `dca exec nginx nginx -s reload` |
+  | `apache2ctl configtest` : **AH00526** sur `<IfFile>` | Apache < 2.4.34 | mettre à jour, ou retirer les blocs `<IfFile>` et gérer le `:443` manuellement |
 
 ---
 
