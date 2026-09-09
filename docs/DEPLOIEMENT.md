@@ -531,11 +531,21 @@ dcp down -v             # ⚠️ SUPPRIME AUSSI LES VOLUMES = perte de la base e
 Navigateur ──HTTPS──▶ Apache :443 ──HTTP + X-Forwarded-Proto:https──▶ nginx CASA 127.0.0.1:8090 ──▶ backend/frontend
 ```
 
+> **Raccourci.** Le script `docker/apache/deploy-behind-apache.sh` fait §§ 13.2 à
+> 13.7 en une commande (config, build, migrations, référentiel, vhost, vérifs) :
+> ```bash
+> cd /opt/casa
+> CASA_DOMAIN=casa.mon-domaine.ci CASA_ADMIN_EMAIL=coordination@mon-domaine.ci \
+>   bash docker/apache/deploy-behind-apache.sh
+> ```
+> Les sections ci-dessous détaillent ce qu'il fait, pour un déploiement manuel
+> ou du dépannage.
+
 ### 13.1 Prérequis
 
 Comme § 1 (Docker + Compose ≥ 2.24, Git), **plus** :
 
-- Apache 2.4 déjà installé et en service.
+- Apache 2.4.34+ déjà installé et en service (2.4.34 pour la directive `<IfFile>`).
 - Un **port TCP local libre** pour CASA (ce guide : `8090`). Vérifier :
   ```bash
   sudo ss -tlnp | grep -E ':8090\b' || echo "8090 libre"
@@ -548,6 +558,20 @@ Comme § 1 (Docker + Compose ≥ 2.24, Git), **plus** :
 - Un **sous-domaine** (`casa.mon-domaine.ci`) avec un enregistrement DNS **A**
   pointant vers l'IP **publique** du serveur, et les ports 80/443 accessibles
   depuis Internet (nécessaire pour que Let's Encrypt valide le domaine).
+- **DNS des conteneurs Docker fonctionnel.** Le *build* (npm / composer / apk)
+  doit résoudre les registres publics ; le *runtime* de CASA, lui, n'a besoin
+  d'aucun DNS externe (résolveur Docker interne pour `postgres` / `frontend`).
+  Tester :
+  ```bash
+  docker run --rm alpine nslookup registry.npmjs.org
+  ```
+  Si ça échoue (le build planterait sur une résolution de nom), forcer des
+  résolveurs fiables au niveau du démon :
+  ```bash
+  echo '{ "dns": ["8.8.8.8", "1.1.1.1"] }' | sudo tee /etc/docker/daemon.json
+  sudo systemctl restart docker
+  ```
+  *(Adapter aux résolveurs internes de l'organisation si `8.8.8.8` est bloqué.)*
 
 ### 13.2 Récupération du code + configuration
 
@@ -556,16 +580,21 @@ Identiques au **mode A** :
 - **§ 3** — cloner le dépôt (ici on suppose `/opt/casa`).
 - **§ 4** — créer et remplir les deux `.env.production`. Différences pour ce mode :
   - `.env.production` (racine) : **pas besoin de `TLS_DIR`** (CASA ne gère pas de
-    certificat). Ajouter :
+    certificat). Ces trois lignes sont déjà dans le modèle — laisser les défauts :
     ```
     CASA_HTTP_PORT=8090
     CASA_BIND_ADDR=127.0.0.1
+    CASA_SUBNET=172.31.243.0/24
     ```
-  - `backend/.env.production` : **exactement comme en mode A** —
-    `APP_URL=https://casa.mon-domaine.ci`, `SESSION_DOMAIN=casa.mon-domaine.ci`,
-    `SANCTUM_STATEFUL_DOMAINS=casa.mon-domaine.ci`, `SESSION_SECURE_COOKIE=true`,
-    `TRUSTED_PROXIES=*` (voir § 13.5). Le HTTPS est réel côté visiteur (assuré
-    par Apache) — les cookies `Secure` sont donc corrects.
+  - `backend/.env.production` : `APP_URL=https://casa.mon-domaine.ci`,
+    `SESSION_DOMAIN=casa.mon-domaine.ci`,
+    `SANCTUM_STATEFUL_DOMAINS=casa.mon-domaine.ci`, `SESSION_SECURE_COOKIE=true`.
+    Le HTTPS est réel côté visiteur (assuré par Apache) — les cookies `Secure`
+    sont donc corrects.
+  - `backend/.env.production` : **`TRUSTED_PROXIES=172.31.243.0/24`** (= `CASA_SUBNET`),
+    **jamais `*`** (voir § 13.5 — le serveur héberge d'autres apps, `*` ouvre
+    une usurpation d'IP). C'est la valeur du modèle ; le script la pose
+    automatiquement.
 
 Alias de commande pour ce mode :
 
@@ -587,6 +616,10 @@ n'est exposé publiquement. Test local :
 ```bash
 curl -s http://127.0.0.1:8090/up | head -c 40 ; echo      # page "up" Laravel
 curl -sI http://127.0.0.1:8090/ | grep -i "^HTTP"         # 200 (SPA)
+
+# Le sous-réseau réel DOIT être égal à TRUSTED_PROXIES (§ 13.5) :
+docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}'
+grep '^TRUSTED_PROXIES=' backend/.env.production
 ```
 
 Base de données + référentiel + premier admin : **identiques aux § 8 et § 9**
@@ -627,28 +660,87 @@ Ce que contient le vhost :
 À ce stade, `http://casa.mon-domaine.ci/up` répond déjà (en clair). ⚠️ **Le
 login ne marchera qu'en HTTPS** (cookies `Secure`) — passer au § 13.6.
 
-### 13.5 `trustProxies` — pourquoi ça reste cohérent
+### 13.5 `TRUSTED_PROXIES` — durcissement (serveur mutualisé)
 
 `bootstrap/app.php` : `$middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'))`.
 Les en-têtes `X-Forwarded-*` sont dans la liste de confiance par défaut de
-Laravel. Résultat :
+Laravel.
 
-| Ce qu'Apache envoie | Ce que Laravel en déduit |
+**Pourquoi `*` est dangereux ICI.** Apache **ajoute** (n'écrase pas) l'IP du
+client à `X-Forwarded-For`. Avec `TRUSTED_PROXIES=*`, Laravel fait confiance à
+**toute** la chaîne — donc à une valeur que le client aurait **lui-même
+pré-remplie** :
+
+```
+Client envoie:  X-Forwarded-For: 9.9.9.9
+Apache ajoute:  X-Forwarded-For: 9.9.9.9, <vraie IP client>
+Laravel (*)  →  « IP client = 9.9.9.9 »   ← USURPÉE
+```
+
+Conséquences concrètes :
+
+- **Contournement du rate-limiting keyé sur l'IP** — `casa-public` (60/min,
+  `/api/filieres` + `/api/health`), `login` (5/min) et `register` (3/min + 20/j).
+  Un attaquant qui fait tourner la fausse IP défait l'anti-brute-force et
+  l'anti-bot d'inscription.
+- **Logs applicatifs pollués** — `AuthController` journalise `$request->ip()`
+  lors d'une tentative de connexion sur un compte désactivé.
+
+*(Le journal d'audit métier `journal_audit` — ADR-12, immuable — ne stocke pas
+d'IP aujourd'hui, il n'est donc pas directement concerné ; mais si une colonne
+IP y est ajoutée un jour, `TRUSTED_PROXIES` resserré la rend fiable dès le
+départ.)*
+
+Sur un serveur qui héberge d'autres applications, on ne prend pas ce risque.
+
+**La valeur correcte.** Le sous-réseau Docker de CASA, **figé** par
+`docker-compose.prod.yml` (`CASA_SUBNET`, défaut `172.31.243.0/24`) :
+
+```
+TRUSTED_PROXIES=172.31.243.0/24
+```
+
+Laravel remonte alors `X-Forwarded-For` **de droite à gauche** et **s'arrête au
+premier hop hors de ce sous-réseau** :
+
+```
+Chaîne reçue par Laravel :  9.9.9.9 , <vraie IP client> , <vraie IP client>
+REMOTE_ADDR = 172.31.243.x (nginx CASA)     → dans le /24 → sauté
+… <vraie IP client> (à droite)             → HORS du /24 → STOP. IP client = celle-ci.
+   9.9.9.9 (pré-injecté par le client)      → jamais atteint → IGNORÉ
+```
+
+**Prouvé en local** (mode Apache, `docker network inspect` = `172.31.243.0/24`) :
+65 requêtes `/api/health` avec un `X-Forwarded-For` **forgé tournant** →
+`60 × 200` puis `5 × 429` (le limiteur `casa-public` a bien keyé sur la vraie
+IP). Avec `TRUSTED_PROXIES=*` : **65 × 200** — l'usurpation contourne la limite.
+
+Vérifier après `up` que le réseau a bien ce sous-réseau :
+
+```bash
+docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}'   # → 172.31.243.0/24
+```
+
+Si ce `/24` est déjà pris sur le serveur : choisir une autre valeur (ex.
+`10.201.0.0/24`) et la répercuter aux **trois** endroits — `CASA_SUBNET`
+(`.env.production`), `TRUSTED_PROXIES` (`backend/.env.production`),
+`set_real_ip_from` (`docker/nginx/casa.apache.conf`) — puis
+`dca down && dca up -d`.
+
+**La détection de l'IP client reste correcte** (c'est prouvé par la chaîne
+ci-dessus) :
+
+| | Résultat avec `TRUSTED_PROXIES=172.31.243.0/24` |
 |---|---|
-| `X-Forwarded-Proto: https` | `$request->isSecure() === true` → cookies posés avec `Secure`, URLs générées en `https://` |
-| `X-Forwarded-Host: casa.mon-domaine.ci` (via `ProxyPreserveHost`) | `$request->getHost()` correct → `SANCTUM_STATEFUL_DOMAINS` matche l'`Origin` du navigateur |
-| `X-Forwarded-For: <IP client>` | IP réelle tracée à l'audit (ADR-12) et pour le rate-limiting |
+| `$request->ip()` (rate-limiting, logs) | **la vraie IP client** transmise par Apache — un `X-Forwarded-For` forgé est ignoré |
+| `$request->isSecure()` | `true` (via `X-Forwarded-Proto: https` qu'Apache **écrase** — non usurpable, même avec `*`) |
+| `$request->getHost()` | `casa.mon-domaine.ci` (via `ProxyPreserveHost On`) → Sanctum matche l'`Origin` |
 
-**Chaîne à 2 proxys** (Apache → nginx CASA → PHP-FPM) : les deux sont sur des
-réseaux privés/loopback, `TRUSTED_PROXIES=*` est acceptable (nginx CASA n'écoute
-que sur `127.0.0.1`, injoignable de l'extérieur). Pour resserrer : mettre le
-sous-réseau Docker de CASA **et** `127.0.0.1/8`
-(`TRUSTED_PROXIES=127.0.0.1/8,172.18.0.0/16` — adapter le second via
-`docker network inspect casa_casa`).
-
-Rien à changer dans la config Sanctum : `config/session.php` et
-`config/sanctum.php` lisent tout via `env()`, et les valeurs sont **les mêmes
-qu'en mode A**.
+Rien à changer dans `config/session.php` / `config/sanctum.php` (100 % `env()`).
+En **mode A** (§ 1-12), la même valeur `172.31.243.0/24` s'applique : le nginx de
+CASA y **écrase** `X-Forwarded-For` (`$remote_addr`) et pose `HTTPS on` en
+fastcgi, donc rien n'est usurpable — mais on garde la valeur resserrée par
+cohérence et défense en profondeur.
 
 ### 13.6 Certificat Let's Encrypt
 
@@ -688,6 +780,17 @@ XSRF=$(awk '/XSRF-TOKEN/{print $7}' /tmp/j | perl -pe 's/%([0-9A-Fa-f]{2})/chr h
 curl -s -b /tmp/j -c /tmp/j -X POST https://casa.mon-domaine.ci/api/login \
   -H 'Content-Type: application/json' -H 'Origin: https://casa.mon-domaine.ci' \
   -H "X-XSRF-TOKEN: $XSRF" -d '{"email":"coordination@mon-domaine.ci","password":"VOTRE_MOT_DE_PASSE"}' | head -c 200
+
+# 5. Anti-usurpation d'IP (§ 13.5) : un X-Forwarded-For forgé et TOURNANT ne doit
+#    PAS permettre de dépasser la limite (le limiteur key sur la VRAIE IP).
+#    /api/health est limité à 60/min/IP. On envoie 65 requêtes avec un XFF
+#    différent à chaque fois : un 429 DOIT quand même apparaître.
+for i in $(seq 1 65); do
+  curl -s -o /dev/null -w '%{http_code}\n' -H "X-Forwarded-For: 10.$i.$i.$i" \
+    https://casa.mon-domaine.ci/api/health
+done | sort | uniq -c
+#   Attendu : ~60 × "200" PUIS ~5 × "429".  (Si 65 × "200" → TRUSTED_PROXIES
+#   est trop large, l'usurpation marche : revoir § 13.5.)
 ```
 
 Puis, **dans un navigateur** : ouvrir `https://casa.mon-domaine.ci`, se connecter,
@@ -709,6 +812,9 @@ vérifier l'absence d'erreur CSP dans la console.
   |---|---|---|
   | Apache renvoie **502 Bad Gateway** | CASA (`:8090`) est arrêté ou pas `healthy` | `dca ps` ; `dca up -d` ; `dca logs -f nginx` |
   | Login en **boucle** / **419** | `SESSION_DOMAIN` / `SANCTUM_STATEFUL_DOMAINS` ≠ domaine servi, ou `X-Forwarded-Proto` absent (module `headers` non activé) | vérifier les 2 vars = `casa.mon-domaine.ci` ; `a2enmod headers` ; `--force-recreate backend` |
+  | `$request->ip()` (logs, rate-limiting) = **IP interne** `172.31.243.x` au lieu de l'IP client, et/ou `$request->isSecure()` faux (URLs `http://` générées) | `docker network inspect casa_casa` ≠ `TRUSTED_PROXIES` (souvent après avoir changé `CASA_SUBNET` sans `dca down`) | aligner `CASA_SUBNET` / `TRUSTED_PROXIES` / `set_real_ip_from` sur le sous-réseau **réel** ; `dca down && dca up -d` |
+  | Rate-limiting **contournable** avec un `X-Forwarded-For` forgé (test § 13.7 n°5 → 65 × 200) | `TRUSTED_PROXIES` trop **large** (`*` ou un `/8`) → Laravel remonte trop loin dans la chaîne | remettre exactement `= CASA_SUBNET` ; `dca up -d --force-recreate backend` |
+  | `build` échoue sur `getaddrinfo` / `Could not resolve host` (npm, composer) | DNS des conteneurs Docker cassé | `/etc/docker/daemon.json` → `{"dns":["8.8.8.8","1.1.1.1"]}` ; `sudo systemctl restart docker` ; relancer (§ 13.1) |
   | Page blanche, **erreurs CSP** | une lib front charge une ressource externe | ajuster la CSP dans `docker/nginx/casa.apache.conf` puis `dca exec nginx nginx -s reload` |
   | `apache2ctl configtest` : **AH00526** sur `<IfFile>` | Apache < 2.4.34 | mettre à jour, ou retirer les blocs `<IfFile>` et gérer le `:443` manuellement |
 

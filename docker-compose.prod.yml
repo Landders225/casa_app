@@ -70,3 +70,17 @@ services:
     healthcheck:
       # La sonde interne passe par HTTPS (self-signed accepté avec --no-check-certificate).
       test: ["CMD", "wget", "--spider", "-q", "--no-check-certificate", "https://127.0.0.1/up"]
+
+# --- Sous-réseau Docker FIXE (Lot 11 — durcissement) -------------------------
+# En dev, `casa` prend un /16 aléatoire. En prod on le FIGE : c'est la valeur
+# EXACTE que `TRUSTED_PROXIES` (backend/.env.production) doit contenir — Laravel
+# ne fait alors confiance à `X-Forwarded-For` que pour les hops de CE réseau et
+# lit l'IP client réelle sans se laisser usurper (critique derrière un Apache
+# mutualisé — voir docs/DEPLOIEMENT.md § 13). Changer via CASA_SUBNET si
+# collision d'adresses (répercuter dans backend/.env.production ET
+# docker/nginx/casa.apache.conf : set_real_ip_from).
+networks:
+  casa:
+    ipam:
+      config:
+        - subnet: ${CASA_SUBNET:-172.31.243.0/24}

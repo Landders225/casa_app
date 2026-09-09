@@ -18,6 +18,8 @@
 #      CASA_ADMIN_EMAIL   ServerAdmin + Let's Encrypt   (défaut: admin@$CASA_DOMAIN)
 #      CASA_HTTP_PORT     port local de nginx CASA      (défaut: 8090)
 #      CASA_BIND_ADDR     interface d'écoute            (défaut: 127.0.0.1)
+#      CASA_SUBNET        sous-réseau Docker figé = TRUSTED_PROXIES
+#                                                      (défaut: 172.31.243.0/24)
 #      RUN_CERTBOT=1      enchaîne `certbot certonly --apache` à la fin
 #
 #  Idempotent. Ne touche jamais aux autres vhosts / conteneurs du serveur.
@@ -29,6 +31,7 @@ CASA_DOMAIN="${CASA_DOMAIN:?Définir CASA_DOMAIN (ex: CASA_DOMAIN=casa.mon-domai
 CASA_ADMIN_EMAIL="${CASA_ADMIN_EMAIL:-admin@${CASA_DOMAIN}}"
 CASA_HTTP_PORT="${CASA_HTTP_PORT:-8090}"
 CASA_BIND_ADDR="${CASA_BIND_ADDR:-127.0.0.1}"
+CASA_SUBNET="${CASA_SUBNET:-172.31.243.0/24}"
 RUN_CERTBOT="${RUN_CERTBOT:-0}"
 
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -46,6 +49,16 @@ command -v apache2ctl >/dev/null || { echo "Apache absent"; exit 1; }
 if ss -tlnH "sport = :${CASA_HTTP_PORT}" 2>/dev/null | grep -q .; then
     echo "⚠️  Le port ${CASA_HTTP_PORT} est déjà pris — choisir un autre CASA_HTTP_PORT."; exit 1
 fi
+# DNS Docker : le BUILD (npm/composer/apk) doit résoudre les registres publics.
+# Le RUNTIME n'en a pas besoin (résolveur Docker interne pour postgres/frontend).
+if ! docker run --rm alpine sh -c 'nslookup registry.npmjs.org' >/dev/null 2>&1; then
+    echo "⚠️  Le DNS des conteneurs Docker ne résout pas les noms publics."
+    echo "    Le build va probablement échouer. Corriger avant de continuer :"
+    echo "      echo '{ \"dns\": [\"8.8.8.8\", \"1.1.1.1\"] }' | sudo tee /etc/docker/daemon.json"
+    echo "      sudo systemctl restart docker"
+    echo "    (voir docs/DEPLOIEMENT.md § 13.1). Ctrl-C pour arrêter, ou Entrée pour tenter quand même."
+    read -r _
+fi
 
 # --- 1. Fichiers .env.production ---------------------------------------
 say "Configuration (.env.production)"
@@ -55,7 +68,8 @@ if [ ! -f .env.production ]; then
     sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${PGPW}|" .env.production
     sed -i "s|^CASA_HTTP_PORT=.*|CASA_HTTP_PORT=${CASA_HTTP_PORT}|" .env.production
     sed -i "s|^CASA_BIND_ADDR=.*|CASA_BIND_ADDR=${CASA_BIND_ADDR}|" .env.production
-    echo "  → .env.production créé (mot de passe Postgres généré)"
+    sed -i "s|^CASA_SUBNET=.*|CASA_SUBNET=${CASA_SUBNET}|" .env.production
+    echo "  → .env.production créé (mot de passe Postgres généré, sous-réseau ${CASA_SUBNET})"
 else
     PGPW="$(grep -E '^POSTGRES_PASSWORD=' .env.production | cut -d= -f2-)"
     echo "  → .env.production existant conservé"
@@ -69,9 +83,17 @@ if [ ! -f backend/.env.production ]; then
     sed -i "s|^SESSION_DOMAIN=.*|SESSION_DOMAIN=${CASA_DOMAIN}|"                     backend/.env.production
     sed -i "s|^SANCTUM_STATEFUL_DOMAINS=.*|SANCTUM_STATEFUL_DOMAINS=${CASA_DOMAIN}|" backend/.env.production
     sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${PGPW}|"                                  backend/.env.production
-    echo "  → backend/.env.production créé (APP_KEY généré, domaine ${CASA_DOMAIN})"
+    # Durcissement : TRUSTED_PROXIES = sous-réseau Docker de CASA, JAMAIS « * »
+    # (sinon usurpation d'IP via X-Forwarded-For → rate-limiting keyé IP
+    # contourné + logs pollués). Doit être IDENTIQUE à CASA_SUBNET.
+    sed -i "s|^TRUSTED_PROXIES=.*|TRUSTED_PROXIES=${CASA_SUBNET}|"                   backend/.env.production
+    echo "  → backend/.env.production créé (APP_KEY généré, domaine ${CASA_DOMAIN}, TRUSTED_PROXIES=${CASA_SUBNET})"
 else
     echo "  → backend/.env.production existant conservé"
+    case "$(grep -E '^TRUSTED_PROXIES=' backend/.env.production | cut -d= -f2-)" in
+        '*'|'') echo "  ⚠️  TRUSTED_PROXIES vaut « * » (ou vide) — DANGEREUX ici."
+                echo "      Mettre : TRUSTED_PROXIES=${CASA_SUBNET}  puis relancer." ;;
+    esac
 fi
 "${DC[@]}" config -q && echo "  → compose OK"
 
@@ -85,6 +107,19 @@ for _ in $(seq 1 72); do
     echo -n "."; sleep 5
 done
 "${DC[@]}" ps
+
+# Le sous-réseau réel DOIT correspondre à TRUSTED_PROXIES (sinon Laravel ne
+# fait confiance à aucun proxy → schéma HTTPS non vu, IP client fausse).
+REAL_SUBNET="$(docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}' 2>/dev/null || echo '?')"
+if [ "$REAL_SUBNET" = "$CASA_SUBNET" ]; then
+    echo "  ✓ réseau casa_casa = ${CASA_SUBNET} (= TRUSTED_PROXIES)"
+else
+    echo "  ⚠️  réseau casa_casa = ${REAL_SUBNET} ≠ CASA_SUBNET (${CASA_SUBNET})."
+    echo "      Le sous-réseau ${CASA_SUBNET} est peut-être déjà pris. Choisir une"
+    echo "      autre valeur : relancer avec CASA_SUBNET=10.201.0.0/24 (par ex.),"
+    echo "      après « ${DC[*]} down » pour recréer le réseau."
+    exit 1
+fi
 
 # --- 3. Base de données ---------------------------------------------
 say "Migrations + référentiel (sans comptes démo)"
