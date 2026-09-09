@@ -18,9 +18,12 @@
 | Mode | Quand | Sections |
 |---|---|---|
 | **A — Autonome** (défaut) | serveur dédié à CASA, CASA prend 80/443 et termine le TLS lui-même | § 1 → § 12 |
-| **B — Derrière un Apache existant** | le serveur héberge déjà d'autres apps, Apache est en façade sur 80/443 ; CASA tourne en HTTP local sur un port dédié, Apache proxifie | **§ 13** (+ § 4, § 8, § 9 communes) |
+| **T — Test local HTTP** | valider le fonctionnel sur le serveur **avant** de monter Apache/HTTPS ; accès navigateur direct `http://<IP>:8090`, pas de domaine | **§ 13** |
+| **B — Derrière un Apache existant** | le serveur héberge déjà d'autres apps, Apache est en façade sur 80/443 ; CASA tourne en HTTP local sur un port dédié, Apache proxifie | **§ 14** (+ § 4, § 8, § 9 communes) |
 
-Le reste de ce tableau et les sections 1–12 décrivent le **mode A**.
+Le mode **T** est une étape intermédiaire jetable : on l'utilise pour vérifier
+que CASA tourne, puis on bascule sur le mode **B** (le vrai). Le reste de ce
+tableau et les sections 1–12 décrivent le **mode A**.
 
 | Élément | Choix | Où c'est défini |
 |---|---|---|
@@ -513,7 +516,177 @@ dcp down -v             # ⚠️ SUPPRIME AUSSI LES VOLUMES = perte de la base e
 
 ---
 
-## 13. Déploiement derrière un Apache existant (multi-apps, port dédié)
+## 13. Test local en HTTP direct (étape intermédiaire)
+
+> **But.** Avant de monter Apache + Let's Encrypt (§ 14), valider que CASA
+> **tourne** et que le **login fonctionne**, en tapant simplement
+> `http://<IP-du-serveur>:8090` dans un navigateur. Pas de domaine, pas de
+> HTTPS, pas d'Apache : le navigateur parle **directement** au nginx de CASA.
+>
+> ```
+> Navigateur ──HTTP──▶ nginx CASA  0.0.0.0:8090  ──▶ backend / frontend
+> ```
+>
+> ⚠️ **Mode jetable.** Les cookies sont **non-`Secure`** (obligatoire pour un
+> login en HTTP) : à **ne pas exposer sur Internet**. Le passage en production
+> réelle (§ 14) **exige** de remettre `SESSION_SECURE_COOKIE=true` + le vrai
+> domaine.
+
+### 13.1 Prérequis
+
+- § 1 (Docker + Compose ≥ 2.24, Git) et le code cloné (§ 3), p. ex. dans `/opt/casa`.
+- Le **port `8090` libre** : `sudo ss -tlnp | grep ':8090' || echo libre`.
+- **DNS des conteneurs Docker fonctionnel** — le *build* (`npm` / `composer` /
+  `apk`) télécharge des paquets ; le *runtime* de CASA, lui, n'a besoin d'aucun
+  DNS externe. Tester :
+  ```bash
+  docker run --rm alpine nslookup registry.npmjs.org
+  ```
+  Si ça échoue :
+  ```bash
+  echo '{ "dns": ["8.8.8.8", "1.1.1.1"] }' | sudo tee /etc/docker/daemon.json
+  sudo systemctl restart docker
+  ```
+  *(Remplacer par les résolveurs internes de l'organisation si `8.8.8.8` est bloqué.)*
+
+### 13.2 Raccourci — le script
+
+```bash
+cd /opt/casa
+CASA_SERVER_IP=172.30.4.200 bash docker/deploy-test-local.sh
+```
+
+Il crée les `.env.test-local`, build + up, migrate + `casa:seed-referentiel`,
+et vérifie (`/up`, SPA, **anti-usurpation d'IP**). Détail manuel ci-dessous.
+
+### 13.3 Configuration
+
+Deux fichiers **gitignorés**, depuis leurs modèles :
+
+```bash
+cp .env.test-local.example .env.test-local
+cp backend/.env.test-local.example backend/.env.test-local
+```
+
+**`.env.test-local`** (racine) : `POSTGRES_PASSWORD` (fort), `CASA_HTTP_PORT=8090`,
+`CASA_BIND_ADDR=0.0.0.0`, `CASA_SUBNET=172.31.243.0/24`.
+
+> **`CASA_BIND_ADDR=0.0.0.0`** = nginx écoute sur **toutes les interfaces** →
+> `http://172.30.4.200:8090` est joignable depuis le réseau. Avec `127.0.0.1`,
+> le port ne serait atteignable **que depuis le serveur lui-même** (le loopback
+> n'est pas routé).
+
+**`backend/.env.test-local`** — remplacer `SERVEUR_IP` par l'IP réelle
+(`172.30.4.200`) partout :
+
+| Variable | Valeur (test) | Prod réelle (§ 14) |
+|---|---|---|
+| `APP_URL` | `http://172.30.4.200:8090` | `https://casa.mon-domaine.ci` |
+| `SESSION_DOMAIN` | `172.30.4.200` | `casa.mon-domaine.ci` |
+| `SANCTUM_STATEFUL_DOMAINS` | `172.30.4.200:8090` *(avec le port !)* | `casa.mon-domaine.ci` |
+| `SESSION_SECURE_COOKIE` | **`false`** | **`true`** |
+| `APP_KEY` | généré (ci-dessous) | — |
+| `DB_PASSWORD` | = `POSTGRES_PASSWORD` | — |
+| `TRUSTED_PROXIES` | `172.31.243.0/24` (= `CASA_SUBNET`) | idem |
+
+Générer `APP_KEY` :
+
+```bash
+docker compose --env-file .env.test-local \
+  -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.test-local.yml \
+  run --rm --no-deps --entrypoint php backend artisan key:generate --show
+# → coller dans APP_KEY de backend/.env.test-local
+```
+
+### 13.4 Lancement
+
+Alias pratique :
+
+```bash
+cd /opt/casa
+alias dct='docker compose --env-file .env.test-local -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.test-local.yml'
+```
+
+```bash
+dct up -d --build
+watch -n 3 'dct ps'          # 4× (healthy), Ctrl-C
+
+# Le sous-réseau réel DOIT être égal à TRUSTED_PROXIES :
+docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}'   # → 172.31.243.0/24
+
+dct exec backend php artisan migrate --force
+dct exec backend php artisan casa:seed-referentiel
+dct exec backend php artisan casa:create-admin coordination@exemple.ci
+```
+
+### 13.5 Sécurité — pas de proxy = pas de confiance dans `X-Forwarded-*`
+
+Ici le navigateur parle **directement** à nginx : **aucun proxy légitime** en
+amont. `docker/nginx/casa.test.conf` **remplace** (ne transmet pas) les en-têtes
+de proxy :
+
+```nginx
+fastcgi_param HTTP_X_FORWARDED_FOR   $remote_addr;   # IP TCP réelle du client
+fastcgi_param HTTP_X_FORWARDED_PROTO $scheme;        # "http" — imposé
+```
+
+Donc un client qui envoie `X-Forwarded-For: 9.9.9.9` **ne change rien** :
+nginx l'écrase avec l'IP TCP réelle avant de passer à Laravel. `TRUSTED_PROXIES`
+= le sous-réseau Docker sert **uniquement** à ce que Laravel *lise* l'en-tête
+réécrit par nginx (sinon `$request->ip()` = IP du conteneur nginx pour tout le
+monde → rate-limiting = un seau unique).
+
+> Le port publié `0.0.0.0:8090` **préserve l'IP source** pour le trafic réseau
+> → nginx voit la vraie IP du navigateur. (Un `curl` lancé depuis le serveur
+> lui-même verrait la gateway Docker — sans impact.)
+
+### 13.6 Vérifications
+
+```bash
+# 1. Sonde + SPA (depuis n'importe quelle machine du réseau)
+curl -sI http://172.30.4.200:8090/up | grep -i '^HTTP'       # 200
+curl -sI http://172.30.4.200:8090/   | grep -i '^HTTP'       # 200
+curl -s  http://172.30.4.200:8090/api/filieres | head -c 60  # JSON
+
+# 2. LOGIN EN HTTP — le cookie de session doit se poser (Secure absent)
+curl -s -D - -o /dev/null -H 'Origin: http://172.30.4.200:8090' \
+  http://172.30.4.200:8090/sanctum/csrf-cookie | grep -i 'set-cookie'
+#   → 2 lignes : XSRF-TOKEN=… et casa-session=… , SANS le mot-clé « secure »
+
+# 3. Anti-usurpation d'IP : 65 requêtes /api/health, X-Forwarded-For forgé
+#    TOURNANT → un 429 DOIT quand même apparaître (limite = vraie IP)
+for i in $(seq 1 65); do
+  curl -s -o /dev/null -w '%{http_code}\n' -H "X-Forwarded-For: 10.$i.$i.$i" \
+    http://172.30.4.200:8090/api/health
+done | sort | uniq -c
+#   Attendu : ~60 × 200 puis ~5 × 429.
+```
+
+Puis **dans un navigateur** (une autre machine du réseau) : ouvrir
+`http://172.30.4.200:8090`, créer/consulter une candidature, se connecter en
+tant qu'admin — **le login doit aboutir** (pas de boucle 419).
+
+### 13.7 Passage à la production réelle
+
+```bash
+dct down                       # arrête le mode test (garde les volumes)
+```
+
+Puis suivre le **§ 14** (Apache + HTTPS). Points à ne PAS oublier au passage :
+
+- `SESSION_SECURE_COOKIE=true` (obligatoire dès qu'il y a du HTTPS) ;
+- `APP_URL` / `SESSION_DOMAIN` / `SANCTUM_STATEFUL_DOMAINS` = le **vrai domaine**
+  (sans le `:8090`) ;
+- `CASA_BIND_ADDR=127.0.0.1` (le mode Apache : nginx n'écoute plus que sur la
+  loopback, Apache le proxifie).
+
+Les **données** (base, pièces) sont dans des volumes Docker (`casa_postgres_data`,
+`casa_documents_data`) : elles survivent au `dct down` et sont réutilisées par le
+mode Apache (même projet Compose `casa`). Pour repartir de zéro : `dct down -v`.
+
+---
+
+## 14. Déploiement derrière un Apache existant (multi-apps, port dédié)
 
 > **Contexte.** Le serveur Ubuntu héberge déjà d'autres applications, avec
 > **Apache** en façade sur les ports 80/443. CASA **ne peut pas** prendre 80/443
@@ -531,7 +704,7 @@ dcp down -v             # ⚠️ SUPPRIME AUSSI LES VOLUMES = perte de la base e
 Navigateur ──HTTPS──▶ Apache :443 ──HTTP + X-Forwarded-Proto:https──▶ nginx CASA 127.0.0.1:8090 ──▶ backend/frontend
 ```
 
-> **Raccourci.** Le script `docker/apache/deploy-behind-apache.sh` fait §§ 13.2 à
+> **Raccourci.** Le script `docker/apache/deploy-behind-apache.sh` fait §§ 14.2 à
 > 13.7 en une commande (config, build, migrations, référentiel, vhost, vérifs) :
 > ```bash
 > cd /opt/casa
@@ -541,7 +714,7 @@ Navigateur ──HTTPS──▶ Apache :443 ──HTTP + X-Forwarded-Proto:https
 > Les sections ci-dessous détaillent ce qu'il fait, pour un déploiement manuel
 > ou du dépannage.
 
-### 13.1 Prérequis
+### 14.1 Prérequis
 
 Comme § 1 (Docker + Compose ≥ 2.24, Git), **plus** :
 
@@ -573,7 +746,7 @@ Comme § 1 (Docker + Compose ≥ 2.24, Git), **plus** :
   ```
   *(Adapter aux résolveurs internes de l'organisation si `8.8.8.8` est bloqué.)*
 
-### 13.2 Récupération du code + configuration
+### 14.2 Récupération du code + configuration
 
 Identiques au **mode A** :
 
@@ -592,7 +765,7 @@ Identiques au **mode A** :
     Le HTTPS est réel côté visiteur (assuré par Apache) — les cookies `Secure`
     sont donc corrects.
   - `backend/.env.production` : **`TRUSTED_PROXIES=172.31.243.0/24`** (= `CASA_SUBNET`),
-    **jamais `*`** (voir § 13.5 — le serveur héberge d'autres apps, `*` ouvre
+    **jamais `*`** (voir § 14.5 — le serveur héberge d'autres apps, `*` ouvre
     une usurpation d'IP). C'est la valeur du modèle ; le script la pose
     automatiquement.
 
@@ -603,7 +776,7 @@ cd /opt/casa
 alias dca='docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.apache.yml'
 ```
 
-### 13.3 Démarrage de CASA (HTTP local)
+### 14.3 Démarrage de CASA (HTTP local)
 
 ```bash
 dca up -d --build
@@ -617,7 +790,7 @@ n'est exposé publiquement. Test local :
 curl -s http://127.0.0.1:8090/up | head -c 40 ; echo      # page "up" Laravel
 curl -sI http://127.0.0.1:8090/ | grep -i "^HTTP"         # 200 (SPA)
 
-# Le sous-réseau réel DOIT être égal à TRUSTED_PROXIES (§ 13.5) :
+# Le sous-réseau réel DOIT être égal à TRUSTED_PROXIES (§ 14.5) :
 docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}'
 grep '^TRUSTED_PROXIES=' backend/.env.production
 ```
@@ -631,7 +804,7 @@ dca exec backend php artisan casa:seed-referentiel
 dca exec backend php artisan casa:create-admin coordination@mon-domaine.ci
 ```
 
-### 13.4 VirtualHost Apache
+### 14.4 VirtualHost Apache
 
 Le fichier `docker/apache/casa.vhost.conf` est prêt à l'emploi. Seules **3 lignes**
 sont à changer (les `Define` en tête).
@@ -658,9 +831,9 @@ Ce que contient le vhost :
   TLS). Tant qu'il n'y a pas de certificat, seul le `:80` répond.
 
 À ce stade, `http://casa.mon-domaine.ci/up` répond déjà (en clair). ⚠️ **Le
-login ne marchera qu'en HTTPS** (cookies `Secure`) — passer au § 13.6.
+login ne marchera qu'en HTTPS** (cookies `Secure`) — passer au § 14.6.
 
-### 13.5 `TRUSTED_PROXIES` — durcissement (serveur mutualisé)
+### 14.5 `TRUSTED_PROXIES` — durcissement (serveur mutualisé)
 
 `bootstrap/app.php` : `$middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'))`.
 Les en-têtes `X-Forwarded-*` sont dans la liste de confiance par défaut de
@@ -742,7 +915,7 @@ CASA y **écrase** `X-Forwarded-For` (`$remote_addr`) et pose `HTTPS on` en
 fastcgi, donc rien n'est usurpable — mais on garde la valeur resserrée par
 cohérence et défense en profondeur.
 
-### 13.6 Certificat Let's Encrypt
+### 14.6 Certificat Let's Encrypt
 
 ```bash
 sudo apt install -y certbot
@@ -759,7 +932,7 @@ sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-apache.sh
 sudo certbot renew --dry-run
 ```
 
-### 13.7 Vérifications
+### 14.7 Vérifications
 
 ```bash
 # 1. Redirection + certificat
@@ -781,7 +954,7 @@ curl -s -b /tmp/j -c /tmp/j -X POST https://casa.mon-domaine.ci/api/login \
   -H 'Content-Type: application/json' -H 'Origin: https://casa.mon-domaine.ci' \
   -H "X-XSRF-TOKEN: $XSRF" -d '{"email":"coordination@mon-domaine.ci","password":"VOTRE_MOT_DE_PASSE"}' | head -c 200
 
-# 5. Anti-usurpation d'IP (§ 13.5) : un X-Forwarded-For forgé et TOURNANT ne doit
+# 5. Anti-usurpation d'IP (§ 14.5) : un X-Forwarded-For forgé et TOURNANT ne doit
 #    PAS permettre de dépasser la limite (le limiteur key sur la VRAIE IP).
 #    /api/health est limité à 60/min/IP. On envoie 65 requêtes avec un XFF
 #    différent à chaque fois : un 429 DOIT quand même apparaître.
@@ -790,13 +963,13 @@ for i in $(seq 1 65); do
     https://casa.mon-domaine.ci/api/health
 done | sort | uniq -c
 #   Attendu : ~60 × "200" PUIS ~5 × "429".  (Si 65 × "200" → TRUSTED_PROXIES
-#   est trop large, l'usurpation marche : revoir § 13.5.)
+#   est trop large, l'usurpation marche : revoir § 14.5.)
 ```
 
 Puis, **dans un navigateur** : ouvrir `https://casa.mon-domaine.ci`, se connecter,
 vérifier l'absence d'erreur CSP dans la console.
 
-### 13.8 Ce qui change pour la maintenance (§ 11)
+### 14.8 Ce qui change pour la maintenance (§ 11)
 
 - **Mise à jour** : `git fetch --tags && git checkout <tag> && dca up -d --build`
   puis `dca exec backend php artisan migrate --force`.
@@ -813,8 +986,8 @@ vérifier l'absence d'erreur CSP dans la console.
   | Apache renvoie **502 Bad Gateway** | CASA (`:8090`) est arrêté ou pas `healthy` | `dca ps` ; `dca up -d` ; `dca logs -f nginx` |
   | Login en **boucle** / **419** | `SESSION_DOMAIN` / `SANCTUM_STATEFUL_DOMAINS` ≠ domaine servi, ou `X-Forwarded-Proto` absent (module `headers` non activé) | vérifier les 2 vars = `casa.mon-domaine.ci` ; `a2enmod headers` ; `--force-recreate backend` |
   | `$request->ip()` (logs, rate-limiting) = **IP interne** `172.31.243.x` au lieu de l'IP client, et/ou `$request->isSecure()` faux (URLs `http://` générées) | `docker network inspect casa_casa` ≠ `TRUSTED_PROXIES` (souvent après avoir changé `CASA_SUBNET` sans `dca down`) | aligner `CASA_SUBNET` / `TRUSTED_PROXIES` / `set_real_ip_from` sur le sous-réseau **réel** ; `dca down && dca up -d` |
-  | Rate-limiting **contournable** avec un `X-Forwarded-For` forgé (test § 13.7 n°5 → 65 × 200) | `TRUSTED_PROXIES` trop **large** (`*` ou un `/8`) → Laravel remonte trop loin dans la chaîne | remettre exactement `= CASA_SUBNET` ; `dca up -d --force-recreate backend` |
-  | `build` échoue sur `getaddrinfo` / `Could not resolve host` (npm, composer) | DNS des conteneurs Docker cassé | `/etc/docker/daemon.json` → `{"dns":["8.8.8.8","1.1.1.1"]}` ; `sudo systemctl restart docker` ; relancer (§ 13.1) |
+  | Rate-limiting **contournable** avec un `X-Forwarded-For` forgé (test § 14.7 n°5 → 65 × 200) | `TRUSTED_PROXIES` trop **large** (`*` ou un `/8`) → Laravel remonte trop loin dans la chaîne | remettre exactement `= CASA_SUBNET` ; `dca up -d --force-recreate backend` |
+  | `build` échoue sur `getaddrinfo` / `Could not resolve host` (npm, composer) | DNS des conteneurs Docker cassé | `/etc/docker/daemon.json` → `{"dns":["8.8.8.8","1.1.1.1"]}` ; `sudo systemctl restart docker` ; relancer (§ 14.1) |
   | Page blanche, **erreurs CSP** | une lib front charge une ressource externe | ajuster la CSP dans `docker/nginx/casa.apache.conf` puis `dca exec nginx nginx -s reload` |
   | `apache2ctl configtest` : **AH00526** sur `<IfFile>` | Apache < 2.4.34 | mettre à jour, ou retirer les blocs `<IfFile>` et gérer le `:443` manuellement |
 

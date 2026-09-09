@@ -6,15 +6,17 @@
 /frontend/node_modules/
 node_modules/
 
-# --- Environnement réel (jamais versionné ; les *.env.production.example RESTENT suivis) ---
+# --- Environnement réel (jamais versionné ; les *.env.*.example RESTENT suivis) ---
 .env
 /.env
 /.env.production
 /.env.prod
+/.env.test-local
 /backend/.env
 /backend/.env.backup
 /backend/.env.production
 /backend/.env.prod
+/backend/.env.test-local
 /frontend/.env
 *.env.local
 

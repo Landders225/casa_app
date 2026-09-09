@@ -1,0 +1,47 @@
+# =============================================================================
+#  CASA — Override MODE TEST LOCAL EN HTTP DIRECT (Lot 11).
+#
+#  Navigateur ──HTTP──▶ http://<IP-serveur>:8090   (pas d'Apache, pas de HTTPS,
+#  pas de domaine). Étape de validation fonctionnelle sur le serveur, AVANT le
+#  mode Apache + HTTPS (docs/DEPLOIEMENT.md § 14).
+#
+#  Se superpose à docker-compose.prod.yml (backend en image + entrypoint +
+#  postgres) en ne redéfinissant QUE :
+#   - le fichier d'environnement de Laravel  -> backend/.env.test-local
+#   - le nginx : écoute HTTP sur ${CASA_BIND_ADDR}:${CASA_HTTP_PORT}, conf de
+#     test (ignore les X-Forwarded-* entrants), sonde HTTP.
+#
+#    docker compose --env-file .env.test-local \
+#      -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.test-local.yml up -d
+#
+#  ⚠️ NE PAS exposer sur Internet : cookies non-Secure (SESSION_SECURE_COOKIE=false).
+#     C'est un mode de TEST. La prod réelle = mode Apache (§ 14).
+#
+#  Variables (.env.test-local, racine) :
+#   - CASA_BIND_ADDR  défaut 0.0.0.0 (toutes interfaces → joignable depuis le
+#                     réseau). 127.0.0.1 ne serait joignable QUE depuis le serveur.
+#   - CASA_HTTP_PORT  défaut 8090.
+#   - CASA_SUBNET     défaut 172.31.243.0/24 (= TRUSTED_PROXIES).
+# =============================================================================
+
+name: casa
+
+services:
+  backend:
+    # Config Laravel de TEST (HTTP, cookies non-Secure, "domaine" = IP:port).
+    # `!override` : sinon compose empile backend/.env.production (de prod.yml)
+    # + celui-ci.
+    env_file: !override
+      - ./backend/.env.test-local
+
+  nginx:
+    # HTTP seul, sur TOUTES les interfaces par défaut → http://<IP-serveur>:8090.
+    ports: !override
+      - "${CASA_BIND_ADDR:-0.0.0.0}:${CASA_HTTP_PORT:-8090}:80"
+
+    volumes: !override
+      - ./docker/nginx/casa.test.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./backend/public:/var/www/html/public:ro
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/up"]
