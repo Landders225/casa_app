@@ -116,8 +116,9 @@ cat <<EOF
 ──────────────────────────────────────────────────────────────────────────────
  CASA (mode TEST) est joignable :  http://${CASA_SERVER_IP}:${CASA_HTTP_PORT}
 
- 1. Premier administrateur (interactif) :
+ 1. Comptes de l'équipe (interactif — docs/DEPLOIEMENT.md § 9) :
       ${DC[*]} exec backend php artisan casa:create-admin admin@exemple.ci
+      ${DC[*]} exec backend php artisan casa:create-membre eval@exemple.ci   # un par évaluateur
  2. Ouvrir http://${CASA_SERVER_IP}:${CASA_HTTP_PORT} dans un navigateur et
     se connecter (le cookie de session se pose bien en HTTP, Secure=false).
  3. Quand c'est validé → passer au mode Apache + HTTPS (docs/DEPLOIEMENT.md § 14) :

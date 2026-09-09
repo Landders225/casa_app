@@ -34,6 +34,7 @@ tableau et les sections 1–12 décrivent le **mode A**.
 | Migrations | **manuelles** (jamais au démarrage) | § 7 |
 | Référentiel | `php artisan casa:seed-referentiel` — **sans** les comptes démo | § 8 |
 | Premier admin | `php artisan casa:create-admin <email>` | § 9 |
+| Évaluateurs du jury | `php artisan casa:create-membre <email>` (`--role=administrateur` pour un admin de plus) | § 9 |
 | Secrets | 2 fichiers `.env.production` **gitignorés**, jamais dans l'image | § 4 |
 
 Les 4 services : `postgres` (16), `backend` (Laravel/PHP-FPM), `frontend` (build
@@ -288,27 +289,43 @@ dcp exec backend php artisan tinker --execute \
 
 ---
 
-## 9. Premier compte administrateur
+## 9. Comptes de l'équipe (admin + jury)
 
-Aucun compte n'existe encore. Cette commande est le **seul** moyen prévu d'en
-créer un en prod (interactive — mot de passe jamais en clair dans l'historique
-shell) :
+Aucun compte n'existe encore. Deux commandes interactives (mot de passe jamais
+en clair dans l'historique shell) — mêmes règles de mot de passe qu'à
+l'inscription (**min. 10 caractères, majuscule + minuscule + chiffre**), e-mail
+déjà pris refusé, transaction, **ligne d'audit**.
+
+### 9.1 Le premier administrateur
 
 ```bash
 dcp exec backend php artisan casa:create-admin coordination@casa.example.org
 ```
 
-Elle demande : mot de passe (min. 10 caractères, majuscule + minuscule +
-chiffre) et confirmation, puis prénom / nom / poste. Elle valide comme à
-l'inscription, refuse un e-mail déjà pris, écrit dans une transaction et **trace
-une ligne d'audit**.
+Demande : mot de passe + confirmation, puis prénom / nom / poste. Se connecter
+ensuite sur `https://casa.example.org/connexion`.
 
-Se connecter ensuite sur `https://casa.example.org/connexion`.
+### 9.2 Les évaluateurs du jury
 
-> Créer les comptes **évaluateurs** se fait ensuite depuis l'interface
-> d'administration (espace admin → équipe), ou par la même logique si une
-> commande dédiée est ajoutée plus tard. À ce jour, `casa:create-admin` ne crée
-> que des administrateurs.
+Sans évaluateur, aucun dossier ne peut être affecté ni noté. Créer un compte par
+membre du jury (le rôle par défaut est **`evaluateur`** — le moins privilégié) :
+
+```bash
+dcp exec backend php artisan casa:create-membre alice.diallo@cci.ci
+dcp exec backend php artisan casa:create-membre kofi.mensah@cci.ci
+# … un compte par évaluateur
+
+# Un administrateur supplémentaire (co-coordination) :
+dcp exec backend php artisan casa:create-membre adjoint@cci.ci --role=administrateur
+```
+
+`--role` n'accepte que `evaluateur` ou `administrateur` — toute autre valeur
+(dont `candidat`) est refusée sans rien écrire.
+
+> Les **écrans** de gestion de l'équipe et des utilisateurs (ajout depuis
+> l'interface admin, désactivation, charge de travail) sont un point ouvert —
+> voir `docs/POINTS-OUVERTS.md` § « Comptes & équipe » (Lot 11b). En attendant,
+> ces deux commandes CLI sont le moyen de provisionner les comptes.
 
 ---
 
@@ -617,6 +634,7 @@ docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}'   # → 
 dct exec backend php artisan migrate --force
 dct exec backend php artisan casa:seed-referentiel
 dct exec backend php artisan casa:create-admin coordination@exemple.ci
+dct exec backend php artisan casa:create-membre evaluateur1@exemple.ci   # jury (§ 9.2)
 ```
 
 ### 13.5 Sécurité — pas de proxy = pas de confiance dans `X-Forwarded-*`
@@ -795,13 +813,14 @@ docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}'
 grep '^TRUSTED_PROXIES=' backend/.env.production
 ```
 
-Base de données + référentiel + premier admin : **identiques aux § 8 et § 9**
-(remplacer `dcp` par `dca`) :
+Base de données + référentiel + comptes de l'équipe : **identiques aux § 8 et
+§ 9** (remplacer `dcp` par `dca`) :
 
 ```bash
 dca exec backend php artisan migrate --force
 dca exec backend php artisan casa:seed-referentiel
 dca exec backend php artisan casa:create-admin coordination@mon-domaine.ci
+dca exec backend php artisan casa:create-membre alice.diallo@mon-domaine.ci   # un par évaluateur (§ 9.2)
 ```
 
 ### 14.4 VirtualHost Apache

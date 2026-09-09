@@ -6,8 +6,9 @@
 > qu'un nouveau apparaît. Le **journal figé** des décisions reste `docs/ADR.md`
 > (on n'y réécrit pas l'histoire) ; ici on tient le **présent**.
 >
-> Dernière revue : **Lot 10** (2026-09-07) — revue de sécurité défensive, voir
-> [`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md).
+> Dernière revue : **Lot 11a** (2026-09-09) — CLI de provisioning des comptes
+> (`casa:create-membre`). Voir aussi la revue de sécurité **Lot 10**
+> ([`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md)).
 
 ## Légende de statut
 
@@ -42,7 +43,20 @@
 |---|---|---|---|---|
 | **Création / édition de campagne et de filière** (dates, quotas, nom, description) | 🟠 Ouvert | Aucun endpoint d'écriture ; en prod ça se fait par `tinker` / SQL (documenté `DEPLOIEMENT.md` § 11.9). Le garde-fou « une seule campagne ouverte » est déjà appliqué | ADR — Points ouverts (**D-6a-2**) ; ADR sur 8d-1 | Endpoints CRUD + écrans + validations (fenêtres de dates, quotas ≥ retenus déjà décidés) |
 | **Correction exceptionnelle des auto-déclarations candidat** (SC/SE/DI, langues, expériences) | 🟠 Ouvert | Le **backend l'accepte déjà** intégralement (`CorrigerDossierRequest::reponses()`) ; l'UI (Lot 8d-3) ne construit que nationalité / SC.04 diplôme / MO.04 étoiles / commentaire | **ADR-25** (point ouvert explicite) ; `CorrectionDossierModal.jsx` | UI de formulaire pilotée par la structure de la grille — pas de backend à faire |
-| **Export réel des rapports** (Excel / PDF) | 🟠 Ouvert | La maquette a un bouton « Exporter » sans endpoint ; non implémenté | ADR — Points ouverts ; ADR sur 8d-2 | Décision de format + génération serveur + respect strict de la confidentialité (jamais de 🔴 vers un rôle non autorisé) |
+| ~~**Export réel des rapports** (Excel / PDF)~~ → voir « Écran Rapports & statistiques » dans **Comptes & équipe** ci-dessous | — | — | — | — |
+
+## Comptes & équipe
+
+Trois onglets de la navigation admin (`Rapports`, `Évaluateurs`, `Utilisateurs`)
+sont **affichés mais inertes** (`navConfig.js` : fidélité maquette, `is-inert`) —
+les écrans n'ont jamais été portés depuis la maquette. Identifié au Lot 11a.
+
+| Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
+|---|---|---|---|---|
+| **Provisionner des comptes équipe en production** (évaluateurs pour constituer le jury, admins supplémentaires) | 🟢 **Traité — CLI (Lot 11a)** | `casa:create-admin` ne créait qu'un administrateur ; `ComptesDemoSeeder` (crée `evaluateur@…`) n'est jamais joué en prod → impossible de constituer un jury | **`casa:create-membre {email} --role=evaluateur\|administrateur`** ; `DEPLOIEMENT.md` § 9 ; `ProvisionnementMembreEquipe` + `CreerMembreEquipeCommand` ; `CreateMembreTest` | — (les **écrans** de gestion → 11b) |
+| **Écran « Utilisateurs »** (liste des comptes, création, activation/désactivation, réinitialisation de mot de passe) | 🟠 Ouvert (**11b**) | Onglet inerte. Aucun endpoint de gestion des utilisateurs (seule la CLI existe). Maquette `utilisateurs.html` = CRUD complet avec choix du rôle | `navConfig.js` (`utilisateurs`, `is-inert`) ; maquette `pages/admin/utilisateurs.html` | Endpoints CRUD `role:administrateur` + écran + garde-fous (ne jamais créer de `candidat` par cette voie, pas d'auto-désactivation du dernier admin) |
+| **Écran « Évaluateurs »** (liste de l'équipe + charge de travail par membre + ajout) | 🟠 Ouvert (**11b**) | Onglet inerte. `GET /api/admin/evaluateurs` existe (Lot 8d-1) mais **lecture seule** — `id/prenom/nom/poste`, pas de compteurs de charge, pas de création. Maquette `evaluateurs.html` = table (dossiers affectés / évalués / charge) + « Ajouter » | `navConfig.js` (`evaluateurs`, `is-inert`) ; `EvaluateurController` ; maquette `pages/admin/evaluateurs.html` | Enrichir `EvaluateurResource` (compteurs dérivés de `dossiersAffectes`) + endpoint de création (réutilise `ProvisionnementMembreEquipe`) + écran |
+| **Écran « Rapports & statistiques »** (restitution CoPil : candidatures par filière, F/H, distribution des scores, top villes ; + export Excel/PDF) | 🟠 Ouvert (**11c**) | Onglet inerte. Jamais construit ; l'ancienne ligne « Export réel des rapports » ne couvrait que l'export, pas l'écran de restitution. Maquette `rapports.html` = 4 graphiques CoPil | `navConfig.js` (`rapports`, `is-inert`) ; maquette `pages/admin/rapports.html` ; ADR sur 8d-2 (dashboard sans Chart.js) | Endpoints d'agrégation `role:administrateur` (jamais de 🔴 individuel), écran avec graphiques, génération de l'export |
 
 ## Notifications
 

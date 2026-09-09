@@ -166,8 +166,9 @@ cat <<EOF
   2. Certificat (si RUN_CERTBOT n'a pas été passé) :
        sudo certbot certonly --apache -d ${CASA_DOMAIN} -m ${CASA_ADMIN_EMAIL} --agree-tos --no-eff-email
        sudo systemctl reload apache2
-  3. Premier administrateur (interactif) :
+  3. Comptes de l'équipe (interactif — docs/DEPLOIEMENT.md § 9) :
        ${DC[*]} exec backend php artisan casa:create-admin ${CASA_ADMIN_EMAIL}
+       ${DC[*]} exec backend php artisan casa:create-membre <email>   # un par évaluateur du jury
   4. Ouvrir https://${CASA_DOMAIN} et se connecter.
 ──────────────────────────────────────────────────────────────────────────────
 EOF
