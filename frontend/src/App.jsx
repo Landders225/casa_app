@@ -20,6 +20,7 @@ import { CandidaturesSupervision } from './pages/admin/CandidaturesSupervision.j
 import { Classement } from './pages/admin/Classement.jsx'
 import { Equipe } from './pages/admin/Equipe.jsx'
 import { Filieres } from './pages/admin/Filieres.jsx'
+import { Rapports } from './pages/admin/Rapports.jsx'
 import { ProtectedRoute } from './routing/ProtectedRoute.jsx'
 import { RedirectIfAuthed } from './routing/RedirectIfAuthed.jsx'
 import { paths, roleHome } from './routing/routes.js'
@@ -158,6 +159,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={['administrateur']}>
             <Equipe />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={paths.adminRapports}
+        element={
+          <ProtectedRoute roles={['administrateur']}>
+            <Rapports />
           </ProtectedRoute>
         }
       />

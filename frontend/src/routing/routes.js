@@ -13,6 +13,7 @@ export const paths = {
   adminFilieres: '/admin/filieres',
   adminCampagnes: '/admin/campagnes',
   adminEquipe: '/admin/equipe',
+  adminRapports: '/admin/rapports',
   adminAudit: '/admin/audit',
   adminClassement: '/admin/classement',
 }

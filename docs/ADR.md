@@ -480,6 +480,37 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 - **D-11b-3** — pas de bouton « Gérer » ouvrant une fiche détaillée (maquette `utilisateurs.html`) : les 4 actes sont en ligne dans le tableau.
 - **D-11b-4** — pas de suppression de compte ni de changement de rôle depuis l'UI ; l'édition d'identité (prénom/nom/poste d'un membre) est reportée (POINTS-OUVERTS).
 
+## ADR-30 — Rapports & statistiques de pilotage : suppression des petites cellules (k-anonymat) (Lot 11c)
+
+**Contexte.** Dernier écran de l'espace admin : la restitution pour le Comité de Pilotage (CoPil : CCI-CI, FADV, AICS). Elle agrège des données 🔴 (scores, éligibilité, décisions, ADR-02). L'agrégat est **légitime pour piloter le programme** — mais un agrégat mal conçu **ré-identifie** un candidat individuel : une « distribution des scores » sur 2 personnes révèle leurs deux notes ; un « taux de sélection filière X = 100 % » sur 1 candidat révèle sa décision ; un croisement sexe × ville × filière pointe vers une personne. Or ces rapports sont **diffusés** (capture d'écran, export) à des partenaires qui doivent voir des tendances, pas des individus.
+
+**Modèle de menace.** L'admin a déjà accès aux dossiers individuels (supervision) — le risque n'est pas lui, c'est la **diffusion du rapport / de l'export**. Trois vecteurs de fuite par agrégation : (1) petite cellule (comptage/distribution portant sur 1-2 personnes) ; (2) taux sur petit dénominateur ; (3) recoupement de plusieurs dimensions.
+
+**Décision.**
+- **Un endpoint, `role:administrateur` STRICT.** `GET /api/admin/rapports?campagne={uuid|toutes}` (+ `GET /api/admin/rapports/export.csv`). **Jamais** un évaluateur — même via le recouvrement ADR-10 : ce sont des stats globales de pilotage, pas son travail d'évaluation. `MatriceAutorisationTest` le prouve (évaluateur/candidat → 403, invité → 401).
+- **`ServiceRapports` est la source UNIQUE d'agrégation.** L'écran ET l'export CSV passent par lui → le garde-fou est **appliqué à l'identique** ; impossible qu'une valeur masquée à l'écran fuie dans le CSV (une cellule `null` y sort « n/d »). `RapportCsv` ne fait aucun calcul, il sérialise la structure déjà agrégée.
+- **La Resource n'expose QUE des agrégats.** Comptes, distributions marginales, taux — **jamais une ligne individuelle**, jamais un champ nominatif, jamais un score isolé. Périmètre = candidatures **soumises** (`statut_interne != 'brouillon'`) : un brouillon n'est pas une candidature de pilotage (et un candidat ne doit pas voir son propre brouillon peser sur un chiffre).
+- **Garde-fou anti-ré-identification — suppression des petites cellules, `k = ServiceRapports::SEUIL_MASQUAGE = 5`** (k-anonymat ; pratique standard en statistique publique / RGPD) :
+  1. **Toute distribution dont l'effectif total est < k est renvoyée `null`** (F/H, distribution des scores, décisions, présence entretien) → l'écran affiche « Effectif insuffisant pour publier cette répartition sans risque de ré-identification », le CSV met « n/d ».
+  2. **Villes < k → fondues dans « Autres villes »** (jamais nommées). La liste des villes elle-même est masquée si la base < k.
+  3. **Un taux (%) n'est calculé que si son dénominateur est ≥ k** ; sinon `null` (l'écran montre « n/d », les comptes bruts restent visibles).
+  4. **AUCUNE cross-tabulation** — le vecteur le plus vicieux, neutralisé à la racine : `par_filiere` ne porte QUE `{filiere, candidatures}`, jamais un croisement décision/sexe/score. Seules des distributions **marginales à une dimension**.
+  5. **Bins larges** (largeur 20, bornes `[0,20,40,60,80,100]`) — moins identifiants que des tranches fines.
+  Le seuil `k` est exposé dans le payload (`perimetre.seuil_masquage`) pour que l'écran l'explique au CoPil.
+- **Périmètre par défaut = campagne COURANTE** (ouverte, sinon la plus récente). Le CoPil pilote une cohorte à la fois ; mélanger des cohortes de contextes différents donne un taux peu parlant. Option « Toutes les campagnes » disponible (`?campagne=toutes`).
+- **Graphiques : SVG inline maison, ZÉRO lib** (`Charts.jsx`). Cohérent avec la sobriété du dashboard (ADR-23, pas de Chart.js), **zéro impact CSP** (le `script-src 'self'` strict du Lot 9b interdit tout CDN ; une lib bundlée aurait pesé ~70 Ko gzip et introduit la 1ʳᵉ dépendance lourde). Chaque `<svg role="img">` porte un `<title>` et un `aria-label` qui **énumère les valeurs** → restitution par lecteur d'écran sans dépendre du rendu (meilleure accessibilité qu'un `<canvas>`). Aucune borne de barème dans le bundle : les tranches viennent du payload (`noScoringFormula.test.js` reste vert).
+- **Export : CSV réel maintenant, Excel/PDF reste 🟠.** Le CSV (`text/csv`, `Content-Disposition: attachment`, séparateur `;` + BOM) est généré à la main, sans lib. C'est le **vecteur de diffusion réel** vers le CoPil — d'où l'exigence que le masquage y soit strictement identique. Les boutons « Excel » / « PDF » de la maquette sont **affichés désactivés** (« à venir »), cohérent avec les autres entrées inertes du produit.
+
+**Conséquence.** `ServiceRapports` + `RapportCsv` + `RapportResource` + `RapportController` + 2 routes ; côté front `Rapports.jsx` + `useRapports.js` + `Charts.jsx` (SVG) + `Rapports.css` ; l'onglet « Rapports » n'est plus inerte. `apiClient.getBlob()` ajouté (téléchargement authentifié sans sortir une `Response` brute du module). **Preuves — tout vert :** `php artisan test` **383** (+11 : `RapportsStatistiquesTest` — matrice, k=5 masqué/visible, ville < 5 → « Autres », taux masqué, aucune cross-tab, aucune donnée individuelle, brouillons exclus, CSV = même masquage) · `vitest` **472** (`Rapports.test.jsx` +5) · `pint --test` · build (bundle +9 Ko, **pas de Chart.js**). Smoke curl : évaluateur/candidat → 403, invité → 401, base de 3 → distributions `null` + CSV « n/d », base ≥ 5 → valeurs identiques écran/CSV, aucun nom/CNI/n° dossier dans la réponse ni le CSV. E2E `rapports.spec.js` + captures 390/1280.
+
+**Risque résiduel signalé.** Avec `k = 5`, un observateur qui sait qu'exactement 5 personnes d'une ville ont candidaté apprend « ces 5 ont candidaté » — mais aucun de leurs attributs 🔴 (score, décision), et 5 personnes ne sont pas ré-identifiables individuellement. Les **comptages de candidatures par filière** ne sont pas masqués (ce ne sont pas des valeurs 🔴) ; si une filière n'a qu'1 candidature, on apprend « 1 personne a visé cette filière » — sans rien de plus. Jugé acceptable ; `k` est réglable en une constante si le CoPil veut plus strict (10).
+
+**Divergences maquette.**
+- **D-11c-1** — pas de Chart.js : graphiques SVG maison (même rendu : barres, anneau, colonnes).
+- **D-11c-2** — KPI « Profils vulnérables / NEET » de la maquette **retiré** : c'est `vulnerabiliteScore()` (logique de départage/scoring) ; l'importer côté serveur pour un chiffre secondaire n'est pas justifié en v1 (POINTS-OUVERTS).
+- **D-11c-3** — toute répartition sous le seuil k est **masquée** (la maquette, sur données fictives, affiche tout) — c'est le cœur de cet ADR.
+- **D-11c-4** — export : CSV réel ; Excel/PDF affichés désactivés (maquette : `casaToast` « simulé »).
+
 ---
 
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)

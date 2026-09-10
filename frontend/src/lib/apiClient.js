@@ -97,8 +97,32 @@ async function send(method, path, body, { retriedCsrf = false, isForm = false } 
   return parsed
 }
 
+/**
+ * Téléchargement d'un fichier (export CSV admin, Lot 11c). Même session-cookie
+ * que le reste (`credentials: 'include'`) ; renvoie `{ blob, filename }`, jamais
+ * une `Response` brute. GET seul → pas de cycle CSRF.
+ */
+async function getBlob(path) {
+  let res
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+  } catch {
+    throw new ApiError('network', { message: 'Impossible de contacter le serveur.' })
+  }
+  if (!res.ok) throw toApiError(res, await parseBody(res))
+
+  const disposition = res.headers.get('content-disposition') || ''
+  const match = disposition.match(/filename="?([^"]+)"?/i)
+  return { blob: await res.blob(), filename: match ? match[1] : 'export' }
+}
+
 export const apiClient = {
   get: (path) => send('GET', path, undefined),
+  getBlob,
   post: (path, body) => send('POST', path, body ?? {}),
   put: (path, body) => send('PUT', path, body ?? {}),
   patch: (path, body) => send('PATCH', path, body ?? {}),

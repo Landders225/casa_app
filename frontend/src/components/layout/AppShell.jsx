@@ -21,6 +21,7 @@ const NAV_LINKS = {
     cqp: paths.adminFilieres,
     campagnes: paths.adminCampagnes,
     equipe: paths.adminEquipe,
+    rapports: paths.adminRapports,
     classement: paths.adminClassement,
     audit: paths.adminAudit,
   },

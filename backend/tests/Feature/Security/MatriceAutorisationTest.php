@@ -187,6 +187,8 @@ class MatriceAutorisationTest extends TestCase
             ['post', '/api/admin/membres'],
             ['patch', "/api/admin/membres/{$membre->id}"],
             ['post', "/api/admin/membres/{$membre->id}/mot-de-passe"],
+            ['get', '/api/admin/rapports'],
+            ['get', '/api/admin/rapports/export.csv'],
         ];
 
         foreach (['candidat', 'evaluateur'] as $roleInterdit) {

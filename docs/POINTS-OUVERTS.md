@@ -6,9 +6,9 @@
 > qu'un nouveau apparaît. Le **journal figé** des décisions reste `docs/ADR.md`
 > (on n'y réécrit pas l'histoire) ; ici on tient le **présent**.
 >
-> Dernière revue : **Lot 11b** (2026-09-10) — écran admin « Équipe » (création,
-> (dés)activation, réinitialisation de mot de passe) + middleware `EnsureUserActif`
-> (ADR-29). Voir aussi la revue de sécurité **Lot 10**
+> Dernière revue : **Lot 11c** (2026-09-10) — écran admin « Rapports &
+> statistiques » (agrégats de pilotage, garde-fou k-anonymat, export CSV — ADR-30).
+> Voir aussi la revue de sécurité **Lot 10**
 > ([`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md)).
 
 ## Légende de statut
@@ -48,10 +48,9 @@
 
 ## Comptes & équipe
 
-Un onglet de la navigation admin (`Rapports`) reste **affiché mais inerte**
-(`navConfig.js` : fidélité maquette, `is-inert`). Les onglets `Évaluateurs` et
-`Utilisateurs` de la maquette ont été **remplacés par un seul écran « Équipe »**
-au Lot 11b (D-11b-1).
+Tout l'espace admin de la maquette est désormais porté : `Évaluateurs` +
+`Utilisateurs` → écran unique « Équipe » (Lot 11b, D-11b-1) ; `Rapports` →
+écran « Rapports & statistiques » (Lot 11c, ADR-30). Plus aucun onglet inerte.
 
 | Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
 |---|---|---|---|---|
@@ -60,7 +59,9 @@ au Lot 11b (D-11b-1).
 | **Coupure d'accès immédiate d'un compte désactivé** (session en cours, pas seulement au prochain login) | 🟢 **Traité (Lot 11b — ADR-29)** | `login` refusait déjà un compte inactif, mais une session ouverte survivait jusqu'à `SESSION_LIFETIME` (120 min) | **ADR-29** ; `EnsureUserActif` (groupe `auth:sanctum`) ; `EnsureUserActifTest` | — |
 | **Désactiver un compte CANDIDAT** (fraude avérée au-delà de l'« élimination » d'une candidature) | 🟠 Ouvert | Le Lot 11b gère l'équipe (évaluateurs + admins), pas les candidats. Différent d'« éliminer une candidature » (ADR-15) : là c'est le **compte** qu'on bloque. `EnsureUserActif` couvrirait déjà l'exécution — il manque l'acte admin | `MembreController::assertMembreEquipe` (exclut les candidats) ; ADR-15 (élimination ≠ blocage de compte) | Endpoint `role:administrateur` sur un compte candidat + point d'entrée UI (écran de supervision des candidatures ?) + audit |
 | **Édition de l'identité d'un membre** (corriger prénom / nom / poste d'un compte d'équipe) | 🟠 Ouvert | Hors des 4 fonctions du Lot 11b (D-11b-4). Aujourd'hui : en base | `MembreController` (pas de route PUT d'identité) ; maquette `utilisateurs.html` (bouton « Gérer ») | 1 route `PATCH` + champs éditables + audit + un formulaire |
-| **Écran « Rapports & statistiques »** (restitution CoPil : candidatures par filière, F/H, distribution des scores, top villes ; + export Excel/PDF) | 🟠 Ouvert (**11c**) | Onglet inerte. Jamais construit ; l'ancienne ligne « Export réel des rapports » ne couvrait que l'export, pas l'écran de restitution. Maquette `rapports.html` = 4 graphiques CoPil | `navConfig.js` (`rapports`, `is-inert`) ; maquette `pages/admin/rapports.html` ; ADR sur 8d-2 (dashboard sans Chart.js) | Endpoints d'agrégation `role:administrateur` (jamais de 🔴 individuel), écran avec graphiques, génération de l'export |
+| **Écran « Rapports & statistiques »** (restitution CoPil : candidatures par filière, F/H, distribution des scores, top villes, décisions, présence) | 🟢 **Traité (Lot 11c — ADR-30)** | Onglet inerte jusque-là. Agrégats `role:administrateur` strict, garde-fou k-anonymat (masquage < 5, aucune cross-tab, aucune ligne individuelle), graphiques SVG maison (pas de Chart.js) | **ADR-30** ; `ServiceRapports` + `/api/admin/rapports` ; `Rapports.jsx` + `Charts.jsx` ; `RapportsStatistiquesTest` ; maquette `pages/admin/rapports.html` | — |
+| **Export Excel / PDF mis en page** des rapports | 🟠 Ouvert | Le Lot 11c livre un **export CSV réel** des agrégats (même garde-fou k-anonymat que l'écran). Un vrai `.xlsx` / un PDF mis en page demandent une lib (PhpSpreadsheet / DomPDF) + une maquette de document. Les boutons sont affichés désactivés « à venir » | **ADR-30** (D-11c-4) ; `RapportController::exportCsv` ; `Rapports.jsx` (boutons Excel/PDF `disabled`) | Lib + gabarit de document + le même passage par `ServiceRapports` |
+| **Indicateur « Profils vulnérables / NEET »** (comptage agrégé) | 🟠 Ouvert | KPI de la maquette retiré en v1 (D-11c-2) : c'est `vulnerabiliteScore()`, de la logique de départage/scoring — l'importer côté serveur pour un chiffre secondaire n'était pas justifié | **ADR-30** (D-11c-2) ; maquette `rapports.html` ; `ServiceClassement::departage` (logique existante) | Un comptage agrégé serveur pur dans `ServiceRapports`, si le CoPil le réclame |
 
 ## Notifications
 

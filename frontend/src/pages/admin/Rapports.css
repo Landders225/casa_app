@@ -1,0 +1,111 @@
+/* Rapports & statistiques (Lot 11c) — graphiques SVG maison (ADR-30, zéro lib).
+   Transcrit l'esprit du bloc de App_maquette/pages/admin/rapports.html sans
+   Chart.js. Les classes du design system restent dans src/styles/. */
+
+.chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.chart-label {
+  font-size: 11px;
+  fill: var(--casa-text-secondary);
+}
+.chart-tick {
+  font-size: 10px;
+  fill: var(--casa-text-tertiary);
+}
+.chart-value {
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--casa-text-primary);
+}
+.chart-track {
+  fill: var(--casa-bg-alt);
+  stroke: var(--casa-bg-alt);
+}
+.chart-bar {
+  fill: var(--casa-primary-500);
+}
+.chart-axis {
+  stroke: var(--casa-border);
+  stroke-width: 1;
+}
+
+/* Anneau */
+.chart-donut {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+.chart-donut .chart-svg {
+  width: 148px;
+  flex: none;
+}
+.chart-donut-total {
+  font-size: 22px;
+  font-weight: 800;
+  font-family: var(--font-display);
+  fill: var(--casa-text-primary);
+}
+.chart-slice {
+  transition: stroke-dashoffset 0.4s ease;
+}
+.chart-slice-a { stroke: var(--casa-primary-500); }
+.chart-slice-b { stroke: var(--casa-accent-500); }
+.chart-slice-c { stroke: var(--casa-warning-500); }
+.chart-slice-d { stroke: var(--casa-secondary-500); }
+
+.chart-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--fs-caption);
+  color: var(--casa-text-secondary);
+}
+.chart-legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  margin-right: var(--space-2);
+  vertical-align: middle;
+}
+.chart-legend-dot.chart-slice-a { background: var(--casa-primary-500); }
+.chart-legend-dot.chart-slice-b { background: var(--casa-accent-500); }
+.chart-legend-dot.chart-slice-c { background: var(--casa-warning-500); }
+.chart-legend-dot.chart-slice-d { background: var(--casa-secondary-500); }
+
+/* Encart de masquage k-anonymat */
+.chart-masque {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-4);
+  border: 1px dashed var(--casa-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--casa-bg-alt);
+  color: var(--casa-text-secondary);
+  font-size: var(--fs-caption);
+  margin: 0;
+}
+.chart-masque i {
+  color: var(--casa-text-tertiary);
+  margin-top: 2px;
+}
+
+/* Bandeau explicatif du garde-fou */
+.rapports-note {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  font-size: var(--fs-caption);
+  color: var(--casa-text-tertiary);
+  margin-top: var(--space-3);
+}

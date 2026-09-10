@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\Admin\EvaluateurController as AdminEvaluateurContro
 use App\Http\Controllers\Api\Admin\FiliereController as AdminFiliereController;
 use App\Http\Controllers\Api\Admin\MembreController;
 use App\Http\Controllers\Api\Admin\PublicationController;
+use App\Http\Controllers\Api\Admin\RapportController;
 use App\Http\Controllers\Api\Admin\RemplacementController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Candidat\CandidatureController;
@@ -134,6 +135,18 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
         Route::post('/membres', [MembreController::class, 'store']);
         Route::patch('/membres/{utilisateur}', [MembreController::class, 'activation']);
         Route::post('/membres/{utilisateur}/mot-de-passe', [MembreController::class, 'reinitialiserMotDePasse']);
+
+        /*
+        |------------------------------------------------------------------
+        | Lot 11c — Rapports & statistiques de pilotage (ADR-30)
+        |------------------------------------------------------------------
+        | Agrégats pour le CoPil. Garde-fou k-anonymat : suppression des
+        | petites cellules (< 5), villes rares fondues, aucune cross-tab,
+        | JAMAIS une ligne individuelle. Écran + export CSV = même service
+        | d'agrégation, donc même masquage.
+        */
+        Route::get('/rapports', [RapportController::class, 'index']);
+        Route::get('/rapports/export.csv', [RapportController::class, 'exportCsv']);
 
         /*
         |------------------------------------------------------------------
