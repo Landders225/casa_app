@@ -3,7 +3,7 @@
 #  CASA — Déploiement MODE TEST LOCAL HTTP DIRECT (Lot 11).
 #
 #  Monte CASA joignable en HTTP à http://<IP-serveur>:8090 (pas d'Apache, pas de
-#  HTTPS, pas de domaine). Étape de validation AVANT le mode Apache (§ 14).
+#  HTTPS, pas de domaine). Étape de validation AVANT le mode Apache (§ 15).
 #
 #  À lancer par le compte du groupe `docker` (PAS root), depuis la racine du
 #  dépôt cloné :
@@ -42,7 +42,7 @@ if ! docker run --rm alpine sh -c 'nslookup registry.npmjs.org' >/dev/null 2>&1;
     echo "⚠️  DNS des conteneurs Docker KO — le build va échouer. Corriger :"
     echo "      echo '{ \"dns\": [\"8.8.8.8\", \"1.1.1.1\"] }' | sudo tee /etc/docker/daemon.json"
     echo "      sudo systemctl restart docker"
-    echo "    (docs/DEPLOIEMENT.md § 13). Entrée pour tenter quand même, Ctrl-C pour arrêter."
+    echo "    (docs/DEPLOIEMENT.md § 14). Entrée pour tenter quand même, Ctrl-C pour arrêter."
     read -r _
 fi
 
@@ -116,13 +116,13 @@ cat <<EOF
 ──────────────────────────────────────────────────────────────────────────────
  CASA (mode TEST) est joignable :  http://${CASA_SERVER_IP}:${CASA_HTTP_PORT}
 
- 1. Comptes de l'équipe (interactif — docs/DEPLOIEMENT.md § 9) :
+ 1. Comptes de l'équipe (interactif — docs/DEPLOIEMENT.md § 10) :
       ${DC[*]} exec backend php artisan casa:create-admin admin@exemple.ci
       ${DC[*]} exec backend php artisan casa:create-membre eval@exemple.ci   # un par évaluateur
  2. Ouvrir http://${CASA_SERVER_IP}:${CASA_HTTP_PORT} dans un navigateur et
     se connecter (le cookie de session se pose bien en HTTP, Secure=false).
- 3. Quand c'est validé → passer au mode Apache + HTTPS (docs/DEPLOIEMENT.md § 14) :
+ 3. Quand c'est validé → passer au mode Apache + HTTPS (docs/DEPLOIEMENT.md § 15) :
       ${DC[*]} down
-      … puis suivre § 14 (SESSION_SECURE_COOKIE=true, vrai domaine).
+      … puis suivre § 15 (SESSION_SECURE_COOKIE=true, vrai domaine).
 ──────────────────────────────────────────────────────────────────────────────
 EOF

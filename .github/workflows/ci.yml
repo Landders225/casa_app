@@ -140,6 +140,10 @@ jobs:
           grep -q 'server_tokens\s*off' docker/nginx/default.conf
           grep -q '^APP_DEBUG=false' backend/.env.production.example
           grep -q '^SESSION_SECURE_COOKIE=true' backend/.env.production.example
+          # Lot 12a — aucun identifiant SMTP dans l'exemple commité.
+          grep -qE '^MAIL_(HOST|USERNAME|PASSWORD|URL)=$' backend/.env.production.example
+          grep -q '^MAIL_PASSWORD=$' backend/.env.production.example
+          grep -q '^MAIL_USERNAME=$' backend/.env.production.example
           echo "OK — durcissement de configuration présent."
 
   e2e:

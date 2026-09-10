@@ -17,13 +17,13 @@
 
 | Mode | Quand | Sections |
 |---|---|---|
-| **A — Autonome** (défaut) | serveur dédié à CASA, CASA prend 80/443 et termine le TLS lui-même | § 1 → § 12 |
-| **T — Test local HTTP** | valider le fonctionnel sur le serveur **avant** de monter Apache/HTTPS ; accès navigateur direct `http://<IP>:8090`, pas de domaine | **§ 13** |
-| **B — Derrière un Apache existant** | le serveur héberge déjà d'autres apps, Apache est en façade sur 80/443 ; CASA tourne en HTTP local sur un port dédié, Apache proxifie | **§ 14** (+ § 4, § 8, § 9 communes) |
+| **A — Autonome** (défaut) | serveur dédié à CASA, CASA prend 80/443 et termine le TLS lui-même | § 1 → § 13 |
+| **T — Test local HTTP** | valider le fonctionnel sur le serveur **avant** de monter Apache/HTTPS ; accès navigateur direct `http://<IP>:8090`, pas de domaine | **§ 14** |
+| **B — Derrière un Apache existant** | le serveur héberge déjà d'autres apps, Apache est en façade sur 80/443 ; CASA tourne en HTTP local sur un port dédié, Apache proxifie | **§ 15** (+ § 4, § 8, § 9, § 10 communes) |
 
 Le mode **T** est une étape intermédiaire jetable : on l'utilise pour vérifier
 que CASA tourne, puis on bascule sur le mode **B** (le vrai). Le reste de ce
-tableau et les sections 1–12 décrivent le **mode A**.
+tableau et les sections 1–13 décrivent le **mode A**.
 
 | Élément | Choix | Où c'est défini |
 |---|---|---|
@@ -33,12 +33,15 @@ tableau et les sections 1–12 décrivent le **mode A**.
 | Caches Laravel | reconstruits **à chaque démarrage du conteneur** (`config/route/event/view:cache`) | `docker/backend/entrypoint.sh` (ADR-28) |
 | Migrations | **manuelles** (jamais au démarrage) | § 7 |
 | Référentiel | `php artisan casa:seed-referentiel` — **sans** les comptes démo | § 8 |
-| Premier admin | `php artisan casa:create-admin <email>` | § 9 |
-| Évaluateurs du jury | `php artisan casa:create-membre <email>` (`--role=administrateur` pour un admin de plus) | § 9 |
+| E-mail | SMTP **paramétrable** (`log` par défaut) ; envoi **asynchrone** via un worker | § 9 |
+| Premier admin | `php artisan casa:create-admin <email>` | § 10 |
+| Évaluateurs du jury | `php artisan casa:create-membre <email>` (`--role=administrateur` pour un admin de plus) | § 10 |
 | Secrets | 2 fichiers `.env.production` **gitignorés**, jamais dans l'image | § 4 |
 
-Les 4 services : `postgres` (16), `backend` (Laravel/PHP-FPM), `frontend` (build
-React servi par un nginx interne), `nginx` (reverse-proxy + TLS).
+**5 services en production** : `postgres` (16), `backend` (Laravel/PHP-FPM),
+`frontend` (build React servi par un nginx interne), `nginx` (reverse-proxy +
+TLS), **`worker`** (traite la file d'e-mails — Lot 12a, ADR-31). *(La stack de
+développement — `docker-compose.yml` seul — n'a pas de worker : 4 services.)*
 
 ### Raccourci de commande
 
@@ -157,7 +160,7 @@ nano backend/.env.production
 | `SESSION_DOMAIN` | `casa.example.org` | le **host exact**, sans port ni schéma. Apex + `www` : mettre `.example.org` (point initial) |
 | `SANCTUM_STATEFUL_DOMAINS` | `casa.example.org` | le/les host(s) ; ajouter le port **seulement** s'il est non-standard |
 | `DB_PASSWORD` | **la même valeur** que `POSTGRES_PASSWORD` ci-dessus | copier-coller |
-| `TRUSTED_PROXIES` | `*` pour démarrer ; à resserrer (§ 10.5) | voir § 10.5 |
+| `TRUSTED_PROXIES` | `*` pour démarrer ; à resserrer (§ 11.5) | voir § 11.5 |
 
 Les autres variables (`APP_ENV=production`, `APP_DEBUG=false`,
 `SESSION_SECURE_COOKIE=true`, `LOG_CHANNEL=stderr`, …) sont **déjà fixées** dans
@@ -237,7 +240,7 @@ curl -sI https://casa.example.org/up | grep -i "^HTTP"   # 200, sans -k
 
 > **Apex + www** : ajouter `-d www.casa.example.org` à la commande certbot et
 > mettre `SESSION_DOMAIN=.casa.example.org` (point initial) dans
-> `backend/.env.production`, puis recréer le backend (§ 11.6).
+> `backend/.env.production`, puis recréer le backend (§ 12.6).
 
 ---
 
@@ -251,14 +254,18 @@ dcp up -d --build
 - L'**entrypoint** du backend reconstruit les caches Laravel au démarrage
   (visible dans les logs : `[entrypoint] Reconstruction des caches Laravel…`).
 
-Attendre que les 4 services soient `healthy` :
+Attendre que les 5 services soient `healthy` :
 
 ```bash
 watch -n 3 'dcp ps'
-# Ctrl-C quand les 4 lignes affichent (healthy)
+# Ctrl-C quand les 5 lignes affichent (healthy)
 ```
 
-En cas de souci, voir les logs : `dcp logs -f backend` (§ 11.8 et § 11.9).
+Le `worker` peut afficher `(unhealthy)` tant que les migrations (§ 8) ne sont pas
+jouées (il boucle sur « table `jobs` inexistante ») : c'est attendu, il se
+stabilise juste après.
+
+En cas de souci, voir les logs : `dcp logs -f backend` (§ 12.8 et § 12.9).
 
 ---
 
@@ -287,16 +294,94 @@ dcp exec backend php artisan tinker --execute \
 # attendu : 5 filières, 1 grille, 6 types de doc, 1 campagne, 0 compte
 ```
 
+Les migrations créent aussi les tables `jobs` / `failed_jobs` (file d'attente
+des e-mails, § 9). Une fois `migrate --force` passé, le service `worker` (qui
+bouclait sur « table `jobs` inexistante ») se stabilise en `(healthy)`.
+
 ---
 
-## 9. Comptes de l'équipe (admin + jury)
+## 9. Configuration e-mail (SMTP)
+
+CASA envoie des e-mails transactionnels (notifications). Ils partent **en
+asynchrone** via le service `worker` (file `database`, ADR-31) : l'action de
+l'utilisateur n'attend jamais le serveur SMTP.
+
+Par défaut `MAIL_MAILER=log` — les e-mails sont **écrits dans les logs, pas
+envoyés**. Il faut basculer sur `smtp` avec **vos** identifiants (nous ne les
+avons pas) **avant d'ouvrir aux vrais candidats** (checklist § 11, contrôle 10).
+
+### 9.1 Renseigner vos identifiants SMTP
+
+Éditer `backend/.env.production` — **gitignoré**, jamais dans le dépôt ni dans
+l'image :
+
+```dotenv
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.votre-fournisseur.tld
+MAIL_PORT=587          # 587 = STARTTLS (MAIL_SCHEME vide) · 465 = TLS implicite (MAIL_SCHEME=smtps)
+MAIL_SCHEME=
+MAIL_USERNAME=...
+MAIL_PASSWORD=...
+MAIL_FROM_ADDRESS="no-reply@casa.example.org"   # adresse autorisée par le fournisseur (SPF / DKIM)
+```
+
+Puis recréer les conteneurs qui lisent cette config (l'entrypoint refait
+`config:cache` avec les nouvelles valeurs) :
+
+```bash
+dcp up -d --force-recreate backend worker
+```
+
+### 9.2 Valider la configuration
+
+```bash
+dcp exec backend php artisan casa:test-email vous@votre-domaine.tld
+```
+
+Envoi **synchrone** — le résultat s'affiche immédiatement :
+
+- **succès** → vérifier la réception (et le dossier « indésirables ») ;
+- **échec** → le message d'erreur exact du serveur SMTP s'affiche
+  (« Authentication failed », « Connection refused », certificat…) — **jamais le
+  mot de passe**. Corriger les `MAIL_*`, `--force-recreate backend worker`,
+  réessayer.
+
+Pour tester **en plus** la chaîne asynchrone complète (config → file → worker →
+SMTP), ajouter `--queue` :
+
+```bash
+dcp exec backend php artisan casa:test-email vous@votre-domaine.tld --queue
+#   rien reçu au bout d'une minute ? →
+dcp logs worker
+dcp exec backend php artisan queue:failed
+```
+
+### 9.3 Surveiller le worker (anti-arrêt silencieux — ADR-31)
+
+| Vérifier | Commande |
+|---|---|
+| Le worker tourne | `dcp ps worker` → `Up` / `(healthy)` |
+| Ses logs | `dcp logs -f worker` |
+| File qui s'accumule (worker mort ou débordé) | `dcp exec backend php artisan queue:monitor database:default --max=50` — **sort en erreur** si > 50 jobs en attente ; à câbler en cron/supervision |
+| Jobs définitivement échoués (3 tentatives épuisées) | `dcp exec backend php artisan queue:failed` |
+| Relancer un job échoué | `dcp exec backend php artisan queue:retry <uuid>`  (ou `all`) |
+| Purger les échecs déjà traités | `dcp exec backend php artisan queue:flush` |
+
+- `restart: unless-stopped` → Docker relance automatiquement un worker qui crashe.
+- `--max-time=3600` → le worker se recycle chaque heure (fuite mémoire /
+  connexion DB périmée) puis Docker le relance.
+- Un job qui épuise ses 3 tentatives **tombe dans `failed_jobs`** — jamais perdu.
+
+---
+
+## 10. Comptes de l'équipe (admin + jury)
 
 Aucun compte n'existe encore. Deux commandes interactives (mot de passe jamais
 en clair dans l'historique shell) — mêmes règles de mot de passe qu'à
 l'inscription (**min. 10 caractères, majuscule + minuscule + chiffre**), e-mail
 déjà pris refusé, transaction, **ligne d'audit**.
 
-### 9.1 Le premier administrateur
+### 10.1 Le premier administrateur
 
 ```bash
 dcp exec backend php artisan casa:create-admin coordination@casa.example.org
@@ -305,7 +390,7 @@ dcp exec backend php artisan casa:create-admin coordination@casa.example.org
 Demande : mot de passe + confirmation, puis prénom / nom / poste. Se connecter
 ensuite sur `https://casa.example.org/connexion`.
 
-### 9.2 Les évaluateurs du jury
+### 10.2 Les évaluateurs du jury
 
 Sans évaluateur, aucun dossier ne peut être affecté ni noté. Créer un compte par
 membre du jury (le rôle par défaut est **`evaluateur`** — le moins privilégié) :
@@ -322,9 +407,9 @@ dcp exec backend php artisan casa:create-membre adjoint@cci.ci --role=administra
 `--role` n'accepte que `evaluateur` ou `administrateur` — toute autre valeur
 (dont `candidat`) est refusée sans rien écrire.
 
-### 9.3 Ensuite, tout se fait dans l'interface (Lot 11b)
+### 10.3 Ensuite, tout se fait dans l'interface (Lot 11b)
 
-Une fois le **premier administrateur** créé (§ 9.1), la CLI n'est plus
+Une fois le **premier administrateur** créé (§ 10.1), la CLI n'est plus
 nécessaire : l'écran **Paramétrage → Équipe** (`/admin/equipe`) permet d'ajouter
 des évaluateurs et des administrateurs, de **désactiver / réactiver** un compte
 (l'accès est coupé immédiatement, pas au prochain login) et de **réinitialiser
@@ -337,7 +422,7 @@ lot ou hors interface.
 
 ---
 
-## 10. Vérifications post-déploiement
+## 11. Vérifications post-déploiement
 
 Checklist à cocher. Remplacer le domaine.
 
@@ -383,6 +468,13 @@ curl -s -b /tmp/j -c /tmp/j -X POST https://casa.example.org/api/login \
   -H "X-XSRF-TOKEN: $XSRF" \
   -d '{"email":"coordination@casa.example.org","password":"VOTRE_MOT_DE_PASSE"}' | head -c 200
 #   attendu : l'objet utilisateur (role=administrateur), jamais mot_de_passe_hash
+
+# 10. E-MAIL ACTIF — À FAIRE AVANT D'OUVRIR AUX VRAIS CANDIDATS (§ 9)
+dcp exec backend php artisan tinker --execute "echo config('mail.default');"   # attendu : smtp  (PAS log)
+dcp ps worker | grep -E "Up|healthy"                                            # le worker tourne
+dcp exec backend php artisan casa:test-email coordination@casa.example.org       # doit être REÇU
+#   ⚠️ tant que c'est « log », toutes les notifications partent dans un fichier
+#      au lieu d'une boîte réelle — les candidats ne reçoivent rien.
 ```
 
 Enfin, **dans un navigateur** : ouvrir `https://casa.example.org`, se connecter,
@@ -391,9 +483,9 @@ devtools).
 
 ---
 
-## 11. Maintenance
+## 12. Maintenance
 
-### 11.1 Sauvegarde de la base (quotidienne)
+### 12.1 Sauvegarde de la base (quotidienne)
 
 ```bash
 sudo mkdir -p /srv/backups && sudo chown "$USER":"$USER" /srv/backups
@@ -419,7 +511,7 @@ crontab -e
 15 2 * * * /srv/casa/scripts-hote/backup-db.sh >> /srv/backups/backup.log 2>&1
 ```
 
-### 11.2 Sauvegarde des pièces justificatives
+### 12.2 Sauvegarde des pièces justificatives
 
 Elles vivent dans le volume Docker `casa_documents_data` (monté sur
 `storage/app/private`). Sauvegarde :
@@ -429,7 +521,7 @@ docker run --rm -v casa_documents_data:/data -v /srv/backups:/out alpine \
   tar czf /out/casa-documents-$(date +%Y%m%d).tar.gz -C /data .
 ```
 
-### 11.3 Restauration
+### 12.3 Restauration
 
 ```bash
 # Base :
@@ -441,7 +533,7 @@ docker run --rm -v casa_documents_data:/data -v /srv/backups:/in alpine \
   sh -c 'cd /data && tar xzf /in/casa-documents-20260101.tar.gz'
 ```
 
-### 11.4 Mise à jour de l'application
+### 12.4 Mise à jour de l'application
 
 ```bash
 cd /srv/casa
@@ -449,12 +541,13 @@ cd /srv/casa
 git fetch --tags
 git checkout v1.1.0                           # le nouveau tag
 
-dcp up -d --build                             # reconstruit + recrée
+dcp up -d --build                             # reconstruit + recrée backend, worker, frontend, nginx
 #   -> l'entrypoint refait les caches avec le code neuf
 dcp exec backend php artisan migrate --force  # migrations éventuelles
+dcp exec backend php artisan queue:restart    # au cas où un ancien worker traîne
 
-dcp ps                                        # 4x healthy
-# rejouer la checklist § 10 (au moins 1, 5, 8, 9)
+dcp ps                                        # 5x healthy (worker inclus)
+# rejouer la checklist § 11 (au moins 1, 5, 8, 9, 10)
 ```
 
 **Rollback** si la nouvelle version pose problème :
@@ -463,10 +556,10 @@ dcp ps                                        # 4x healthy
 git checkout v1.0.0
 dcp up -d --build
 # si une migration doit être défaite : dcp exec backend php artisan migrate:rollback --force
-# sinon, restaurer la base depuis la sauvegarde d'avant mise à jour (§ 11.3)
+# sinon, restaurer la base depuis la sauvegarde d'avant mise à jour (§ 12.3)
 ```
 
-### 11.5 Resserrer `TRUSTED_PROXIES` (recommandé)
+### 12.5 Resserrer `TRUSTED_PROXIES` (recommandé)
 
 `*` fonctionne mais laisse une marge. Une fois la stack up :
 
@@ -476,25 +569,29 @@ docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}'
 ```
 
 Mettre cette valeur dans `backend/.env.production` (`TRUSTED_PROXIES=172.20.0.0/16`),
-puis recréer le backend :
+puis recréer les conteneurs applicatifs :
 
 ```bash
-dcp up -d --force-recreate backend
+dcp up -d --force-recreate backend worker
 ```
 
 (L'entrypoint refait `config:cache` avec la nouvelle valeur — c'est ce mécanisme
 qui résout le piège « `config:cache` fige l'env », ADR-28.)
 
-### 11.6 Après TOUT changement d'un `.env.production`
+### 12.6 Après TOUT changement d'un `.env.production`
 
 ```bash
-dcp up -d --force-recreate backend     # les caches sont refaits au redémarrage
+dcp up -d --force-recreate backend worker     # les caches sont refaits au redémarrage
 ```
+
+`worker` inclus : il lit la même config (`backend/.env.production`) et met en
+cache à son démarrage — un changement `MAIL_*` ou `DB_*` non répercuté au worker
+laisserait les e-mails partir avec l'ancienne config.
 
 Ne **jamais** éditer un `.env` et attendre que ça prenne : sans recreate, les
 caches figés gardent l'ancienne valeur.
 
-### 11.7 Renouvellement du certificat
+### 12.7 Renouvellement du certificat
 
 Automatique (timer systemd de certbot, installé avec le paquet). Le
 `--deploy-hook` recopie le certificat renouvelé et recharge nginx. Contrôle
@@ -505,7 +602,7 @@ sudo certbot renew --dry-run
 systemctl list-timers | grep certbot
 ```
 
-### 11.8 Logs
+### 12.8 Logs
 
 ```bash
 dcp logs -f backend            # applicatif Laravel (LOG_CHANNEL=stderr)
@@ -516,7 +613,7 @@ dcp logs --since 1h            # tout, dernière heure
 Le journal d'audit métier (append-only, ADR-12) est **dans la base**, consultable
 depuis l'espace admin — c'est une donnée, pas un log serveur.
 
-### 11.9 « Si X casse »
+### 12.9 « Si X casse »
 
 | Symptôme | Cause probable | Correctif |
 |---|---|---|
@@ -531,7 +628,7 @@ depuis l'espace admin — c'est une donnée, pas un log serveur.
 
 ---
 
-## 12. Arrêt
+## 13. Arrêt
 
 ```bash
 dcp stop                # arrête les conteneurs, garde les données
@@ -541,9 +638,9 @@ dcp down -v             # ⚠️ SUPPRIME AUSSI LES VOLUMES = perte de la base e
 
 ---
 
-## 13. Test local en HTTP direct (étape intermédiaire)
+## 14. Test local en HTTP direct (étape intermédiaire)
 
-> **But.** Avant de monter Apache + Let's Encrypt (§ 14), valider que CASA
+> **But.** Avant de monter Apache + Let's Encrypt (§ 15), valider que CASA
 > **tourne** et que le **login fonctionne**, en tapant simplement
 > `http://<IP-du-serveur>:8090` dans un navigateur. Pas de domaine, pas de
 > HTTPS, pas d'Apache : le navigateur parle **directement** au nginx de CASA.
@@ -554,10 +651,13 @@ dcp down -v             # ⚠️ SUPPRIME AUSSI LES VOLUMES = perte de la base e
 >
 > ⚠️ **Mode jetable.** Les cookies sont **non-`Secure`** (obligatoire pour un
 > login en HTTP) : à **ne pas exposer sur Internet**. Le passage en production
-> réelle (§ 14) **exige** de remettre `SESSION_SECURE_COOKIE=true` + le vrai
+> réelle (§ 15) **exige** de remettre `SESSION_SECURE_COOKIE=true` + le vrai
 > domaine.
+>
+> Le service `worker` (§ 9) tourne aussi ici. L'e-mail reste `MAIL_MAILER=log`
+> par défaut (pas de domaine réel) — inutile de configurer le SMTP pour ce mode.
 
-### 13.1 Prérequis
+### 14.1 Prérequis
 
 - § 1 (Docker + Compose ≥ 2.24, Git) et le code cloné (§ 3), p. ex. dans `/opt/casa`.
 - Le **port `8090` libre** : `sudo ss -tlnp | grep ':8090' || echo libre`.
@@ -574,7 +674,7 @@ dcp down -v             # ⚠️ SUPPRIME AUSSI LES VOLUMES = perte de la base e
   ```
   *(Remplacer par les résolveurs internes de l'organisation si `8.8.8.8` est bloqué.)*
 
-### 13.2 Raccourci — le script
+### 14.2 Raccourci — le script
 
 ```bash
 cd /opt/casa
@@ -584,7 +684,7 @@ CASA_SERVER_IP=172.30.4.200 bash docker/deploy-test-local.sh
 Il crée les `.env.test-local`, build + up, migrate + `casa:seed-referentiel`,
 et vérifie (`/up`, SPA, **anti-usurpation d'IP**). Détail manuel ci-dessous.
 
-### 13.3 Configuration
+### 14.3 Configuration
 
 Deux fichiers **gitignorés**, depuis leurs modèles :
 
@@ -604,7 +704,7 @@ cp backend/.env.test-local.example backend/.env.test-local
 **`backend/.env.test-local`** — remplacer `SERVEUR_IP` par l'IP réelle
 (`172.30.4.200`) partout :
 
-| Variable | Valeur (test) | Prod réelle (§ 14) |
+| Variable | Valeur (test) | Prod réelle (§ 15) |
 |---|---|---|
 | `APP_URL` | `http://172.30.4.200:8090` | `https://casa.mon-domaine.ci` |
 | `SESSION_DOMAIN` | `172.30.4.200` | `casa.mon-domaine.ci` |
@@ -623,7 +723,7 @@ docker compose --env-file .env.test-local \
 # → coller dans APP_KEY de backend/.env.test-local
 ```
 
-### 13.4 Lancement
+### 14.4 Lancement
 
 Alias pratique :
 
@@ -642,10 +742,10 @@ docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}'   # → 
 dct exec backend php artisan migrate --force
 dct exec backend php artisan casa:seed-referentiel
 dct exec backend php artisan casa:create-admin coordination@exemple.ci
-dct exec backend php artisan casa:create-membre evaluateur1@exemple.ci   # jury (§ 9.2)
+dct exec backend php artisan casa:create-membre evaluateur1@exemple.ci   # jury (§ 10.2)
 ```
 
-### 13.5 Sécurité — pas de proxy = pas de confiance dans `X-Forwarded-*`
+### 14.5 Sécurité — pas de proxy = pas de confiance dans `X-Forwarded-*`
 
 Ici le navigateur parle **directement** à nginx : **aucun proxy légitime** en
 amont. `docker/nginx/casa.test.conf` **remplace** (ne transmet pas) les en-têtes
@@ -666,7 +766,7 @@ monde → rate-limiting = un seau unique).
 > → nginx voit la vraie IP du navigateur. (Un `curl` lancé depuis le serveur
 > lui-même verrait la gateway Docker — sans impact.)
 
-### 13.6 Vérifications
+### 14.6 Vérifications
 
 ```bash
 # 1. Sonde + SPA (depuis n'importe quelle machine du réseau)
@@ -692,13 +792,13 @@ Puis **dans un navigateur** (une autre machine du réseau) : ouvrir
 `http://172.30.4.200:8090`, créer/consulter une candidature, se connecter en
 tant qu'admin — **le login doit aboutir** (pas de boucle 419).
 
-### 13.7 Passage à la production réelle
+### 14.7 Passage à la production réelle
 
 ```bash
 dct down                       # arrête le mode test (garde les volumes)
 ```
 
-Puis suivre le **§ 14** (Apache + HTTPS). Points à ne PAS oublier au passage :
+Puis suivre le **§ 15** (Apache + HTTPS). Points à ne PAS oublier au passage :
 
 - `SESSION_SECURE_COOKIE=true` (obligatoire dès qu'il y a du HTTPS) ;
 - `APP_URL` / `SESSION_DOMAIN` / `SANCTUM_STATEFUL_DOMAINS` = le **vrai domaine**
@@ -712,7 +812,7 @@ mode Apache (même projet Compose `casa`). Pour repartir de zéro : `dct down -v
 
 ---
 
-## 14. Déploiement derrière un Apache existant (multi-apps, port dédié)
+## 15. Déploiement derrière un Apache existant (multi-apps, port dédié)
 
 > **Contexte.** Le serveur Ubuntu héberge déjà d'autres applications, avec
 > **Apache** en façade sur les ports 80/443. CASA **ne peut pas** prendre 80/443
@@ -730,7 +830,7 @@ mode Apache (même projet Compose `casa`). Pour repartir de zéro : `dct down -v
 Navigateur ──HTTPS──▶ Apache :443 ──HTTP + X-Forwarded-Proto:https──▶ nginx CASA 127.0.0.1:8090 ──▶ backend/frontend
 ```
 
-> **Raccourci.** Le script `docker/apache/deploy-behind-apache.sh` fait §§ 14.2 à
+> **Raccourci.** Le script `docker/apache/deploy-behind-apache.sh` fait §§ 15.2 à
 > 13.7 en une commande (config, build, migrations, référentiel, vhost, vérifs) :
 > ```bash
 > cd /opt/casa
@@ -740,7 +840,7 @@ Navigateur ──HTTPS──▶ Apache :443 ──HTTP + X-Forwarded-Proto:https
 > Les sections ci-dessous détaillent ce qu'il fait, pour un déploiement manuel
 > ou du dépannage.
 
-### 14.1 Prérequis
+### 15.1 Prérequis
 
 Comme § 1 (Docker + Compose ≥ 2.24, Git), **plus** :
 
@@ -772,7 +872,7 @@ Comme § 1 (Docker + Compose ≥ 2.24, Git), **plus** :
   ```
   *(Adapter aux résolveurs internes de l'organisation si `8.8.8.8` est bloqué.)*
 
-### 14.2 Récupération du code + configuration
+### 15.2 Récupération du code + configuration
 
 Identiques au **mode A** :
 
@@ -791,7 +891,7 @@ Identiques au **mode A** :
     Le HTTPS est réel côté visiteur (assuré par Apache) — les cookies `Secure`
     sont donc corrects.
   - `backend/.env.production` : **`TRUSTED_PROXIES=172.31.243.0/24`** (= `CASA_SUBNET`),
-    **jamais `*`** (voir § 14.5 — le serveur héberge d'autres apps, `*` ouvre
+    **jamais `*`** (voir § 15.5 — le serveur héberge d'autres apps, `*` ouvre
     une usurpation d'IP). C'est la valeur du modèle ; le script la pose
     automatiquement.
 
@@ -802,7 +902,7 @@ cd /opt/casa
 alias dca='docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.apache.yml'
 ```
 
-### 14.3 Démarrage de CASA (HTTP local)
+### 15.3 Démarrage de CASA (HTTP local)
 
 ```bash
 dca up -d --build
@@ -816,22 +916,25 @@ n'est exposé publiquement. Test local :
 curl -s http://127.0.0.1:8090/up | head -c 40 ; echo      # page "up" Laravel
 curl -sI http://127.0.0.1:8090/ | grep -i "^HTTP"         # 200 (SPA)
 
-# Le sous-réseau réel DOIT être égal à TRUSTED_PROXIES (§ 14.5) :
+# Le sous-réseau réel DOIT être égal à TRUSTED_PROXIES (§ 15.5) :
 docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}'
 grep '^TRUSTED_PROXIES=' backend/.env.production
 ```
 
-Base de données + référentiel + comptes de l'équipe : **identiques aux § 8 et
-§ 9** (remplacer `dcp` par `dca`) :
+Base de données + référentiel + e-mail + comptes de l'équipe : **identiques aux
+§ 8, § 9 et § 10** (remplacer `dcp` par `dca`) :
 
 ```bash
 dca exec backend php artisan migrate --force
 dca exec backend php artisan casa:seed-referentiel
+# E-mail (§ 9) : renseigner MAIL_* dans backend/.env.production, puis
+#   dca up -d --force-recreate backend worker
+#   dca exec backend php artisan casa:test-email vous@mon-domaine.ci
 dca exec backend php artisan casa:create-admin coordination@mon-domaine.ci
-dca exec backend php artisan casa:create-membre alice.diallo@mon-domaine.ci   # un par évaluateur (§ 9.2)
+dca exec backend php artisan casa:create-membre alice.diallo@mon-domaine.ci   # un par évaluateur (§ 10.2)
 ```
 
-### 14.4 VirtualHost Apache
+### 15.4 VirtualHost Apache
 
 Le fichier `docker/apache/casa.vhost.conf` est prêt à l'emploi. Seules **3 lignes**
 sont à changer (les `Define` en tête).
@@ -858,9 +961,9 @@ Ce que contient le vhost :
   TLS). Tant qu'il n'y a pas de certificat, seul le `:80` répond.
 
 À ce stade, `http://casa.mon-domaine.ci/up` répond déjà (en clair). ⚠️ **Le
-login ne marchera qu'en HTTPS** (cookies `Secure`) — passer au § 14.6.
+login ne marchera qu'en HTTPS** (cookies `Secure`) — passer au § 15.6.
 
-### 14.5 `TRUSTED_PROXIES` — durcissement (serveur mutualisé)
+### 15.5 `TRUSTED_PROXIES` — durcissement (serveur mutualisé)
 
 `bootstrap/app.php` : `$middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'))`.
 Les en-têtes `X-Forwarded-*` sont dans la liste de confiance par défaut de
@@ -942,7 +1045,7 @@ CASA y **écrase** `X-Forwarded-For` (`$remote_addr`) et pose `HTTPS on` en
 fastcgi, donc rien n'est usurpable — mais on garde la valeur resserrée par
 cohérence et défense en profondeur.
 
-### 14.6 Certificat Let's Encrypt
+### 15.6 Certificat Let's Encrypt
 
 ```bash
 sudo apt install -y certbot
@@ -959,7 +1062,7 @@ sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-apache.sh
 sudo certbot renew --dry-run
 ```
 
-### 14.7 Vérifications
+### 15.7 Vérifications
 
 ```bash
 # 1. Redirection + certificat
@@ -974,14 +1077,14 @@ curl -s https://casa.mon-domaine.ci/api/filieres | head -c 60 ; echo
 # 3. En-têtes : HSTS vient d'Apache, les 5 autres du nginx de CASA
 curl -sI https://casa.mon-domaine.ci/ | grep -iE 'strict-transport|content-security|x-frame|x-content-type|referrer-policy|permissions-policy'
 
-# 4. Login admin (nécessite l'en-tête Origin, cf. § 10.9) — objet utilisateur, jamais de hash
+# 4. Login admin (nécessite l'en-tête Origin, cf. § 11.9) — objet utilisateur, jamais de hash
 curl -sc /tmp/j https://casa.mon-domaine.ci/sanctum/csrf-cookie -o /dev/null
 XSRF=$(awk '/XSRF-TOKEN/{print $7}' /tmp/j | perl -pe 's/%([0-9A-Fa-f]{2})/chr hex $1/ge')
 curl -s -b /tmp/j -c /tmp/j -X POST https://casa.mon-domaine.ci/api/login \
   -H 'Content-Type: application/json' -H 'Origin: https://casa.mon-domaine.ci' \
   -H "X-XSRF-TOKEN: $XSRF" -d '{"email":"coordination@mon-domaine.ci","password":"VOTRE_MOT_DE_PASSE"}' | head -c 200
 
-# 5. Anti-usurpation d'IP (§ 14.5) : un X-Forwarded-For forgé et TOURNANT ne doit
+# 5. Anti-usurpation d'IP (§ 15.5) : un X-Forwarded-For forgé et TOURNANT ne doit
 #    PAS permettre de dépasser la limite (le limiteur key sur la VRAIE IP).
 #    /api/health est limité à 60/min/IP. On envoie 65 requêtes avec un XFF
 #    différent à chaque fois : un 429 DOIT quand même apparaître.
@@ -990,17 +1093,17 @@ for i in $(seq 1 65); do
     https://casa.mon-domaine.ci/api/health
 done | sort | uniq -c
 #   Attendu : ~60 × "200" PUIS ~5 × "429".  (Si 65 × "200" → TRUSTED_PROXIES
-#   est trop large, l'usurpation marche : revoir § 14.5.)
+#   est trop large, l'usurpation marche : revoir § 15.5.)
 ```
 
 Puis, **dans un navigateur** : ouvrir `https://casa.mon-domaine.ci`, se connecter,
 vérifier l'absence d'erreur CSP dans la console.
 
-### 14.8 Ce qui change pour la maintenance (§ 11)
+### 15.8 Ce qui change pour la maintenance (§ 12)
 
 - **Mise à jour** : `git fetch --tags && git checkout <tag> && dca up -d --build`
   puis `dca exec backend php artisan migrate --force`.
-- **Sauvegardes / restauration / logs** : identiques au § 11, en remplaçant
+- **Sauvegardes / restauration / logs** : identiques au § 12, en remplaçant
   `dcp` par `dca`.
 - **Après un changement d'`.env.production`** : `dca up -d --force-recreate backend`.
 - **Cohabitation** : le projet Compose s'appelle `casa` (réseau `casa_casa`,
@@ -1013,8 +1116,8 @@ vérifier l'absence d'erreur CSP dans la console.
   | Apache renvoie **502 Bad Gateway** | CASA (`:8090`) est arrêté ou pas `healthy` | `dca ps` ; `dca up -d` ; `dca logs -f nginx` |
   | Login en **boucle** / **419** | `SESSION_DOMAIN` / `SANCTUM_STATEFUL_DOMAINS` ≠ domaine servi, ou `X-Forwarded-Proto` absent (module `headers` non activé) | vérifier les 2 vars = `casa.mon-domaine.ci` ; `a2enmod headers` ; `--force-recreate backend` |
   | `$request->ip()` (logs, rate-limiting) = **IP interne** `172.31.243.x` au lieu de l'IP client, et/ou `$request->isSecure()` faux (URLs `http://` générées) | `docker network inspect casa_casa` ≠ `TRUSTED_PROXIES` (souvent après avoir changé `CASA_SUBNET` sans `dca down`) | aligner `CASA_SUBNET` / `TRUSTED_PROXIES` / `set_real_ip_from` sur le sous-réseau **réel** ; `dca down && dca up -d` |
-  | Rate-limiting **contournable** avec un `X-Forwarded-For` forgé (test § 14.7 n°5 → 65 × 200) | `TRUSTED_PROXIES` trop **large** (`*` ou un `/8`) → Laravel remonte trop loin dans la chaîne | remettre exactement `= CASA_SUBNET` ; `dca up -d --force-recreate backend` |
-  | `build` échoue sur `getaddrinfo` / `Could not resolve host` (npm, composer) | DNS des conteneurs Docker cassé | `/etc/docker/daemon.json` → `{"dns":["8.8.8.8","1.1.1.1"]}` ; `sudo systemctl restart docker` ; relancer (§ 14.1) |
+  | Rate-limiting **contournable** avec un `X-Forwarded-For` forgé (test § 15.7 n°5 → 65 × 200) | `TRUSTED_PROXIES` trop **large** (`*` ou un `/8`) → Laravel remonte trop loin dans la chaîne | remettre exactement `= CASA_SUBNET` ; `dca up -d --force-recreate backend` |
+  | `build` échoue sur `getaddrinfo` / `Could not resolve host` (npm, composer) | DNS des conteneurs Docker cassé | `/etc/docker/daemon.json` → `{"dns":["8.8.8.8","1.1.1.1"]}` ; `sudo systemctl restart docker` ; relancer (§ 15.1) |
   | Page blanche, **erreurs CSP** | une lib front charge une ressource externe | ajuster la CSP dans `docker/nginx/casa.apache.conf` puis `dca exec nginx nginx -s reload` |
   | `apache2ctl configtest` : **AH00526** sur `<IfFile>` | Apache < 2.4.34 | mettre à jour, ou retirer les blocs `<IfFile>` et gérer le `:443` manuellement |
 
@@ -1033,7 +1136,7 @@ certificat auto-signé (`gen-selfsigned.sh`), fichiers `.env.production` dédié
   présent », rien touché.
 - `dcp exec backend php artisan casa:create-admin` → compte créé, ligne d'audit,
   login navigateur OK.
-- Checklist § 10 : 301 http→https, 6 en-têtes sur `/` et `/api`, `/storage` +
+- Checklist § 11 : 301 http→https, 6 en-têtes sur `/` et `/api`, `/storage` +
   `/.env` → 404, `php artisan about` → Config/Routes/Events **CACHED**, login
   admin curl → objet utilisateur sans `mot_de_passe_hash`, **0 violation CSP** au
   navigateur.

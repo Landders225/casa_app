@@ -35,6 +35,12 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis en production}
 
   backend:
+    # Image taguée explicitement → réutilisée telle quelle par le service
+    # `worker` (même code, même config), sans second build.
+    image: casa-backend:local
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     # Le code vient de l'IMAGE (pas de bind-mount ./backend). On garde uniquement
     # le volume des pièces (hors webroot, ADR-11), la surcharge PHP et l'entrypoint.
     volumes: !override
@@ -53,6 +59,53 @@ services:
     # .dockerignore l'exclut). `env()` résout depuis l'environnement du conteneur.
     env_file:
       - ./backend/.env.production
+
+  # --- Worker de la file d'attente (Lot 12a, ADR-31) -----------------------
+  # Traite les jobs `database` (e-mails asynchrones — les envois ne bloquent
+  # jamais l'action de l'utilisateur). MÊME image que `backend`.
+  #
+  # Anti-« plantage silencieux » (4 couches) :
+  #   1. restart: unless-stopped  → Docker relance un worker qui crashe ;
+  #   2. --max-time=3600          → auto-recyclage horaire (fuite mémoire,
+  #                                  connexion DB périmée) puis relance ;
+  #   3. healthcheck `pgrep`      → `dcp ps` montre `worker` (unhealthy) si le
+  #                                  process a disparu — visible d'un coup d'œil ;
+  #   4. failed_jobs             → un job qui épuise ses 3 tentatives y tombe
+  #                                  (jamais perdu) : `queue:failed` / `queue:retry`.
+  # --timeout=60 < DB_QUEUE_RETRY_AFTER (90) : un job bloqué est tué sans
+  # double-envoi. L'entrypoint (mêmes caches que backend) garantit une config
+  # identique ; après un changement SMTP → `dcp up -d --force-recreate worker`.
+  worker:
+    image: casa-backend:local
+    restart: unless-stopped
+    volumes:
+      - documents_data:/var/www/html/storage/app/private
+      - ./docker/php/casa.ini:/usr/local/etc/php/conf.d/zz-casa.ini:ro
+      - ./docker/backend/entrypoint.sh:/usr/local/bin/casa-entrypoint.sh:ro
+    env_file:
+      - ./backend/.env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["sh", "/usr/local/bin/casa-entrypoint.sh"]
+    command:
+      - php
+      - artisan
+      - queue:work
+      - database
+      - --queue=default
+      - --tries=3
+      - --backoff=10
+      - --max-time=3600
+      - --timeout=60
+      - --sleep=3
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'queue:work' >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks: [casa]
 
   nginx:
     ports: !override

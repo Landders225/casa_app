@@ -6,12 +6,12 @@
 > qu'un nouveau apparaît. Le **journal figé** des décisions reste `docs/ADR.md`
 > (on n'y réécrit pas l'histoire) ; ici on tient le **présent**.
 >
-> Dernière revue : **espace candidat** (2026-09-10) — 4 entrées de nav inertes
-> (Mon profil, Documents, Notifications, Aide) → nouvelle section « Espace
-> candidat » (dont 2 🔴 : changement + réinitialisation de mot de passe). Avant
-> cela, **Lot 11c** (2026-09-10) — écran admin « Rapports & statistiques »
-> (garde-fou k-anonymat, export CSV — ADR-30). Voir aussi la revue de sécurité
-> **Lot 10** ([`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md)).
+> Dernière revue : **Lot 12a** (2026-09-10) — infra d'envoi d'e-mails
+> (SMTP paramétrable + file + worker, ADR-31) : la ligne « Notifications réelles »
+> se scinde (infra 🟢 / mails métier 12b 🟠). Avant : **revue espace candidat**
+> (4 entrées de nav inertes → nouvelle section, dont 2 🔴 mot de passe) ; **Lot
+> 11c** (écran Rapports, ADR-30). Voir aussi la revue de sécurité **Lot 10**
+> ([`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md)).
 
 ## Légende de statut
 
@@ -53,7 +53,7 @@ l'infra e-mail du Lot 12).
 | Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
 |---|---|---|---|---|
 | **Changement de mot de passe candidat** (en libre-service, connecté) | 🔴 Bloquant prod | **Aucun endpoint** : seul `POST /admin/membres/{u}/mot-de-passe` existe (équipe). La maquette `profil.html` a un bouton « Changer mon mot de passe » **sans backend**. Un candidat ne peut pas changer son mot de passe — manque critique pour une vraie cohorte | Revue espace candidat (2026-09-10) ; maquette `pages/candidate/profil.html` | Endpoint `PUT /api/candidat/mot-de-passe` (vérif du mot de passe actuel + règles ADR-16) + section dans l'écran « Mon profil » |
-| **Réinitialisation « mot de passe oublié »** (non connecté) | 🔴 Bloquant prod | Aucun mécanisme : le broker `Password::` de Laravel n'est pas câblé, `password_reset_tokens` inexploitée, aucune route `forgot-password` / `reset-password`. Un candidat qui oublie son mot de passe est **bloqué dehors sans recours** | Revue espace candidat (2026-09-10) | Routes `forgot-password` / `reset-password` (Laravel natif) + e-mail de lien + écrans publics — **dépend de l'infra e-mail (Lot 12a)** |
+| **Réinitialisation « mot de passe oublié »** (non connecté) | 🔴 Bloquant prod | Aucun mécanisme : le broker `Password::` de Laravel n'est pas câblé, `password_reset_tokens` inexploitée, aucune route `forgot-password` / `reset-password`. Un candidat qui oublie son mot de passe est **bloqué dehors sans recours** | Revue espace candidat (2026-09-10) | Routes `forgot-password` / `reset-password` (Laravel natif) + e-mail de lien + écrans publics. **Infra e-mail prête (Lot 12a, ADR-31)** — reste le broker + les templates + 2 écrans |
 | **Écran « Mon profil » candidat** (consulter / corriger état civil) | 🟠 Ouvert | Entrée de nav inerte. **Backend prêt depuis le Lot 7** : `GET` + `PATCH /api/candidat/profil` (éditables : prénom, nom, sexe, date_naissance, cni, téléphone, ville ; `prohibited` : email, residence_ci, nationalité). Divergence à trancher : la maquette rend l'identité « non modifiable » (tél. seul), le backend autorise 7 champs | Revue espace candidat (2026-09-10) ; `ProfilController` (Lot 7, ADR-16) ; maquette `pages/candidate/profil.html` | 1 écran React + hook, **aucun backend** ; décider des champs réellement éditables côté UI |
 | **Écran « Documents » candidat** (re-consultation / re-téléchargement) | 🟠 Ouvert | Entrée de nav inerte. Après soumission, **aucun moyen de revoir ou re-télécharger** les pièces (le wizard `StepDocuments` est le seul chemin, et seulement en brouillon). Endpoints prêts : `GET /api/candidatures/{c}/pieces` + `GET /api/pieces/{p}/download` | Revue espace candidat (2026-09-10) ; `PieceController` ; maquette `pages/candidate/documents.html` | 1 écran lecture seule (liste + download), endpoints prêts. Le re-upload post-soumission « sur demande d'un évaluateur » (maquette) = fonctionnalité séparée, non couverte au backend |
 | **Page « Aide » candidat** (contacts + FAQ) | 🟠 Ouvert | Entrée de nav inerte. Page **statique** (3 cartes contact + accordéon FAQ) ; contenu « démo » dans la maquette. Seul point de contact offert au candidat, référencé par d'autres textes (« contactez l'équipe depuis la page Aide ») | Revue espace candidat (2026-09-10) ; maquette `pages/candidate/aide.html` ; **recoupe le 🔴 « Relecture des textes candidats par les partenaires »** (section Institutionnel) | Composant statique (faible effort technique) — **bloqué sur le contenu validé par CCI-CI / FADV / AICS** (coordonnées réelles, réponses FAQ) |
@@ -87,7 +87,9 @@ Tout l'espace admin de la maquette est désormais porté : `Évaluateurs` +
 
 | Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
 |---|---|---|---|---|
-| **Notifications réelles (e-mail / SMS)** — accusé d'inscription, dossier affecté, publication des résultats | 🟠 Ouvert | La maquette les simule ; aucune infra d'envoi. `MAIL_MAILER=log` en prod | ADR — Points ouverts ; ADR-27 (« infra mail hors CASA ») | **Lot 12a** : infra d'envoi (SMTP paramétrable + file `database` + worker + `casa:test-email`). **Lot 12b** : les 4 mails métier |
+| **Infra d'envoi d'e-mails** (SMTP paramétrable + file + worker) | 🟢 **Traité (Lot 12a — ADR-31)** | ADR-27 posait « infra mail hors CASA ». Désormais : `MAIL_*` 100 % `env()` (valeurs vides dans l'exemple, garde CI) ; envoi asynchrone (`QUEUE_CONNECTION=database`) ; service Docker `worker` (`restart` + `--max-time` + healthcheck + `failed_jobs` + `queue:monitor`) ; `casa:test-email` | **ADR-31** ; `docker-compose.prod.yml` (`worker`) ; `TestEmail` (Mailable + commande) ; `DEPLOIEMENT.md` § 9 ; `TestEmailCommandTest` | — |
+| **Mails métier** (accusé d'inscription, dossier affecté, complément demandé, publication du résultat) | 🟠 Ouvert (**12b**) | L'infra est prête (12a) ; les 4 `Mailable` + templates + événements qui les déclenchent restent à écrire. Overlay Mailpit à ajouter pour prévisualiser | **ADR-31** (12b annoncé) ; maquette (mails simulés) | 4 `Mailable` + vues + listeners sur les événements métier + `docker-compose.mail.yml` (Mailpit, dev) |
+| **SMS** (passerelle) | 🟠 Ouvert | Hors périmètre Lot 12 (e-mail seul). La maquette évoque des notifications, pas de canal SMS explicite | ADR — Points ouverts | Fournisseur SMS + un canal de notification dédié |
 | **Historique in-app des notifications** (écran « Notifications » candidat / évaluateur) | 🟠 Ouvert | Entrée de nav inerte (espace candidat + évaluateur). **Rien au backend** : pas de table `notifications`, pas d'endpoint ; `Notifiable` sur `User` inutilisé. Le candidat n'a aujourd'hui que le statut courant via `MaCandidature.jsx` | Revue espace candidat (2026-09-10) ; maquette `pages/candidate/notifications.html`, `pages/evaluator/notifications.html` | Table `notifications` (canal `database`) + événements métier qui l'alimentent + `GET /api/.../notifications` + marquage lu + écran — **Lot 12c**, après 12a/12b |
 
 ## Sécurité / conformité

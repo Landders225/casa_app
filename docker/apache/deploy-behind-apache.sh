@@ -2,7 +2,7 @@
 # =============================================================================
 #  CASA — Déploiement « derrière un Apache existant » (Lot 11).
 #
-#  Automatise docs/DEPLOIEMENT.md § 14 sur un serveur qui héberge déjà d'autres
+#  Automatise docs/DEPLOIEMENT.md § 15 sur un serveur qui héberge déjà d'autres
 #  applications (Apache en façade sur 80/443). CASA tourne en HTTP local ; Apache
 #  proxifie.
 #
@@ -56,7 +56,7 @@ if ! docker run --rm alpine sh -c 'nslookup registry.npmjs.org' >/dev/null 2>&1;
     echo "    Le build va probablement échouer. Corriger avant de continuer :"
     echo "      echo '{ \"dns\": [\"8.8.8.8\", \"1.1.1.1\"] }' | sudo tee /etc/docker/daemon.json"
     echo "      sudo systemctl restart docker"
-    echo "    (voir docs/DEPLOIEMENT.md § 14.1). Ctrl-C pour arrêter, ou Entrée pour tenter quand même."
+    echo "    (voir docs/DEPLOIEMENT.md § 15.1). Ctrl-C pour arrêter, ou Entrée pour tenter quand même."
     read -r _
 fi
 
@@ -166,9 +166,13 @@ cat <<EOF
   2. Certificat (si RUN_CERTBOT n'a pas été passé) :
        sudo certbot certonly --apache -d ${CASA_DOMAIN} -m ${CASA_ADMIN_EMAIL} --agree-tos --no-eff-email
        sudo systemctl reload apache2
-  3. Comptes de l'équipe (interactif — docs/DEPLOIEMENT.md § 9) :
+  3. E-mail (docs/DEPLOIEMENT.md § 9) — par défaut « log » (rien n'est envoyé) :
+       éditer backend/.env.production : MAIL_MAILER=smtp + MAIL_HOST/USERNAME/PASSWORD…
+       ${DC[*]} up -d --force-recreate backend worker
+       ${DC[*]} exec backend php artisan casa:test-email vous@${CASA_DOMAIN}
+  4. Comptes de l'équipe (interactif — docs/DEPLOIEMENT.md § 10) :
        ${DC[*]} exec backend php artisan casa:create-admin ${CASA_ADMIN_EMAIL}
        ${DC[*]} exec backend php artisan casa:create-membre <email>   # un par évaluateur du jury
-  4. Ouvrir https://${CASA_DOMAIN} et se connecter.
+  5. Ouvrir https://${CASA_DOMAIN} et se connecter.
 ──────────────────────────────────────────────────────────────────────────────
 EOF
