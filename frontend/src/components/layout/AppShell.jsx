@@ -20,6 +20,7 @@ const NAV_LINKS = {
     candidatures: paths.adminCandidatures,
     cqp: paths.adminFilieres,
     campagnes: paths.adminCampagnes,
+    equipe: paths.adminEquipe,
     classement: paths.adminClassement,
     audit: paths.adminAudit,
   },

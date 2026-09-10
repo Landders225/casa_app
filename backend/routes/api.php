@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\Admin\CorrectionController;
 use App\Http\Controllers\Api\Admin\EliminationController;
 use App\Http\Controllers\Api\Admin\EvaluateurController as AdminEvaluateurController;
 use App\Http\Controllers\Api\Admin\FiliereController as AdminFiliereController;
+use App\Http\Controllers\Api\Admin\MembreController;
 use App\Http\Controllers\Api\Admin\PublicationController;
 use App\Http\Controllers\Api\Admin\RemplacementController;
 use App\Http\Controllers\Api\AuthController;
@@ -59,7 +60,9 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:lo
 Route::post('/register', [RegisterController::class, 'store'])->middleware('throttle:register');
 
 // `throttle:casa-api` — filet global 120 req/min/utilisateur (Lot 10, T1).
-Route::middleware(['auth:sanctum', 'throttle:casa-api'])->group(function () {
+// `actif` — coupe l'accès d'une session dont le compte a été désactivé, sans
+// attendre l'expiration (Lot 11b, ADR-29).
+Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
@@ -114,6 +117,23 @@ Route::middleware(['auth:sanctum', 'throttle:casa-api'])->group(function () {
         Route::get('/evaluateurs', [AdminEvaluateurController::class, 'index']);
         // Journal d'audit : consultation (lecture seule, append-only garanti par le trigger).
         Route::get('/audit', [AuditController::class, 'index']);
+
+        /*
+        |------------------------------------------------------------------
+        | Lot 11b — Gestion des comptes de l'ÉQUIPE (évaluateurs + admins)
+        |------------------------------------------------------------------
+        | Ouverture de l'autorisation EN ÉCRITURE (ADR-29). Le rôle créé est
+        | validé serveur — {evaluateur, administrateur} STRICTEMENT, jamais
+        | `candidat` ni arbitraire (comme `casa:create-membre`). Chaque acte
+        | écrit 1 ligne `journal_audit` (auteur = l'admin connecté). Garde-fous
+        | métier : jamais 0 admin actif (G2), pas d'auto-désactivation (G1).
+        | Le mot de passe (création + réinitialisation) est GÉNÉRÉ et renvoyé
+        | une seule fois — jamais de hash ni de mot de passe en clair au repos.
+        */
+        Route::get('/membres', [MembreController::class, 'index']);
+        Route::post('/membres', [MembreController::class, 'store']);
+        Route::patch('/membres/{utilisateur}', [MembreController::class, 'activation']);
+        Route::post('/membres/{utilisateur}/mot-de-passe', [MembreController::class, 'reinitialiserMotDePasse']);
 
         /*
         |------------------------------------------------------------------

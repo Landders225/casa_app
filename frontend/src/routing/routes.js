@@ -12,6 +12,7 @@ export const paths = {
   adminCandidatures: '/admin/candidatures',
   adminFilieres: '/admin/filieres',
   adminCampagnes: '/admin/campagnes',
+  adminEquipe: '/admin/equipe',
   adminAudit: '/admin/audit',
   adminClassement: '/admin/classement',
 }

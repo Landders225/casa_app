@@ -6,8 +6,9 @@
 > qu'un nouveau apparaît. Le **journal figé** des décisions reste `docs/ADR.md`
 > (on n'y réécrit pas l'histoire) ; ici on tient le **présent**.
 >
-> Dernière revue : **Lot 11a** (2026-09-09) — CLI de provisioning des comptes
-> (`casa:create-membre`). Voir aussi la revue de sécurité **Lot 10**
+> Dernière revue : **Lot 11b** (2026-09-10) — écran admin « Équipe » (création,
+> (dés)activation, réinitialisation de mot de passe) + middleware `EnsureUserActif`
+> (ADR-29). Voir aussi la revue de sécurité **Lot 10**
 > ([`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md)).
 
 ## Légende de statut
@@ -47,15 +48,18 @@
 
 ## Comptes & équipe
 
-Trois onglets de la navigation admin (`Rapports`, `Évaluateurs`, `Utilisateurs`)
-sont **affichés mais inertes** (`navConfig.js` : fidélité maquette, `is-inert`) —
-les écrans n'ont jamais été portés depuis la maquette. Identifié au Lot 11a.
+Un onglet de la navigation admin (`Rapports`) reste **affiché mais inerte**
+(`navConfig.js` : fidélité maquette, `is-inert`). Les onglets `Évaluateurs` et
+`Utilisateurs` de la maquette ont été **remplacés par un seul écran « Équipe »**
+au Lot 11b (D-11b-1).
 
 | Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
 |---|---|---|---|---|
-| **Provisionner des comptes équipe en production** (évaluateurs pour constituer le jury, admins supplémentaires) | 🟢 **Traité — CLI (Lot 11a)** | `casa:create-admin` ne créait qu'un administrateur ; `ComptesDemoSeeder` (crée `evaluateur@…`) n'est jamais joué en prod → impossible de constituer un jury | **`casa:create-membre {email} --role=evaluateur\|administrateur`** ; `DEPLOIEMENT.md` § 9 ; `ProvisionnementMembreEquipe` + `CreerMembreEquipeCommand` ; `CreateMembreTest` | — (les **écrans** de gestion → 11b) |
-| **Écran « Utilisateurs »** (liste des comptes, création, activation/désactivation, réinitialisation de mot de passe) | 🟠 Ouvert (**11b**) | Onglet inerte. Aucun endpoint de gestion des utilisateurs (seule la CLI existe). Maquette `utilisateurs.html` = CRUD complet avec choix du rôle | `navConfig.js` (`utilisateurs`, `is-inert`) ; maquette `pages/admin/utilisateurs.html` | Endpoints CRUD `role:administrateur` + écran + garde-fous (ne jamais créer de `candidat` par cette voie, pas d'auto-désactivation du dernier admin) |
-| **Écran « Évaluateurs »** (liste de l'équipe + charge de travail par membre + ajout) | 🟠 Ouvert (**11b**) | Onglet inerte. `GET /api/admin/evaluateurs` existe (Lot 8d-1) mais **lecture seule** — `id/prenom/nom/poste`, pas de compteurs de charge, pas de création. Maquette `evaluateurs.html` = table (dossiers affectés / évalués / charge) + « Ajouter » | `navConfig.js` (`evaluateurs`, `is-inert`) ; `EvaluateurController` ; maquette `pages/admin/evaluateurs.html` | Enrichir `EvaluateurResource` (compteurs dérivés de `dossiersAffectes`) + endpoint de création (réutilise `ProvisionnementMembreEquipe`) + écran |
+| **Provisionner des comptes équipe en production** (évaluateurs pour constituer le jury, admins supplémentaires) | 🟢 **Traité — CLI (Lot 11a)** | `casa:create-admin` ne créait qu'un administrateur ; `ComptesDemoSeeder` (crée `evaluateur@…`) n'est jamais joué en prod → impossible de constituer un jury | **`casa:create-membre {email} --role=evaluateur\|administrateur`** ; `DEPLOIEMENT.md` § 9 ; `ProvisionnementMembreEquipe` + `CreerMembreEquipeCommand` ; `CreateMembreTest` | — |
+| **Écran « Équipe »** (ex-« Utilisateurs » + « Évaluateurs » : liste évaluateurs + admins avec charge, création, activation/désactivation, réinitialisation de mot de passe) | 🟢 **Traité (Lot 11b — ADR-29)** | Onglets inertes ; seule la CLI existait. Un seul écran unifié (candidats hors périmètre, D-11b-1) | **ADR-29** ; `MembreController` + `/api/admin/membres` (4 routes) ; `GestionCompteEquipe` ; `Equipe.jsx` ; `GestionMembresEquipeTest` ; `navConfig.js` (`equipe`) | — |
+| **Coupure d'accès immédiate d'un compte désactivé** (session en cours, pas seulement au prochain login) | 🟢 **Traité (Lot 11b — ADR-29)** | `login` refusait déjà un compte inactif, mais une session ouverte survivait jusqu'à `SESSION_LIFETIME` (120 min) | **ADR-29** ; `EnsureUserActif` (groupe `auth:sanctum`) ; `EnsureUserActifTest` | — |
+| **Désactiver un compte CANDIDAT** (fraude avérée au-delà de l'« élimination » d'une candidature) | 🟠 Ouvert | Le Lot 11b gère l'équipe (évaluateurs + admins), pas les candidats. Différent d'« éliminer une candidature » (ADR-15) : là c'est le **compte** qu'on bloque. `EnsureUserActif` couvrirait déjà l'exécution — il manque l'acte admin | `MembreController::assertMembreEquipe` (exclut les candidats) ; ADR-15 (élimination ≠ blocage de compte) | Endpoint `role:administrateur` sur un compte candidat + point d'entrée UI (écran de supervision des candidatures ?) + audit |
+| **Édition de l'identité d'un membre** (corriger prénom / nom / poste d'un compte d'équipe) | 🟠 Ouvert | Hors des 4 fonctions du Lot 11b (D-11b-4). Aujourd'hui : en base | `MembreController` (pas de route PUT d'identité) ; maquette `utilisateurs.html` (bouton « Gérer ») | 1 route `PATCH` + champs éditables + audit + un formulaire |
 | **Écran « Rapports & statistiques »** (restitution CoPil : candidatures par filière, F/H, distribution des scores, top villes ; + export Excel/PDF) | 🟠 Ouvert (**11c**) | Onglet inerte. Jamais construit ; l'ancienne ligne « Export réel des rapports » ne couvrait que l'export, pas l'écran de restitution. Maquette `rapports.html` = 4 graphiques CoPil | `navConfig.js` (`rapports`, `is-inert`) ; maquette `pages/admin/rapports.html` ; ADR sur 8d-2 (dashboard sans Chart.js) | Endpoints d'agrégation `role:administrateur` (jamais de 🔴 individuel), écran avec graphiques, génération de l'export |
 
 ## Notifications

@@ -63,15 +63,57 @@ class ProvisionnementMembreEquipe
     }
 
     /**
+     * Mot de passe temporaire GÉNÉRÉ — conforme par construction à
+     * `motDePasseRules()` (≥ 10, minuscule + majuscule + chiffre). Utilisé par
+     * l'écran d'administration (Lot 11b) : l'admin ne saisit rien, la force est
+     * garantie. Alphabet sans caractères ambigus (l/1/I, O/0) pour une
+     * transcription manuelle sûre. JAMAIS journalisé — communiqué une seule fois
+     * dans la réponse de l'acte, puis inconnaissable.
+     */
+    public static function genererMotDePasse(): string
+    {
+        $minuscules = 'abcdefghijkmnopqrstuvwxyz';
+        $majuscules = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        $chiffres = '23456789';
+        $tous = $minuscules.$majuscules.$chiffres;
+
+        // Au moins un de chaque classe, puis complété au hasard.
+        $chars = [
+            $minuscules[random_int(0, strlen($minuscules) - 1)],
+            $majuscules[random_int(0, strlen($majuscules) - 1)],
+            $chiffres[random_int(0, strlen($chiffres) - 1)],
+        ];
+        for ($i = count($chars); $i < 18; $i++) {
+            $chars[] = $tous[random_int(0, strlen($tous) - 1)];
+        }
+
+        // Mélange de Fisher-Yates (random_int, pas shuffle()) pour ne pas laisser
+        // les 3 classes garanties en tête.
+        for ($i = count($chars) - 1; $i > 0; $i--) {
+            $j = random_int(0, $i);
+            [$chars[$i], $chars[$j]] = [$chars[$j], $chars[$i]];
+        }
+
+        return implode('', $chars);
+    }
+
+    /**
      * Crée `utilisateur` + `membre_equipe` + 1 ligne d'audit, dans une seule
      * transaction. L'appelant a déjà validé (`rules()`) et garanti l'unicité
      * de l'e-mail.
      *
+     * `$auteur` :
+     *  - `null` (CLI `casa:create-*`) : auto-provisionnement — `auteur_id` = le
+     *    nouveau compte lui-même (FK NOT NULL, pas d'acteur authentifié), action
+     *    suffixée « (console) » ;
+     *  - un `User` (écran admin, Lot 11b) : `auteur_id` = l'admin connecté,
+     *    action sans suffixe.
+     *
      * @param  array{email:string, role:string, password:string, prenom:string, nom:string, poste:string}  $data
      */
-    public function creer(array $data): User
+    public function creer(array $data, ?User $auteur = null): User
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $auteur) {
             $user = User::create([
                 'email' => $data['email'],
                 'mot_de_passe_hash' => $data['password'], // cast 'hashed' -> bcrypt
@@ -88,9 +130,9 @@ class ProvisionnementMembreEquipe
             ]);
 
             JournalAudit::create([
-                'auteur_id' => $user->id, // self-provisionné : pas d'acteur authentifié en CLI, FK NOT NULL
-                'role' => $data['role'],
-                'action' => "Création de compte {$data['role']} (console)",
+                'auteur_id' => $auteur?->id ?? $user->id,
+                'role' => $auteur?->role ?? $data['role'],
+                'action' => "Création de compte {$data['role']}".($auteur === null ? ' (console)' : ''),
                 'module' => 'Utilisateurs',
                 'objet' => $data['email'],
                 'nouvelle_valeur' => "role={$data['role']}, {$data['prenom']} {$data['nom']}",

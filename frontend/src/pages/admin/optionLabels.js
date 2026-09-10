@@ -35,6 +35,23 @@ export const DECISION_LABELS = {
 }
 
 /**
+ * Rôles d'un membre d'équipe (Lot 11b) — les SEULES valeurs proposées à la
+ * création d'un compte via l'écran « Équipe ». « Candidat » est volontairement
+ * absent : il ne se crée pas par cette voie (serveur : 422). L'ordre place le
+ * rôle le moins privilégié en premier (défaut du `<select>`).
+ */
+export const ROLE_MEMBRE_LABELS = {
+  evaluateur: 'Évaluateur',
+  administrateur: 'Administrateur',
+}
+
+/** Badge de rôle dans la liste de l'équipe. */
+export const ROLE_LABELS = {
+  evaluateur: { label: 'Évaluateur', badge: 'badge-neutral' },
+  administrateur: { label: 'Administrateur', badge: 'badge-primary' },
+}
+
+/**
  * Modules du journal d'audit (Lot 8d-1) — les libellés `module` en dur dans
  * chaque contrôleur qui écrit une ligne d'audit (Candidatures, Compte,
  * Entretien, Évaluation, Campagnes, Classement, Résultats, Filières). Noms de
@@ -44,6 +61,7 @@ export const DECISION_LABELS = {
 export const AUDIT_MODULES = [
   'Candidatures',
   'Compte',
+  'Utilisateurs',
   'Entretien',
   'Évaluation',
   'Campagnes',

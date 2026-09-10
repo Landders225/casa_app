@@ -121,6 +121,60 @@ class MassAssignmentTest extends TestCase
         $this->assertSame('Nouveau', $frais->candidat->prenom); // le champ légitime est bien pris
     }
 
+    // --- Création d'un compte d'équipe (Lot 11b) --------------------------
+
+    private function payloadMembre(array $extra = []): array
+    {
+        return array_merge([
+            'email' => 'membre'.fake()->numerify('####').'@cci.ci',
+            'role' => 'evaluateur',
+            'prenom' => 'Awa', 'nom' => 'Traoré', 'poste' => 'Jury',
+        ], $extra);
+    }
+
+    public function test_admin_membres_refuse_un_role_injecte_hors_liste(): void
+    {
+        $admin = User::factory()->administrateur()->create();
+        $admin->membreEquipe()->create(['prenom' => 'A', 'nom' => 'D', 'poste' => 'Coord']);
+
+        $this->actingAs($admin)
+            ->postJson('/api/admin/membres', $this->payloadMembre(['role' => 'candidat']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('role');
+
+        $this->assertSame(1, User::query()->count()); // seul l'admin
+    }
+
+    public function test_admin_membres_refuse_actif_id_et_hash_injectes(): void
+    {
+        $admin = User::factory()->administrateur()->create();
+        $admin->membreEquipe()->create(['prenom' => 'A', 'nom' => 'D', 'poste' => 'Coord']);
+        $idForge = '22222222-2222-2222-2222-222222222222';
+
+        $this->actingAs($admin)->postJson('/api/admin/membres', $this->payloadMembre([
+            'actif' => false,
+            'id' => $idForge,
+            'mot_de_passe_hash' => 'peu importe',
+        ]))->assertStatus(422)->assertJsonValidationErrors(['actif', 'id', 'mot_de_passe_hash']);
+
+        $this->assertDatabaseMissing('utilisateur', ['id' => $idForge]);
+    }
+
+    public function test_admin_membres_patch_refuse_de_changer_le_role(): void
+    {
+        $admin = User::factory()->administrateur()->create();
+        $admin->membreEquipe()->create(['prenom' => 'A', 'nom' => 'D', 'poste' => 'Coord']);
+        $eval = User::factory()->evaluateur()->create();
+        $eval->membreEquipe()->create(['prenom' => 'E', 'nom' => 'V', 'poste' => 'Jury']);
+
+        $this->actingAs($admin)->patchJson("/api/admin/membres/{$eval->id}", [
+            'actif' => true,
+            'role' => 'administrateur',
+        ])->assertStatus(422)->assertJsonValidationErrors('role');
+
+        $this->assertSame('evaluateur', $eval->fresh()->role);
+    }
+
     // --- Vérification évaluateur -----------------------------------------
 
     public function test_verification_ignore_le_verdict_d_eligibilite_injecte(): void

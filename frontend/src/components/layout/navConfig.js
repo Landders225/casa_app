@@ -54,8 +54,10 @@ export const navConfig = {
       {
         title: 'Paramétrage',
         items: [
-          { key: 'evaluateurs', icon: 'fa-user-tie', label: 'Évaluateurs' },
-          { key: 'utilisateurs', icon: 'fa-users-gear', label: 'Utilisateurs' },
+          // Lot 11b : un seul écran « Équipe » (évaluateurs + admins) remplace
+          // les deux entrées inertes « Évaluateurs » / « Utilisateurs » de la
+          // maquette — les candidats n'y sont pas gérés (D-11b-1).
+          { key: 'equipe', icon: 'fa-users-gear', label: 'Équipe' },
           { key: 'cqp', icon: 'fa-layer-group', label: 'Filières CQP' },
           { key: 'audit', icon: 'fa-clipboard-list', label: "Journal d'audit" },
         ],

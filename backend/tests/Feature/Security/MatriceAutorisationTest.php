@@ -170,6 +170,10 @@ class MatriceAutorisationTest extends TestCase
             'numero_dossier' => 'CASA-TEST-0001',
         ]);
 
+        // Membre d'équipe réel : le binding {utilisateur} réussit, puis `role:`
+        // rejette → 403 EXACT sur les routes de gestion des comptes (Lot 11b).
+        $membre = User::factory()->evaluateur()->create();
+
         $routesSensibles = [
             ['post', "/api/admin/candidatures/{$candidature->id}/correction/dossier"],
             ['post', "/api/admin/candidatures/{$candidature->id}/correction/entretien"],
@@ -179,6 +183,10 @@ class MatriceAutorisationTest extends TestCase
             ['post', "/api/admin/campagnes/{$campagne->id}/classement"],
             ['patch', "/api/admin/campagnes/{$campagne->id}"],
             ['patch', "/api/admin/filieres/{$filiere->id}"],
+            ['get', '/api/admin/membres'],
+            ['post', '/api/admin/membres'],
+            ['patch', "/api/admin/membres/{$membre->id}"],
+            ['post', "/api/admin/membres/{$membre->id}/mot-de-passe"],
         ];
 
         foreach (['candidat', 'evaluateur'] as $roleInterdit) {

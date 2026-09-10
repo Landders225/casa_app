@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureCandidatureModifiable;
+use App\Http\Middleware\EnsureUserActif;
 use App\Http\Middleware\EnsureUserHasRole;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -31,6 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // role:evaluateur,administrateur / role:administrateur
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
+            // Coupe l'accès d'une session dont le compte vient d'être désactivé,
+            // sans attendre l'expiration de session (Lot 11b, ADR-29).
+            'actif' => EnsureUserActif::class,
             // Ferme l'édition d'une candidature soumise (Lot 3c) : 404 si pas
             // propriétaire, 409 si plus en brouillon.
             'candidature.modifiable' => EnsureCandidatureModifiable::class,

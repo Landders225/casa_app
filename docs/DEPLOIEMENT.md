@@ -322,10 +322,18 @@ dcp exec backend php artisan casa:create-membre adjoint@cci.ci --role=administra
 `--role` n'accepte que `evaluateur` ou `administrateur` — toute autre valeur
 (dont `candidat`) est refusée sans rien écrire.
 
-> Les **écrans** de gestion de l'équipe et des utilisateurs (ajout depuis
-> l'interface admin, désactivation, charge de travail) sont un point ouvert —
-> voir `docs/POINTS-OUVERTS.md` § « Comptes & équipe » (Lot 11b). En attendant,
-> ces deux commandes CLI sont le moyen de provisionner les comptes.
+### 9.3 Ensuite, tout se fait dans l'interface (Lot 11b)
+
+Une fois le **premier administrateur** créé (§ 9.1), la CLI n'est plus
+nécessaire : l'écran **Paramétrage → Équipe** (`/admin/equipe`) permet d'ajouter
+des évaluateurs et des administrateurs, de **désactiver / réactiver** un compte
+(l'accès est coupé immédiatement, pas au prochain login) et de **réinitialiser
+un mot de passe** (un mot de passe provisoire est généré et affiché **une seule
+fois** — à transmettre au membre par un canal sûr). Le rôle reste limité à
+`evaluateur` / `administrateur` (jamais `candidat`), on ne peut pas désactiver
+le dernier administrateur actif ni son propre compte, et chaque acte est tracé
+au journal d'audit. `casa:create-membre` reste utile pour un provisioning en
+lot ou hors interface.
 
 ---
 

@@ -18,6 +18,7 @@ import { Audit } from './pages/admin/Audit.jsx'
 import { Campagnes } from './pages/admin/Campagnes.jsx'
 import { CandidaturesSupervision } from './pages/admin/CandidaturesSupervision.jsx'
 import { Classement } from './pages/admin/Classement.jsx'
+import { Equipe } from './pages/admin/Equipe.jsx'
 import { Filieres } from './pages/admin/Filieres.jsx'
 import { ProtectedRoute } from './routing/ProtectedRoute.jsx'
 import { RedirectIfAuthed } from './routing/RedirectIfAuthed.jsx'
@@ -149,6 +150,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={['administrateur']}>
             <Campagnes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={paths.adminEquipe}
+        element={
+          <ProtectedRoute roles={['administrateur']}>
+            <Equipe />
           </ProtectedRoute>
         }
       />
