@@ -13,7 +13,7 @@
 
 ## 0. Vue d'ensemble
 
-**Deux modes de déploiement** — choisir selon le serveur :
+**Trois modes de déploiement** — choisir selon le serveur :
 
 | Mode | Quand | Sections |
 |---|---|---|
@@ -160,7 +160,7 @@ nano backend/.env.production
 | `SESSION_DOMAIN` | `casa.example.org` | le **host exact**, sans port ni schéma. Apex + `www` : mettre `.example.org` (point initial) |
 | `SANCTUM_STATEFUL_DOMAINS` | `casa.example.org` | le/les host(s) ; ajouter le port **seulement** s'il est non-standard |
 | `DB_PASSWORD` | **la même valeur** que `POSTGRES_PASSWORD` ci-dessus | copier-coller |
-| `TRUSTED_PROXIES` | `*` pour démarrer ; à resserrer (§ 11.5) | voir § 11.5 |
+| `TRUSTED_PROXIES` | déjà `172.31.243.0/24` dans le modèle (= `CASA_SUBNET`) — **laisser tel quel**, ne jamais mettre `*` | voir § 12.5 (mode A) / § 15.5 (mode B) |
 
 Les autres variables (`APP_ENV=production`, `APP_DEBUG=false`,
 `SESSION_SECURE_COOKIE=true`, `LOG_CHANNEL=stderr`, …) sont **déjà fixées** dans
@@ -735,7 +735,14 @@ alias dct='docker compose --env-file .env.test-local -f docker-compose.yml -f do
 ```bash
 dct up -d --build
 watch -n 3 'dct ps'          # 4× (healthy), Ctrl-C
+```
 
+> Il y a **5 services** au total (`postgres`, `backend`, `frontend`, `nginx`,
+> `worker`) mais on n'attend que **4** ici : le `worker` reste `(unhealthy)`
+> tant que les migrations (juste après) n'ont pas créé la table `jobs` — normal,
+> il se stabilise dès `migrate --force` passé (cf. § 7-§ 8).
+
+```bash
 # Le sous-réseau réel DOIT être égal à TRUSTED_PROXIES :
 docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}'   # → 172.31.243.0/24
 
@@ -831,7 +838,7 @@ Navigateur ──HTTPS──▶ Apache :443 ──HTTP + X-Forwarded-Proto:https
 ```
 
 > **Raccourci.** Le script `docker/apache/deploy-behind-apache.sh` fait §§ 15.2 à
-> 13.7 en une commande (config, build, migrations, référentiel, vhost, vérifs) :
+> 15.7 en une commande (config, build, migrations, référentiel, vhost, vérifs) :
 > ```bash
 > cd /opt/casa
 > CASA_DOMAIN=casa.mon-domaine.ci CASA_ADMIN_EMAIL=coordination@mon-domaine.ci \
@@ -908,6 +915,10 @@ alias dca='docker compose --env-file .env.production -f docker-compose.yml -f do
 dca up -d --build
 watch -n 3 'dca ps'        # attendre 4× (healthy), Ctrl-C
 ```
+
+> Comme en § 14.4 : **5 services** au total, mais on n'en attend que **4** ici —
+> le `worker` reste `(unhealthy)` tant que `migrate --force` (juste après) n'a
+> pas créé la table `jobs`. C'est attendu, il se stabilise ensuite.
 
 `nginx` de CASA écoute maintenant sur **`127.0.0.1:8090`** uniquement — rien
 n'est exposé publiquement. Test local :
@@ -1142,3 +1153,360 @@ certificat auto-signé (`gen-selfsigned.sh`), fichiers `.env.production` dédié
   navigateur.
 - `dcp up -d --force-recreate backend` après édition de `TRUSTED_PROXIES` →
   nouvelle valeur bien reprise dans `config:cache` (piège ADR-28 neutralisé).
+
+---
+
+## 16. Runbook de bascule : mode test → production réelle (Apache + HTTPS + domaine)
+
+> **Contexte.** Le serveur tourne actuellement en **mode T** (§ 14) —
+> `http://<IP-serveur>:8090`, pas de domaine, cookies non-`Secure`. Ce runbook
+> fait basculer vers le **mode B définitif** (§ 15) : Apache + HTTPS + le vrai
+> sous-domaine déjà pointé sur ce serveur.
+>
+> **Décision actée : on repart propre.** Aucune donnée du mode test n'est
+> migrée — candidatures, comptes et documents de test sont **détruits** à
+> l'étape (a), volontairement, avant de reconstruire une base vierge en (c).
+>
+> **Qui exécute quoi.** Chaque commande ci-dessous est à lancer **par vous**,
+> sur le serveur réel. Aucun secret (mots de passe, `APP_KEY`, identifiants
+> SMTP) ne doit jamais être collé dans cette conversation ni dans un message à
+> Claude — les emplacements où **vous seul** saisissez une valeur sont marqués
+> **🔒 SECRET — vous seul**.
+
+### a) Nettoyer le mode test — ⚠️ destruction IRRÉVERSIBLE des données de test
+
+> ### ⚠️ LIRE AVANT D'EXÉCUTER QUOI QUE CE SOIT DANS CETTE ÉTAPE
+>
+> La dernière commande de cette étape (`dct down -v`) **détruit définitivement
+> et sans confirmation supplémentaire** :
+> - le volume Docker **`casa_postgres_data`** → **toute** la base : candidatures
+>   de test, comptes créés, notes, journal d'audit — tout ;
+> - le volume Docker **`casa_documents_data`** → tous les fichiers uploadés en
+>   test (pièces justificatives).
+>
+> **Il n'y a pas de corbeille.** Une fois la commande passée, ces données ne
+> sont récupérables par **aucun** moyen (pas de sauvegarde à restaurer : le
+> mode test n'en a jamais eu). Si le moindre doute existe sur le fait que des
+> données du mode test doivent être conservées (export, capture d'écran,
+> vérification métier en cours…), **s'arrêter ici et ne pas exécuter `-v`**.
+>
+> Ceci est cohérent avec la décision actée en tête de ce runbook — mais c'est
+> la seule étape du document qui efface des données sans retour possible.
+
+État actuel, avant toute action destructrice :
+
+```bash
+cd /opt/casa   # adapter si le clone du mode test est ailleurs
+alias dct='docker compose --env-file .env.test-local -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.test-local.yml'
+dct ps
+docker volume ls | grep casa_
+```
+**Résultat attendu** : `dct ps` liste les 5 conteneurs du mode test ; `docker
+volume ls` fait apparaître (au moins) `casa_postgres_data` et
+`casa_documents_data`.
+
+Arrêt propre (garde encore les volumes — réversible) :
+
+```bash
+dct down
+docker volume ls | grep casa_    # les volumes sont TOUJOURS là à ce stade
+```
+
+Puis, **seulement après avoir lu l'avertissement ci-dessus et confirmé la
+décision** — destruction effective des volumes :
+
+```bash
+dct down -v
+docker volume ls | grep casa_    # attendu : AUCUNE ligne (volumes détruits)
+```
+
+**Résultat attendu** : la seconde commande ne renvoie rien — plus aucun volume
+`casa_*` sur le serveur. C'est l'état « repartir propre » recherché : l'étape
+(c) reconstruira une base et un stockage de documents entièrement vierges.
+
+Hygiène optionnelle (les fichiers du mode test ne servent plus, mais sont
+gitignorés et sans risque s'ils restent) :
+
+```bash
+rm -f .env.test-local backend/.env.test-local
+```
+
+### b) Configurer `.env.production` (domaine réel)
+
+```bash
+cp .env.production.example .env.production
+cp backend/.env.production.example backend/.env.production
+nano .env.production
+nano backend/.env.production
+```
+
+| Fichier | Variable | Qui remplit | Valeur |
+|---|---|---|---|
+| `.env.production` | `POSTGRES_PASSWORD` | 🔒 **vous** | mot de passe fort — `openssl rand -base64 24` |
+| `.env.production` | `POSTGRES_DB` / `POSTGRES_USER` | — | laisser `casa` (défaut du modèle) |
+| `.env.production` | `CASA_SUBNET` | — | laisser `172.31.243.0/24` (défaut du modèle — cf. § 15.5) |
+| `.env.production` | `CASA_HTTP_PORT` / `CASA_BIND_ADDR` | — | laisser `8090` / `127.0.0.1` (mode Apache — § 15.2) |
+| `backend/.env.production` | `APP_KEY` | 🔒 **vous** | générer puis coller — voir commande ci-dessous |
+| `backend/.env.production` | `APP_URL` | vous | `https://<votre-sous-domaine-réel>` |
+| `backend/.env.production` | `SESSION_DOMAIN` | vous | le host exact du sous-domaine (sans port, sans schéma) |
+| `backend/.env.production` | `SANCTUM_STATEFUL_DOMAINS` | vous | idem `SESSION_DOMAIN` |
+| `backend/.env.production` | `DB_PASSWORD` | 🔒 **vous** | **identique** à `POSTGRES_PASSWORD` ci-dessus |
+| `backend/.env.production` | `TRUSTED_PROXIES` | — | laisser `172.31.243.0/24` (déjà correct dans le modèle — **jamais `*`**, § 15.5) |
+| `backend/.env.production` | `MAIL_MAILER` | — | laisser `log` **pour l'instant** — basculé en `smtp` à l'étape (g) |
+| `backend/.env.production` | `MAIL_HOST`/`MAIL_USERNAME`/`MAIL_PASSWORD` | 🔒 **vous, à l'étape (g)** | **pas maintenant** — laisser vide ici |
+
+Générer `APP_KEY` (la commande tourne sur le serveur ; la clé générée
+s'affiche à **vous**, vous seul la collez dans le fichier) :
+
+```bash
+docker compose --env-file .env.production \
+  -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.apache.yml \
+  run --rm --no-deps --entrypoint php backend artisan key:generate --show
+```
+
+Contrôle avant de continuer :
+
+```bash
+alias dca='docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.apache.yml'
+dca config -q && echo "compose OK"
+grep -E '^(APP_KEY|APP_URL|SESSION_DOMAIN|DB_PASSWORD|TRUSTED_PROXIES)=' backend/.env.production
+grep -E '^POSTGRES_PASSWORD=' .env.production
+```
+**Résultat attendu** : `compose OK` ; `APP_KEY` non vide ; `DB_PASSWORD` ==
+`POSTGRES_PASSWORD` ; `TRUSTED_PROXIES=172.31.243.0/24` (**pas** `*`).
+
+### c) Démarrer CASA en mode Apache (build, migrations, référentiel)
+
+```bash
+dca up -d --build
+watch -n 3 'dca ps'          # attendre 4× (healthy), Ctrl-C
+```
+**Résultat attendu** : 4 services `(healthy)` (`postgres`, `backend`,
+`frontend`, `nginx`) ; le 5ᵉ (`worker`) affiche `(unhealthy)` — normal, il
+n'a pas encore la table `jobs` (cf. § 15.3).
+
+```bash
+docker network inspect casa_casa -f '{{(index .IPAM.Config 0).Subnet}}'
+grep '^TRUSTED_PROXIES=' backend/.env.production
+```
+**Résultat attendu** : les deux valeurs sont **identiques** (`172.31.243.0/24`
+par défaut).
+
+```bash
+dca exec backend php artisan migrate --force
+dca exec backend php artisan casa:seed-referentiel
+```
+**Résultat attendu** : migrations appliquées sans erreur ; le seed installe
+**sans comptes démo** (pas `casa:seed-demo`) :
+
+```bash
+dca exec backend php artisan tinker --execute \
+  "echo DB::table('filiere')->count().' filières, '.DB::table('grille')->count().' grille, '.DB::table('type_document')->count().' types de doc, '.DB::table('campagne')->count().' campagne, '.DB::table('utilisateur')->count().' comptes';"
+# attendu : 5 filières, 1 grille, 6 types de doc, 1 campagne, 0 compte
+dca ps worker   # attendu : maintenant (healthy) — la table jobs existe
+```
+
+### d) VirtualHost Apache pour le domaine réel
+
+```bash
+sudo a2enmod proxy proxy_http headers rewrite ssl
+sudo cp /opt/casa/docker/apache/casa.vhost.conf /etc/apache2/sites-available/casa.conf
+sudo nano /etc/apache2/sites-available/casa.conf
+```
+Modifier **seulement** les 3 `Define` en tête du fichier :
+```
+Define CASA_DOMAIN        <votre-sous-domaine-réel>
+Define CASA_ADMIN_EMAIL   <votre-email-de-contact>
+Define CASA_UPSTREAM      http://127.0.0.1:8090
+```
+
+```bash
+sudo a2ensite casa
+sudo apache2ctl configtest          # attendu : "Syntax OK"
+sudo systemctl reload apache2
+curl -sI http://<votre-domaine>/up | grep -i "^HTTP"   # attendu : 200 (en clair, pas encore HTTPS)
+```
+
+### e) Certificat Let's Encrypt
+
+```bash
+sudo apt install -y certbot
+sudo certbot certonly --apache -d <votre-domaine> \
+     -m <votre-email-de-contact> --agree-tos --no-eff-email
+sudo systemctl reload apache2
+```
+**Résultat attendu** : certbot confirme l'émission (`Congratulations!`) ; le
+bloc `:443` du vhost — déjà présent, encadré par `<IfFile>` — s'active tout
+seul dès que le certificat existe (aucune 2ᵉ édition du vhost nécessaire).
+
+Rechargement automatique au renouvellement (une seule fois) :
+```bash
+echo 'systemctl reload apache2' | sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-apache.sh
+sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-apache.sh
+sudo certbot renew --dry-run    # attendu : simulation réussie
+```
+
+Vérification bascule HTTPS :
+```bash
+curl -sI http://<votre-domaine>/  | grep -iE '^HTTP|^location'   # attendu : 301 -> https://
+curl -sI https://<votre-domaine>/ | grep -i '^HTTP'               # attendu : 200
+```
+
+### f) Premier administrateur réel
+
+Commande **interactive** — mot de passe saisi au clavier, jamais en argument,
+jamais dans l'historique shell, jamais transmis à Claude :
+
+```bash
+dca exec backend php artisan casa:create-admin <votre-email-admin-réel>
+```
+Répond aux invites : mot de passe + confirmation (min. 10 caractères,
+majuscule + minuscule + chiffre), puis prénom / nom / poste.
+**Résultat attendu** : compte créé, ligne d'audit posée. Se connecter ensuite
+sur `https://<votre-domaine>/connexion` pour vérifier.
+
+### g) Test SMTP réel — 🔒 vos identifiants, vous seul
+
+**C'est vous, et seulement vous, qui éditez ce fichier et lancez la commande
+de test** — vos identifiants SMTP ne doivent jamais être partagés ailleurs :
+
+```bash
+nano backend/.env.production
+```
+```dotenv
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.votre-fournisseur.tld
+MAIL_PORT=587          # 587 = STARTTLS (laisser MAIL_SCHEME vide) · 465 = TLS implicite (MAIL_SCHEME=smtps)
+MAIL_USERNAME=...
+MAIL_PASSWORD=...
+MAIL_FROM_ADDRESS="no-reply@<votre-domaine>"
+```
+
+```bash
+dca up -d --force-recreate backend worker
+dca exec backend php artisan casa:test-email <votre-email>
+```
+Envoi **synchrone** (pas de flag) — le résultat s'affiche immédiatement :
+- **succès** → vérifier la réception (et les indésirables) ;
+- **échec** → le message d'erreur exact du serveur SMTP s'affiche (jamais le
+  mot de passe) ; corriger, `--force-recreate backend worker`, réessayer.
+
+Optionnel, pour tester aussi la chaîne asynchrone complète :
+```bash
+dca exec backend php artisan casa:test-email <votre-email> --queue
+```
+
+### h) Vérifier que le worker tourne
+
+```bash
+dca ps worker                 # attendu : Up / (healthy)
+dca logs --tail 30 worker
+dca exec backend php artisan tinker --execute "echo config('mail.default');"   # attendu : smtp (pas log)
+```
+
+### i) Checklist complète de vérification post-bascule
+
+Remplacer `<votre-domaine>` :
+
+```bash
+# 1. HTTPS actif + redirection
+curl -sI http://<votre-domaine>/  | grep -iE '^HTTP|^location'   # 301 -> https
+curl -sI https://<votre-domaine>/ | grep -i '^HTTP'               # 200
+
+# 2. Certificat réel (pas de self-signed)
+echo | openssl s_client -connect <votre-domaine>:443 -servername <votre-domaine> 2>/dev/null \
+  | openssl x509 -noout -issuer -dates                            # issuer = Let's Encrypt
+
+# 3. Les 6 en-têtes de sécurité (5 nginx CASA + HSTS Apache)
+curl -sI https://<votre-domaine>/ | grep -iE 'strict-transport|x-content-type|x-frame|referrer-policy|permissions-policy|content-security-policy'
+
+# 4. Sonde backend + API
+curl -s https://<votre-domaine>/up | head -c 40; echo
+curl -s https://<votre-domaine>/api/filieres | head -c 60; echo
+
+# 5. Pièces + secrets hors du web
+curl -sI https://<votre-domaine>/storage/ | grep -i "^HTTP"       # 404
+curl -sI https://<votre-domaine>/.env     | grep -i "^HTTP"       # 404
+
+# 6. Login admin réel (Origin obligatoire, cf. § 11.9) — objet utilisateur, JAMAIS mot_de_passe_hash
+curl -sc /tmp/j https://<votre-domaine>/sanctum/csrf-cookie -o /dev/null
+XSRF=$(awk '/XSRF-TOKEN/{print $7}' /tmp/j | perl -pe 's/%([0-9A-Fa-f]{2})/chr hex $1/ge')
+curl -s -b /tmp/j -c /tmp/j -X POST https://<votre-domaine>/api/login \
+  -H 'Content-Type: application/json' -H "Origin: https://<votre-domaine>" \
+  -H "X-XSRF-TOKEN: $XSRF" -d '{"email":"<votre-email-admin-réel>","password":"VOTRE_MOT_DE_PASSE"}' | head -c 200
+
+# 7. Worker + e-mail réel (§ g/h)
+dca ps worker | grep -E "Up|healthy"
+dca exec backend php artisan tinker --execute "echo config('mail.default');"    # smtp
+
+# 8. Anti-usurpation d'IP (TRUSTED_PROXIES resserré, § 15.5)
+for i in $(seq 1 65); do
+  curl -s -o /dev/null -w '%{http_code}\n' -H "X-Forwarded-For: 10.$i.$i.$i" \
+    https://<votre-domaine>/api/health
+done | sort | uniq -c
+#   attendu : ~60 × 200 PUIS ~5 × 429 (si 65 × 200 → TRUSTED_PROXIES trop large, revoir § 15.5)
+
+# 9. Aucun secret dans les logs
+dca logs --since 1h | grep -iE "MAIL_PASSWORD|POSTGRES_PASSWORD|DB_PASSWORD"
+#   attendu : AUCUNE ligne (ni nom de variable avec valeur, ni mot de passe en clair)
+```
+
+Puis, **dans un navigateur** : ouvrir `https://<votre-domaine>`, se connecter
+avec le compte admin (f), vérifier l'absence d'erreur CSP dans la console
+(devtools), et parcourir un écran candidat + un écran admin pour confirmer que
+la base est bien vierge (0 candidature, 1 seul compte).
+
+### j) Sauvegardes
+
+Base de données — script `/srv/casa/scripts-hote/backup-db.sh` (ou
+`/opt/casa/scripts-hote/backup-db.sh` selon votre chemin), **hors dépôt** :
+
+```bash
+mkdir -p /srv/backups
+cat > /opt/casa/scripts-hote/backup-db.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cd /opt/casa
+STAMP=$(date +%Y%m%d-%H%M%S)
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.apache.yml \
+  exec -T postgres pg_dump -U casa -d casa | gzip > "/srv/backups/casa-$STAMP.sql.gz"
+# Rotation : garder 14 jours
+find /srv/backups -name 'casa-*.sql.gz' -mtime +14 -delete
+EOF
+chmod +x /opt/casa/scripts-hote/backup-db.sh
+```
+
+Cron quotidien (2h15) :
+```bash
+crontab -e
+# ajouter :
+15 2 * * * /opt/casa/scripts-hote/backup-db.sh >> /srv/backups/backup.log 2>&1
+```
+
+Pièces justificatives (volume `casa_documents_data`) — même principe,
+hebdomadaire suffit (fichiers peu volatils) :
+```bash
+cat > /opt/casa/scripts-hote/backup-documents.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+docker run --rm -v casa_documents_data:/data -v /srv/backups:/out alpine \
+  tar czf /out/casa-documents-$(date +%Y%m%d).tar.gz -C /data .
+find /srv/backups -name 'casa-documents-*.tar.gz' -mtime +30 -delete
+EOF
+chmod +x /opt/casa/scripts-hote/backup-documents.sh
+crontab -e
+# ajouter :
+30 2 * * 0 /opt/casa/scripts-hote/backup-documents.sh >> /srv/backups/backup.log 2>&1
+```
+
+Vérification immédiate (ne pas attendre le 1er passage cron) :
+```bash
+/opt/casa/scripts-hote/backup-db.sh
+/opt/casa/scripts-hote/backup-documents.sh
+ls -la /srv/backups/
+```
+**Résultat attendu** : un fichier `casa-<horodatage>.sql.gz` et un
+`casa-documents-<date>.tar.gz` non vides. Restauration détaillée : § 12.3
+(remplacer `dcp` par `dca`).
+
+---

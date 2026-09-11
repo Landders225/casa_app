@@ -6,7 +6,7 @@
 #  reverse-proxy HTTPS → CASA en HTTP local sur un port dédié.
 #
 #  Se superpose à docker-compose.prod.yml (dont il reprend backend + postgres +
-#  entrypoint), en ne redéfinissant QUE le service nginx :
+#  worker + entrypoint), en ne redéfinissant QUE le service nginx :
 #
 #    docker compose --env-file .env.production \
 #      -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.apache.yml up -d

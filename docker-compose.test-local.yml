@@ -6,7 +6,7 @@
 #  mode Apache + HTTPS (docs/DEPLOIEMENT.md § 14).
 #
 #  Se superpose à docker-compose.prod.yml (backend en image + entrypoint +
-#  postgres) en ne redéfinissant QUE :
+#  postgres + worker) en ne redéfinissant QUE :
 #   - le fichier d'environnement de Laravel  -> backend/.env.test-local
 #   - le nginx : écoute HTTP sur ${CASA_BIND_ADDR}:${CASA_HTTP_PORT}, conf de
 #     test (ignore les X-Forwarded-* entrants), sonde HTTP.
