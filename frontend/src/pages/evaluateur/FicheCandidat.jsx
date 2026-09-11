@@ -70,6 +70,14 @@ function humanSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
 }
 
+/**
+ * `rel="noopener"` SEUL (pas `noreferrer`, corrigé au Lot 14) : `noreferrer`
+ * supprime aussi l'en-tête `Referer`, dont Sanctum a besoin pour reconnaître
+ * cette navigation same-origin comme une requête « frontend » — sans lui, le
+ * téléchargement échouait en 401 (E2E `documents.spec.js` a attrapé le même
+ * bug sur `Documents.jsx`, patron copié d'ici). `noopener` seul protège déjà
+ * contre le reverse-tabnabbing (le vrai risque d'un `target="_blank"`).
+ */
 function PieceLink({ label, piece }) {
   if (!piece) {
     return (
@@ -91,7 +99,7 @@ function PieceLink({ label, piece }) {
       style={{ marginBottom: 'var(--space-3)', textDecoration: 'none' }}
       href={piece.url}
       target="_blank"
-      rel="noreferrer"
+      rel="noopener"
     >
       <div className="file-icon">
         <i className="fa-solid fa-file-lines" aria-hidden="true" />

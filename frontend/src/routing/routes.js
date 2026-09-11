@@ -9,6 +9,7 @@ export const paths = {
   candidatureWizard: '/candidat/candidature',
   maCandidature: '/candidat/ma-candidature',
   candidatProfil: '/candidat/profil',
+  candidatDocuments: '/candidat/documents',
   candidatNotifications: '/candidat/notifications',
   evaluateur: '/evaluateur',
   evaluateurDossiers: '/evaluateur/mes-dossiers',

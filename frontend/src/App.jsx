@@ -9,6 +9,7 @@ import { HomePage } from './pages/public/HomePage.jsx'
 import { InscriptionPage } from './pages/public/InscriptionPage.jsx'
 import { CandidatDashboard } from './pages/candidat/CandidatDashboard.jsx'
 import { CandidatureWizard } from './pages/candidat/CandidatureWizard.jsx'
+import { Documents } from './pages/candidat/Documents.jsx'
 import { MaCandidature } from './pages/candidat/MaCandidature.jsx'
 import { Notifications } from './pages/candidat/Notifications.jsx'
 import { Profil } from './pages/candidat/Profil.jsx'
@@ -85,6 +86,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={['candidat']}>
             <Profil />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={paths.candidatDocuments}
+        element={
+          <ProtectedRoute roles={['candidat']}>
+            <Documents />
           </ProtectedRoute>
         }
       />
