@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Candidature;
 use App\Models\CritereEliminatoireDeclenche;
 use App\Models\JournalAudit;
+use App\Notifications\CandidatureSoumise;
 use App\Services\StatutPublicResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,7 +43,7 @@ class SoumissionController extends Controller
         abort_if(! $candidature->estBrouillon(), 409, 'Cette candidature a déjà été soumise.');
 
         $candidature->load([
-            'candidat', 'campagne', 'reponseFormulaire', 'experiences', 'piecesDossier',
+            'candidat.utilisateur', 'campagne', 'reponseFormulaire', 'experiences', 'piecesDossier',
         ]);
 
         // 1) Complétude — dicible (c'est la propre complétude du candidat).
@@ -87,6 +88,12 @@ class SoumissionController extends Controller
                 'resultat' => 'Succès',
             ]);
         });
+
+        // 2bis) Confirmation — APPEL UNIQUE, hors de toute branche conditionnelle
+        // sur l'éligibilité (RÈGLE REINE, ADR-33) : le seul champ qui varie entre
+        // deux destinataires est `numero_dossier`. Ne bloque jamais la réponse
+        // (ShouldQueue).
+        $candidature->candidat->utilisateur->notify(new CandidatureSoumise($candidature->numero_dossier));
 
         // 3) Réponse NEUTRE — surface minimale (séquence a). `statut_public` via
         // le VRAI resolver (ADR-03) : 'soumis' comme 'non_eligible' -> "en_cours_de_traitement".

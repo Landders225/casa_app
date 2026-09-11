@@ -9,6 +9,7 @@ use App\Http\Resources\UserResource;
 use App\Models\Candidat;
 use App\Models\JournalAudit;
 use App\Models\User;
+use App\Notifications\InscriptionConfirmee;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -80,6 +81,11 @@ class RegisterController extends Controller
 
             return $user;
         });
+
+        // Lot 12b — accusé de réception, hors transaction (ShouldQueue, ne
+        // bloque jamais la réponse) : rien sur l'éligibilité, aucune candidature
+        // n'existe encore à ce stade.
+        $user->notify(new InscriptionConfirmee);
 
         Auth::guard('web')->login($user);
         $request->session()->regenerate();

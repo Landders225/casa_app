@@ -11,6 +11,7 @@ use App\Models\Entretien;
 use App\Models\Grille;
 use App\Models\JournalAudit;
 use App\Models\SousCritereEntretien;
+use App\Notifications\EntretienPlanifie;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +54,11 @@ class EntretienController extends Controller
 
         $entretien = $candidature->entretien;
         abort_if($entretien !== null && $entretien->statut === 'valide', 409, 'Entretien déjà validé et verrouillé.');
+
+        // Lot 12b — capturé AVANT la transaction : signal fiable de « première
+        // planification » (seul déclencheur du mail de convocation, cf. ADR-33
+        // point d — une replanification ne renvoie pas de mail).
+        $premierePlanification = $entretien === null;
 
         $donnees = $request->validated();
 
@@ -105,6 +111,18 @@ class EntretienController extends Controller
                 }
             }
         });
+
+        if ($premierePlanification) {
+            // Convocation — envoyée UNE SEULE FOIS, hors transaction (ShouldQueue,
+            // ne bloque jamais la réponse à l'évaluateur).
+            $entretienPersiste = $candidature->fresh('entretien')->entretien;
+            $candidature->loadMissing('candidat.utilisateur');
+            $candidature->candidat->utilisateur->notify(new EntretienPlanifie(
+                $entretienPersiste->date->format('d/m/Y'),
+                $entretienPersiste->heure,
+                $entretienPersiste->lieu,
+            ));
+        }
 
         return new EntretienResource($this->etat($candidature->fresh()));
     }

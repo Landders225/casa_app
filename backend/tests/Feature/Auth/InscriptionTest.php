@@ -3,7 +3,10 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
+use App\Notifications\InscriptionConfirmee;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 /**
@@ -200,6 +203,28 @@ class InscriptionTest extends TestCase
 
         $this->assertDatabaseCount('utilisateur', 0);
         $this->assertDatabaseCount('candidat', 0);
+    }
+
+    /**
+     * Lot 12b (ADR-33) — accusé de réception, hors transaction, sans blocage,
+     * sans mention d'éligibilité (aucune candidature n'existe encore ici).
+     */
+    public function test_mail_de_bienvenue_envoye_et_muet_sur_l_eligibilite(): void
+    {
+        Notification::fake();
+
+        $this->fromSpa()->postJson('/api/register', $this->payload())->assertCreated();
+        $user = User::firstWhere('email', 'awa.kone@example.ci');
+
+        Notification::assertSentTo($user, InscriptionConfirmee::class, function ($n) use ($user) {
+            $this->assertTrue(in_array(ShouldQueue::class, class_implements($n), true));
+            $corps = (string) $n->toMail($user)->render();
+            foreach (['eligib', 'non_eligible', 'statut', 'critere'] as $mot) {
+                $this->assertStringNotContainsStringIgnoringCase($mot, $corps, "« {$mot} » ne doit pas apparaître dans le mail");
+            }
+
+            return true;
+        });
     }
 
     public function test_inscription_rate_limited_par_ip(): void

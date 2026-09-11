@@ -9,8 +9,10 @@ use App\Models\Candidature;
 use App\Models\DecisionCandidature;
 use App\Models\JournalAudit;
 use App\Models\Publication;
+use App\Notifications\ResultatsPublies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 /**
  * PUBLICATION des résultats d'une campagne (Lot 5b) — administrateur strict.
@@ -81,6 +83,24 @@ class PublicationController extends Controller
         });
 
         $publication->load('publiePar');
+
+        // Lot 12b — invitation à consulter, MÊME contenu pour tous, quelle que
+        // soit la décision (RÈGLE REINE, ADR-33). `Notification::send()` avec une
+        // notification `ShouldQueue` dispatche UN job indépendant par
+        // destinataire (vérifié : `NotificationSender::queueNotification`) — la
+        // réponse admin reste synchrone et rapide, et l'échec d'un envoi
+        // n'affecte jamais les autres (isolation par job, cf. ADR-31).
+        $destinataires = Candidature::query()
+            ->where('campagne_id', $campagne->id)
+            ->whereIn('id', DecisionCandidature::query()->select('candidature_id'))
+            ->with('candidat.utilisateur')
+            ->get()
+            ->pluck('candidat.utilisateur')
+            ->filter()
+            ->unique('id') // un même candidat ne reçoit qu'un seul mail, même avec plusieurs candidatures décidées.
+            ->values();
+
+        Notification::send($destinataires, new ResultatsPublies($campagne->nom));
 
         return new PublicationResource([
             'campagne' => ['id' => $campagne->id, 'nom' => $campagne->nom],
