@@ -13,6 +13,7 @@ const NAV_LINKS = {
   candidat: {
     dashboard: paths.candidat,
     candidature: paths.maCandidature,
+    profil: paths.candidatProfil,
   },
   evaluateur: { dashboard: paths.evaluateur, 'mes-dossiers': paths.evaluateurDossiers },
   administrateur: {

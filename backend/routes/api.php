@@ -14,11 +14,13 @@ use App\Http\Controllers\Api\Admin\MembreController;
 use App\Http\Controllers\Api\Admin\PublicationController;
 use App\Http\Controllers\Api\Admin\RapportController;
 use App\Http\Controllers\Api\Admin\RemplacementController;
+use App\Http\Controllers\Api\Auth\MotDePasseController as AuthMotDePasseController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Candidat\CandidatureController;
 use App\Http\Controllers\Api\Candidat\ClassementController;
 use App\Http\Controllers\Api\Candidat\ExperienceController;
 use App\Http\Controllers\Api\Candidat\JustificatifExperienceController;
+use App\Http\Controllers\Api\Candidat\MotDePasseController as CandidatMotDePasseController;
 use App\Http\Controllers\Api\Candidat\PieceController;
 use App\Http\Controllers\Api\Candidat\PieceDossierController;
 use App\Http\Controllers\Api\Candidat\ProfilController;
@@ -59,6 +61,19 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:lo
 // Inscription candidat — PUBLIC (Lot 7, comble ADR-13). Crée le compte seul
 // (utilisateur role=candidat + candidat) ; la candidature reste POST /api/candidatures.
 Route::post('/register', [RegisterController::class, 'store'])->middleware('throttle:register');
+
+/*
+|--------------------------------------------------------------------------
+| Lot 13 — Mot de passe oublié (PUBLIC, déconnecté) — ADR-32
+|--------------------------------------------------------------------------
+| Mécanisme natif Laravel (Password broker, password_reset_tokens). Réponse
+| STRICTEMENT identique que l'e-mail existe ou non (anti-énumération) — voir
+| MotDePasseController. `throttle:casa-mot-de-passe` : 6/min par IP.
+*/
+Route::post('/mot-de-passe/oubli', [AuthMotDePasseController::class, 'envoyerLien'])
+    ->middleware('throttle:casa-mot-de-passe');
+Route::post('/mot-de-passe/reinitialiser', [AuthMotDePasseController::class, 'reinitialiser'])
+    ->middleware('throttle:casa-mot-de-passe');
 
 // `throttle:casa-api` — filet global 120 req/min/utilisateur (Lot 10, T1).
 // `actif` — coupe l'accès d'une session dont le compte a été désactivé, sans
@@ -178,6 +193,12 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
         // le candidat du compte courant -> aucune surface vers le profil d'autrui.
         Route::get('/candidat/profil', [ProfilController::class, 'show']);
         Route::patch('/candidat/profil', [ProfilController::class, 'update']);
+
+        // Changement de mot de passe CONNECTÉ (Lot 13, ADR-32) — exige le mot de
+        // passe actuel, invalide les autres sessions. Distinct du reset « oublié »
+        // ci-dessus (déconnecté, mécanisme natif Laravel).
+        Route::put('/candidat/mot-de-passe', [CandidatMotDePasseController::class, 'update'])
+            ->middleware('throttle:casa-mot-de-passe');
 
         Route::get('/candidature', [CandidatureController::class, 'courante']);
         // Anti-spam de brouillons : 12 créations / min (Lot 10, T1).

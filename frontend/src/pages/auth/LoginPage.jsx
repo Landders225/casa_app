@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth.js'
 import { Alert } from '../../components/ui/Alert.jsx'
 import { FormField } from '../../components/ui/FormField.jsx'
 import { ApiError } from '../../lib/ApiError.js'
-import { roleHome } from '../../routing/routes.js'
+import { paths, roleHome } from '../../routing/routes.js'
 import './LoginPage.css'
 
 /**
@@ -24,6 +24,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const from = location.state?.from
+  const motDePasseReinitialise = location.state?.motDePasseReinitialise
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -101,6 +102,11 @@ export function LoginPage() {
             Connectez-vous pour continuer votre parcours CASA.
           </p>
 
+          {motDePasseReinitialise ? (
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <Alert variant="success">Votre mot de passe a été réinitialisé. Connectez-vous.</Alert>
+            </div>
+          ) : null}
           {error ? (
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <Alert variant="danger">{error}</Alert>
@@ -132,6 +138,9 @@ export function LoginPage() {
                 required: true,
               }}
             />
+            <p className="caption" style={{ marginTop: 'calc(-1 * var(--space-3))', marginBottom: 'var(--space-4)', textAlign: 'right' }}>
+              <Link to={paths.motDePasseOublie}>Mot de passe oublié ?</Link>
+            </p>
             <button
               type="submit"
               className={`btn btn-primary btn-lg btn-block${submitting ? ' is-loading' : ''}`}

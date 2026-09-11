@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\ReinitialisationMotDePasse;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -73,6 +74,17 @@ class User extends Authenticatable
     public function getAuthPassword(): string
     {
         return $this->mot_de_passe_hash;
+    }
+
+    /**
+     * Réinitialisation de mot de passe (Lot 13, ADR-32) — remplace la
+     * notification `ResetPassword` par défaut de Laravel (qui pointe vers une
+     * route web `password.reset` inexistante ici, API-only) par une
+     * notification française, `ShouldQueue`, dont le lien cible la SPA.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ReinitialisationMotDePasse($token));
     }
 
     // --- « Remember me » neutralisé (pas de colonne, session SPA, ADR-01) ---

@@ -82,4 +82,22 @@ describe('LoginPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/trop de tentatives/i)
   })
+
+  it('propose un lien « Mot de passe oublié ? » (Lot 13)', () => {
+    useAuth.mockReturnValue({ login: vi.fn() })
+    renderLogin()
+    expect(screen.getByRole('link', { name: /mot de passe oublié/i })).toHaveAttribute('href', '/mot-de-passe/oublie')
+  })
+
+  it('un retour depuis la réinitialisation affiche un message de succès', () => {
+    useAuth.mockReturnValue({ login: vi.fn() })
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/connexion', state: { motDePasseReinitialise: true } }]}>
+        <Routes>
+          <Route path="/connexion" element={<LoginPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(screen.getByText(/mot de passe a été réinitialisé/i)).toBeInTheDocument()
+  })
 })

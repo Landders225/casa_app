@@ -2,12 +2,15 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth/useAuth.js'
 import { FullPageSpinner } from './components/ui/Spinner.jsx'
 import { LoginPage } from './pages/auth/LoginPage.jsx'
+import { MotDePasseOublie } from './pages/auth/MotDePasseOublie.jsx'
+import { NouveauMotDePasse } from './pages/auth/NouveauMotDePasse.jsx'
 import { NotFoundPage } from './pages/NotFoundPage.jsx'
 import { HomePage } from './pages/public/HomePage.jsx'
 import { InscriptionPage } from './pages/public/InscriptionPage.jsx'
 import { CandidatDashboard } from './pages/candidat/CandidatDashboard.jsx'
 import { CandidatureWizard } from './pages/candidat/CandidatureWizard.jsx'
 import { MaCandidature } from './pages/candidat/MaCandidature.jsx'
+import { Profil } from './pages/candidat/Profil.jsx'
 import { DossiersList } from './pages/evaluateur/DossiersList.jsx'
 import { Entretien } from './pages/evaluateur/Entretien.jsx'
 import { EvaluateurDashboard } from './pages/evaluateur/EvaluateurDashboard.jsx'
@@ -57,6 +60,8 @@ export default function App() {
           </RedirectIfAuthed>
         }
       />
+      <Route path={paths.motDePasseOublie} element={<MotDePasseOublie />} />
+      <Route path={paths.motDePasseNouveau} element={<NouveauMotDePasse />} />
 
       <Route
         path={paths.candidatureWizard}
@@ -71,6 +76,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={['candidat']}>
             <MaCandidature />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={paths.candidatProfil}
+        element={
+          <ProtectedRoute roles={['candidat']}>
+            <Profil />
           </ProtectedRoute>
         }
       />

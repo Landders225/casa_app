@@ -6,12 +6,12 @@
 > qu'un nouveau apparaît. Le **journal figé** des décisions reste `docs/ADR.md`
 > (on n'y réécrit pas l'histoire) ; ici on tient le **présent**.
 >
-> Dernière revue : **Lot 12a** (2026-09-10) — infra d'envoi d'e-mails
-> (SMTP paramétrable + file + worker, ADR-31) : la ligne « Notifications réelles »
-> se scinde (infra 🟢 / mails métier 12b 🟠). Avant : **revue espace candidat**
-> (4 entrées de nav inertes → nouvelle section, dont 2 🔴 mot de passe) ; **Lot
-> 11c** (écran Rapports, ADR-30). Voir aussi la revue de sécurité **Lot 10**
-> ([`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md)).
+> Dernière revue : **Lot 13** (2026-09-11) — espace candidat : profil réconcilié
+> sur le backend, mot de passe connecté (`PUT /candidat/mot-de-passe`) et
+> « oublié » (mécanisme natif Laravel, anti-énumération, ADR-32). Les **2 lignes
+> 🔴** de la revue candidat passent à 🟢. Avant : **Lot 12a** (infra d'envoi
+> d'e-mails, ADR-31) ; **Lot 11c** (écran Rapports, ADR-30). Voir aussi la revue
+> de sécurité **Lot 10** ([`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md)).
 
 ## Légende de statut
 
@@ -42,21 +42,21 @@
 
 ## Espace candidat
 
-Quatre entrées de `navConfig.candidat` (`Mon profil`, `Documents`, `Notifications`,
-`Aide`) sont **affichées mais inertes** (`AppShell.jsx` : `NAV_LINKS.candidat` ne
-câble que `dashboard` + `candidature` — fidélité maquette depuis le Lot 8a, comme
-l'était l'espace admin avant le Lot 11a). Les écrans n'ont jamais été portés.
-Revue de l'espace candidat : **2026-09-10**. L'historique **in-app** des
-notifications est suivi dans la section « Notifications » ci-dessous (dépend de
-l'infra e-mail du Lot 12).
+Trois entrées de `navConfig.candidat` (`Documents`, `Notifications`, `Aide`)
+restent **affichées mais inertes** (fidélité maquette depuis le Lot 8a, comme
+l'était l'espace admin avant le Lot 11a). `Mon profil` est câblé depuis le
+Lot 13. L'historique **in-app** des notifications est suivi dans la section
+« Notifications » ci-dessous (dépend de l'infra e-mail du Lot 12).
 
 | Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
 |---|---|---|---|---|
-| **Changement de mot de passe candidat** (en libre-service, connecté) | 🔴 Bloquant prod | **Aucun endpoint** : seul `POST /admin/membres/{u}/mot-de-passe` existe (équipe). La maquette `profil.html` a un bouton « Changer mon mot de passe » **sans backend**. Un candidat ne peut pas changer son mot de passe — manque critique pour une vraie cohorte | Revue espace candidat (2026-09-10) ; maquette `pages/candidate/profil.html` | Endpoint `PUT /api/candidat/mot-de-passe` (vérif du mot de passe actuel + règles ADR-16) + section dans l'écran « Mon profil » |
-| **Réinitialisation « mot de passe oublié »** (non connecté) | 🔴 Bloquant prod | Aucun mécanisme : le broker `Password::` de Laravel n'est pas câblé, `password_reset_tokens` inexploitée, aucune route `forgot-password` / `reset-password`. Un candidat qui oublie son mot de passe est **bloqué dehors sans recours** | Revue espace candidat (2026-09-10) | Routes `forgot-password` / `reset-password` (Laravel natif) + e-mail de lien + écrans publics. **Infra e-mail prête (Lot 12a, ADR-31)** — reste le broker + les templates + 2 écrans |
-| **Écran « Mon profil » candidat** (consulter / corriger état civil) | 🟠 Ouvert | Entrée de nav inerte. **Backend prêt depuis le Lot 7** : `GET` + `PATCH /api/candidat/profil` (éditables : prénom, nom, sexe, date_naissance, cni, téléphone, ville ; `prohibited` : email, residence_ci, nationalité). Divergence à trancher : la maquette rend l'identité « non modifiable » (tél. seul), le backend autorise 7 champs | Revue espace candidat (2026-09-10) ; `ProfilController` (Lot 7, ADR-16) ; maquette `pages/candidate/profil.html` | 1 écran React + hook, **aucun backend** ; décider des champs réellement éditables côté UI |
+| **Changement de mot de passe candidat** (en libre-service, connecté) | 🟢 **Traité (Lot 13 — ADR-32)** | `PUT /api/candidat/mot-de-passe` : mot de passe actuel vérifié, règles ADR-16, invalide les AUTRES sessions, e-mail de confirmation | **ADR-32** ; `Candidat\MotDePasseController` ; `ChangementMotDePasseCard.jsx` ; `ChangementMotDePasseTest` | — |
+| **Réinitialisation « mot de passe oublié »** (non connecté) | 🟢 **Traité (Lot 13 — ADR-32)** | Mécanisme natif Laravel (`Password` broker, `password_reset_tokens`), notification française `ShouldQueue` (Lot 12a). Réponse **strictement identique** que l'e-mail existe ou non (anti-énumération à 3 niveaux : réponse / timing / throttle) ; token usage unique + expiration 60 min ; lien exclu des logs nginx | **ADR-32** ; `Auth\MotDePasseController` ; `MotDePasseOublie.jsx` + `NouveauMotDePasse.jsx` ; `MotDePasseOublieTest` + `ReinitialisationMotDePasseTest` | — |
+| **Écran « Mon profil » candidat** (consulter / corriger état civil) | 🟢 **Traité (Lot 13 — ADR-32)** | Réconcilié sur le BACKEND (source d'autorité, pas la maquette) : 7 champs éditables (prénom/nom/sexe/date_naissance/cni/téléphone/ville), e-mail et résidence CI en lecture seule, pas de champ nationalité/diplôme | **ADR-32** (D-13-1) ; `Profil.jsx` + `useProfil.js` ; `ProfilCandidatTest` (Lot 7, backend inchangé) | — |
+| **Verrouiller l'identité candidat après soumission de la candidature** | 🟠 Ouvert | `PATCH /candidat/profil` reste ouvert même dossier soumis — l'évaluateur lit `candidature.candidat` **en direct** (pas de snapshot), donc une correction de CNI/nom post-soumission change ce qu'il voit. Le Lot 13 ajoute un bandeau d'avertissement, sans verrouiller (décision à part) | **ADR-32** ; `Profil.jsx` (bandeau si `date_soumission` non nul) | Décider quels champs verrouiller (identité vs coordonnées) + condition sur `statut_interne` côté `MettreAJourProfilRequest` |
 | **Écran « Documents » candidat** (re-consultation / re-téléchargement) | 🟠 Ouvert | Entrée de nav inerte. Après soumission, **aucun moyen de revoir ou re-télécharger** les pièces (le wizard `StepDocuments` est le seul chemin, et seulement en brouillon). Endpoints prêts : `GET /api/candidatures/{c}/pieces` + `GET /api/pieces/{p}/download` | Revue espace candidat (2026-09-10) ; `PieceController` ; maquette `pages/candidate/documents.html` | 1 écran lecture seule (liste + download), endpoints prêts. Le re-upload post-soumission « sur demande d'un évaluateur » (maquette) = fonctionnalité séparée, non couverte au backend |
 | **Page « Aide » candidat** (contacts + FAQ) | 🟠 Ouvert | Entrée de nav inerte. Page **statique** (3 cartes contact + accordéon FAQ) ; contenu « démo » dans la maquette. Seul point de contact offert au candidat, référencé par d'autres textes (« contactez l'équipe depuis la page Aide ») | Revue espace candidat (2026-09-10) ; maquette `pages/candidate/aide.html` ; **recoupe le 🔴 « Relecture des textes candidats par les partenaires »** (section Institutionnel) | Composant statique (faible effort technique) — **bloqué sur le contenu validé par CCI-CI / FADV / AICS** (coordonnées réelles, réponses FAQ) |
+| **Changement de mot de passe équipe** (évaluateur / admin, self-service connecté) | 🟠 Ouvert | Le Lot 13 traite le candidat seulement (périmètre volontairement restreint, Q5). L'équipe n'a que le reset PAR UN ADMIN (Lot 11b, `POST /admin/membres/{u}/mot-de-passe`) — pas de self-service | **ADR-32** (Q5) | Généraliser `PUT /api/candidat/mot-de-passe` en `PUT /api/mot-de-passe` (tout utilisateur authentifié) ou dupliquer pour l'équipe |
 
 ## Espace administrateur
 

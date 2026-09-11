@@ -51,6 +51,14 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('casa-candidatures', fn (Request $request) => Limit::perMinute(12)
             ->by($request->user()?->getAuthIdentifier() ?: $request->ip()));
 
+        // --- Mot de passe (Lot 13, ADR-32) : demande de reset, réinitialisation,
+        // changement connecté. 6/min, cohérent avec login (5) / register (3+20/j).
+        // Keyé IP quand non authentifié (demande/réinitialisation de reset) —
+        // JAMAIS par e-mail, pour ne pas ouvrir un oracle d'énumération sur le
+        // throttle lui-même. Keyé utilisateur pour le changement connecté.
+        RateLimiter::for('casa-mot-de-passe', fn (Request $request) => Limit::perMinute(6)
+            ->by($request->user()?->getAuthIdentifier() ?: $request->ip()));
+
         // --- Routes PUBLIQUES non authentifiées : 60 / min par IP -------------
         // `/api/health` et `/api/filieres` sont hors du filet `casa-api` (pas de
         // session) — ce sont les seules portes ouvertes aux non-authentifiés.
