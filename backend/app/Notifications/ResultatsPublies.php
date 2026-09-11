@@ -19,6 +19,12 @@ use Illuminate\Notifications\Notification;
  * est constante pour tous les destinataires d'un même appel (pas un
  * discriminant entre eux). Le lien est générique (espace candidat), jamais
  * `/resultat/<decision>`.
+ *
+ * Lot 12c (ADR-33, extension) — canal `database` en plus de `mail` : même
+ * RÈGLE REINE réappliquée à `toDatabase()` — `$nomCampagne` est la SEULE
+ * donnée interpolée, constante pour tous les destinataires d'un même appel
+ * de publication. Preuve rejouée sur le contenu stocké (Lot 12c), pas
+ * seulement sur le mail (Lot 12b).
  */
 class ResultatsPublies extends Notification implements ShouldQueue
 {
@@ -31,7 +37,7 @@ class ResultatsPublies extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', 'database'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -43,5 +49,18 @@ class ResultatsPublies extends Notification implements ShouldQueue
                 'nomCampagne' => $this->nomCampagne,
                 'lien' => rtrim((string) config('app.url'), '/').'/candidat',
             ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function toDatabase(object $notifiable): array
+    {
+        return [
+            'categorie' => 'resultats',
+            'titre' => 'Résultats disponibles',
+            'message' => "Les résultats de la campagne {$this->nomCampagne} sont disponibles.",
+            'lien' => '/candidat',
+        ];
     }
 }

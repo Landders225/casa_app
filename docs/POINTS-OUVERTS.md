@@ -6,12 +6,14 @@
 > qu'un nouveau apparaît. Le **journal figé** des décisions reste `docs/ADR.md`
 > (on n'y réécrit pas l'histoire) ; ici on tient le **présent**.
 >
-> Dernière revue : **Lot 12b** (2026-09-11) — les 4 mails métier (inscription,
-> soumission, entretien, publication), indiscernabilité prouvée par test
-> (ADR-33). Avant : **Lot 13** (espace candidat : profil réconcilié sur le
-> backend, mot de passe connecté et « oublié », ADR-32) ; **Lot 12a** (infra
-> d'envoi d'e-mails, ADR-31) ; **Lot 11c** (écran Rapports, ADR-30). Voir aussi
-> la revue de sécurité **Lot 10** ([`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md)).
+> Dernière revue : **Lot 12c** (2026-09-11) — historique in-app des
+> notifications candidat (canal `database`, badge, écran), indiscernabilité du
+> contenu stocké prouvée pour `ResultatsPublies` (extension ADR-33). Avant :
+> **Lot 12b** (les 4 mails métier, ADR-33) ; **Lot 13** (espace candidat :
+> profil réconcilié sur le backend, mot de passe connecté et « oublié »,
+> ADR-32) ; **Lot 12a** (infra d'envoi d'e-mails, ADR-31) ; **Lot 11c** (écran
+> Rapports, ADR-30). Voir aussi la revue de sécurité **Lot 10**
+> ([`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md)).
 
 ## Légende de statut
 
@@ -42,11 +44,11 @@
 
 ## Espace candidat
 
-Trois entrées de `navConfig.candidat` (`Documents`, `Notifications`, `Aide`)
-restent **affichées mais inertes** (fidélité maquette depuis le Lot 8a, comme
-l'était l'espace admin avant le Lot 11a). `Mon profil` est câblé depuis le
-Lot 13. L'historique **in-app** des notifications est suivi dans la section
-« Notifications » ci-dessous (dépend de l'infra e-mail du Lot 12).
+Deux entrées de `navConfig.candidat` (`Documents`, `Aide`) restent **affichées
+mais inertes** (fidélité maquette depuis le Lot 8a, comme l'était l'espace
+admin avant le Lot 11a). `Mon profil` est câblé depuis le Lot 13,
+`Notifications` depuis le Lot 12c (détail dans la section « Notifications »
+ci-dessous).
 
 | Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
 |---|---|---|---|---|
@@ -88,10 +90,11 @@ Tout l'espace admin de la maquette est désormais porté : `Évaluateurs` +
 | Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
 |---|---|---|---|---|
 | **Infra d'envoi d'e-mails** (SMTP paramétrable + file + worker) | 🟢 **Traité (Lot 12a — ADR-31)** | ADR-27 posait « infra mail hors CASA ». Désormais : `MAIL_*` 100 % `env()` (valeurs vides dans l'exemple, garde CI) ; envoi asynchrone (`QUEUE_CONNECTION=database`) ; service Docker `worker` (`restart` + `--max-time` + healthcheck + `failed_jobs` + `queue:monitor`) ; `casa:test-email` | **ADR-31** ; `docker-compose.prod.yml` (`worker`) ; `TestEmail` (Mailable + commande) ; `DEPLOIEMENT.md` § 9 ; `TestEmailCommandTest` | — |
-| **Mails métier** (accusé d'inscription, confirmation de soumission, convocation entretien, invitation à consulter les résultats) | 🟢 **Traité (Lot 12b — ADR-33)** | 4 notifications `ShouldQueue` déclenchées directement dans `RegisterController`/`SoumissionController`/`EntretienController`/`PublicationController`. Indiscernabilité PROUVÉE par test (soumission éligible/non-éligible, publication sur les 4 décisions) ; publication en volume non bloquante et sans cascade d'échec (1 job indépendant/destinataire) ; résidu de risque du mail Entretien (corrélation structurelle à l'éligibilité) documenté et assumé | **ADR-33** ; `App\Notifications\{InscriptionConfirmee,CandidatureSoumise,EntretienPlanifie,ResultatsPublies}` | — |
+| **Mails métier** (accusé d'inscription, confirmation de soumission, convocation entretien, invitation à consulter les résultats) | 🟢 **Traité (Lot 12b — ADR-33)** | 4 notifications `ShouldQueue` déclenchées directement dans `RegisterController`/`SoumissionController`/`EntretienController`/`PublicationController`. Indiscernabilité PROUVÉE par test (soumission éligible/non-éligible, publication sur les 4 décisions) ; publication en volume non bloquante et sans cascade d'échec (1 job indépendant/canal/destinataire, cf. Lot 12c) ; résidu de risque du mail Entretien (corrélation structurelle à l'éligibilité) documenté et assumé | **ADR-33** ; `App\Notifications\{InscriptionConfirmee,CandidatureSoumise,EntretienPlanifie,ResultatsPublies}` | — |
 | **Overlay Mailpit** (prévisualisation des templates en dev) | 🟠 Ouvert | Annoncé au Lot 12a, reporté (dev reste sur `MAIL_MAILER=log`, lecture des mails via les logs backend, cf. E2E Lot 13) | ADR-31 | `docker-compose.mail.yml` (service Mailpit, dev uniquement) |
 | **SMS** (passerelle) | 🟠 Ouvert | Hors périmètre Lot 12 (e-mail seul). La maquette évoque des notifications, pas de canal SMS explicite | ADR — Points ouverts | Fournisseur SMS + un canal de notification dédié |
-| **Historique in-app des notifications** (écran « Notifications » candidat / évaluateur) | 🟠 Ouvert | Entrée de nav inerte (espace candidat + évaluateur). **Rien au backend** : pas de table `notifications`, pas d'endpoint ; `Notifiable` sur `User` inutilisé. Le candidat n'a aujourd'hui que le statut courant via `MaCandidature.jsx` | Revue espace candidat (2026-09-10) ; maquette `pages/candidate/notifications.html`, `pages/evaluator/notifications.html` | Table `notifications` (canal `database`) + événements métier qui l'alimentent + `GET /api/.../notifications` + marquage lu + écran — **Lot 12c**, après 12a/12b |
+| **Historique in-app des notifications — candidat** (écran « Notifications ») | 🟢 **Traité (Lot 12c — extension ADR-33)** | Canal `database` natif ajouté aux 4 notifications du Lot 12b (`via() => ['mail', 'database']`), table `notifications` créée (migration `uuidMorphs`, PK `User` en UUID). `GET /candidat/notifications` (paginé) + `GET .../compteur` + `PATCH .../{id}/lue` + `POST .../marquer-tout-lu`, scope strict `role:candidat` + `$request->user()`. Indiscernabilité du contenu STOCKÉ (pas seulement du mail) prouvée pour `ResultatsPublies`. Badge non-lues sur la sidebar | **ADR-33** (addendum Lot 12c) ; `Api\Candidat\NotificationController` ; `NotificationTest` ; `Notifications.jsx` + `useNotifications.js` + `NotificationsBadge.jsx` | — |
+| **Historique in-app des notifications — évaluateur/admin** | 🟠 Ouvert | Hors périmètre du Lot 12c (candidat seul, `navConfig.evaluateur`/`administrateur` n'ont d'ailleurs pas d'entrée « Notifications »). Aucune notification métier n'existe aujourd'hui pour l'équipe (affectation, etc.) | Kickoff Lot 12c (périmètre candidat) | Décider d'abord QUELS événements équipe méritent une notification, avant tout écran |
 
 ## Sécurité / conformité
 

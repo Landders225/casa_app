@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Candidat\ClassementController;
 use App\Http\Controllers\Api\Candidat\ExperienceController;
 use App\Http\Controllers\Api\Candidat\JustificatifExperienceController;
 use App\Http\Controllers\Api\Candidat\MotDePasseController as CandidatMotDePasseController;
+use App\Http\Controllers\Api\Candidat\NotificationController as CandidatNotificationController;
 use App\Http\Controllers\Api\Candidat\PieceController;
 use App\Http\Controllers\Api\Candidat\PieceDossierController;
 use App\Http\Controllers\Api\Candidat\ProfilController;
@@ -199,6 +200,13 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
         // ci-dessus (déconnecté, mécanisme natif Laravel).
         Route::put('/candidat/mot-de-passe', [CandidatMotDePasseController::class, 'update'])
             ->middleware('throttle:casa-mot-de-passe');
+
+        // Historique in-app des notifications (Lot 12c, canal `database` du Lot
+        // 12b/ADR-33) — scope strict au compte courant (cf. docstring contrôleur).
+        Route::get('/candidat/notifications', [CandidatNotificationController::class, 'index']);
+        Route::get('/candidat/notifications/compteur', [CandidatNotificationController::class, 'compteur']);
+        Route::patch('/candidat/notifications/{id}/lue', [CandidatNotificationController::class, 'marquerLue']);
+        Route::post('/candidat/notifications/marquer-tout-lu', [CandidatNotificationController::class, 'marquerToutLu']);
 
         Route::get('/candidature', [CandidatureController::class, 'courante']);
         // Anti-spam de brouillons : 12 créations / min (Lot 10, T1).

@@ -20,6 +20,19 @@ function renderDashboard() {
   )
 }
 
+/**
+ * `AppShell` (Lot 12c) appelle AUSSI `GET /candidat/notifications/compteur`
+ * (badge de la sidebar) — dès le premier rendu (état "loading" inclus), donc
+ * AVANT même l'effet de `useMaCandidature`. Le mock doit donc router par URL,
+ * pas par ordre d'appel (`mockResolvedValueOnce` serait consommé par le badge).
+ */
+function mockCandidatureResponse(fabriqueReponse) {
+  apiClient.get.mockImplementation((path) => {
+    if (path === '/candidature') return fabriqueReponse()
+    return Promise.resolve({ data: { non_lues: 0 } })
+  })
+}
+
 describe('CandidatDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -31,7 +44,7 @@ describe('CandidatDashboard', () => {
   })
 
   it('GET /api/candidature 404 -> état d\'accueil « compte créé » + CTA Commencer', async () => {
-    apiClient.get.mockRejectedValueOnce(new ApiError('http', { status: 404 }))
+    mockCandidatureResponse(() => Promise.reject(new ApiError('http', { status: 404 })))
     renderDashboard()
 
     expect(await screen.findByText('Votre compte a été créé !')).toBeInTheDocument()
@@ -41,17 +54,17 @@ describe('CandidatDashboard', () => {
   })
 
   it('brouillon -> « Reprendre » vers le wizard', async () => {
-    apiClient.get.mockResolvedValueOnce({
+    mockCandidatureResponse(() => Promise.resolve({
       data: { numero_dossier: 'CASA-2026-000001', statut_public: 'brouillon', filiere: { nom: 'Agent de cuisine' } },
-    })
+    }))
     renderDashboard()
     expect(await screen.findByRole('link', { name: 'Reprendre' })).toHaveAttribute('href', '/candidat/candidature')
   })
 
   it('en_cours_de_traitement -> statut + numéro + « Suivre ma candidature » vers le suivi', async () => {
-    apiClient.get.mockResolvedValueOnce({
+    mockCandidatureResponse(() => Promise.resolve({
       data: { numero_dossier: 'CASA-2026-000042', statut_public: 'en_cours_de_traitement', filiere: { nom: 'Agent de cuisine' } },
-    })
+    }))
     renderDashboard()
 
     expect(await screen.findByText('En cours de traitement')).toBeInTheDocument()
@@ -61,9 +74,9 @@ describe('CandidatDashboard', () => {
   })
 
   it('decision_publiee -> « Voir mon résultat » vers le suivi', async () => {
-    apiClient.get.mockResolvedValueOnce({
+    mockCandidatureResponse(() => Promise.resolve({
       data: { numero_dossier: 'CASA-2026-000042', statut_public: 'decision_publiee', decision: 'retenu', filiere: { nom: 'Agent de cuisine' } },
-    })
+    }))
     renderDashboard()
     const liens = await screen.findAllByRole('link', { name: /voir mon résultat/i })
     expect(liens[0]).toHaveAttribute('href', '/candidat/ma-candidature')
@@ -72,15 +85,15 @@ describe('CandidatDashboard', () => {
   })
 
   it('erreur serveur -> message d\'erreur, pas de crash', async () => {
-    apiClient.get.mockRejectedValueOnce(new ApiError('server', { status: 500 }))
+    mockCandidatureResponse(() => Promise.reject(new ApiError('server', { status: 500 })))
     renderDashboard()
     expect(await screen.findByRole('alert')).toHaveTextContent(/n'a pas pu être chargé/i)
   })
 
   it('stepper : 4 étapes coarse, aucune étape interne, quel que soit le statut', async () => {
-    apiClient.get.mockResolvedValueOnce({
+    mockCandidatureResponse(() => Promise.resolve({
       data: { numero_dossier: 'CASA-2026-000042', statut_public: 'en_cours_de_traitement', filiere: { nom: 'X' } },
-    })
+    }))
     const { container } = renderDashboard()
     await screen.findByText('En cours de traitement')
     const stepper = container.querySelector('.stepper')

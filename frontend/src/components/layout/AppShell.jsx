@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth.js'
 import { paths } from '../../routing/routes.js'
 import { navConfig, roleLabel } from './navConfig.js'
+import { NotificationsBadge } from './NotificationsBadge.jsx'
 
 /**
  * Entrées de navigation RÉELLEMENT branchées, par rôle et par clé `navConfig`.
@@ -14,6 +15,7 @@ const NAV_LINKS = {
     dashboard: paths.candidat,
     candidature: paths.maCandidature,
     profil: paths.candidatProfil,
+    notifications: paths.candidatNotifications,
   },
   evaluateur: { dashboard: paths.evaluateur, 'mes-dossiers': paths.evaluateurDossiers },
   administrateur: {
@@ -117,6 +119,7 @@ export function AppShell({ title, space, children }) {
                     onClick={() => setSidebarOpen(false)}
                   >
                     <i className={`fa-solid ${item.icon}`} aria-hidden="true" /> {item.label}
+                    {item.key === 'notifications' && navRole === 'candidat' ? <NotificationsBadge /> : null}
                   </Link>
                 )
               })}

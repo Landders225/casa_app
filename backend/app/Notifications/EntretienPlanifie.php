@@ -22,6 +22,9 @@ use Illuminate\Notifications\Notification;
  *
  * Contenu : uniquement date/heure/lieu — jamais de score, de barème ou de nom
  * d'évaluateur.
+ *
+ * Lot 12c (ADR-33, extension) — canal `database` en plus de `mail` : même
+ * date/heure/lieu, jamais de score ni de nom d'évaluateur dans `toDatabase()`.
  */
 class EntretienPlanifie extends Notification implements ShouldQueue
 {
@@ -38,7 +41,7 @@ class EntretienPlanifie extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', 'database'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -52,5 +55,18 @@ class EntretienPlanifie extends Notification implements ShouldQueue
                 'lieu' => $this->lieu,
                 'lien' => rtrim((string) config('app.url'), '/').'/candidat',
             ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function toDatabase(object $notifiable): array
+    {
+        return [
+            'categorie' => 'entretien',
+            'titre' => 'Convocation à un entretien',
+            'message' => "Le {$this->date} à {$this->heure}, {$this->lieu}.",
+            'lien' => '/candidat',
+        ];
     }
 }

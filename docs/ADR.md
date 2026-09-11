@@ -581,6 +581,8 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 
 **Conséquence.** 4 classes `App\Notifications\*` + 4 vues texte, 4 contrôleurs touchés (`RegisterController`, `SoumissionController`, `EntretienController`, `PublicationController`), aucune route ni migration nouvelle. **Preuves — tout vert :** `php artisan test` (+27 : `CandidatureSoumiseNotificationTest` 4, `EntretienPlanifieNotificationTest` 4, `ResultatsPubliesNotificationTest` 6, `InscriptionTest` +1) · `pint --test`. Les tests d'indiscernabilité (soumission, publication) et le test d'isolation d'échec (job corrompu en base, `queue:work` réel) sont les preuves prioritaires du lot.
 
+**Mise à jour (Lot 12c).** Le canal `database` a été ajouté aux 4 `via()` (`['mail', 'database']`) pour l'historique in-app candidat — pas un ADR séparé (extension directe de la même décision, cf. ADR-33bis absent par choix), mais une précision factuelle s'impose : `NotificationSender::queueNotification` dispatche **un job PAR CANAL PAR DESTINATAIRE**, pas un job par destinataire — le nombre de jobs pour une publication à N destinataires est donc passé de N à 2N (`ResultatsPubliesNotificationTest` mis à jour en conséquence). La garantie de non-blocage et d'isolation par job reste inchangée (chaque canal reste un job indépendant).
+
 **Divergences maquette.** La maquette simule les 4 mails sans jamais les avoir écrits ; en particulier elle ne pose aucune contrainte d'indiscernabilité (elle affiche même parfois la décision dans son aperçu simulé) — le contenu et la garantie de neutralité sont une construction propre à cette industrialisation, pas un portage.
 
 ---

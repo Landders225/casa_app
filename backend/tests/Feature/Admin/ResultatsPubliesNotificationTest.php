@@ -185,9 +185,12 @@ class ResultatsPubliesNotificationTest extends TestCase
         $this->actingAs($this->admin)->postJson($this->url())->assertOk();
         $duree = microtime(true) - $debut;
 
-        // 24 destinataires -> 24 jobs `SendQueuedNotifications` indépendants,
-        // AUCUN envoi SMTP exécuté ici (queue database, jamais traitée).
-        $this->assertDatabaseCount('jobs', count($destinataires));
+        // 24 destinataires x 2 canaux (mail + database, Lot 12c) -> 1 job
+        // `SendQueuedNotifications` indépendant PAR CANAL PAR DESTINATAIRE
+        // (`NotificationSender::queueNotification` boucle sur `via()` et
+        // dispatche un job par itération) — AUCUN envoi SMTP exécuté ici (queue
+        // database, jamais traitée).
+        $this->assertDatabaseCount('jobs', count($destinataires) * 2);
         $this->assertLessThan(5.0, $duree, 'La publication doit rester synchrone et rapide : elle ne doit pas attendre les envois.');
     }
 
@@ -200,7 +203,8 @@ class ResultatsPubliesNotificationTest extends TestCase
         $this->candidatAvecDecision('liste_attente');
 
         $this->actingAs($this->admin)->postJson($this->url())->assertOk();
-        $this->assertDatabaseCount('jobs', 3);
+        // 3 destinataires x 2 canaux (mail + database, Lot 12c).
+        $this->assertDatabaseCount('jobs', 6);
 
         // Corrompt le PREMIER job en base (commande sérialisée illisible) : simule
         // un échec sans dépendre du comportement du transport mail. `pop()` reste

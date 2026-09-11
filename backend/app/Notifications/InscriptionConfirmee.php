@@ -15,6 +15,9 @@ use Illuminate\Notifications\Notification;
  * n'existe encore (l'inscription crée le COMPTE seul, Lot 7) — il n'y a donc
  * rien à taire, mais la règle générale du lot (aucun mot sur un statut) reste
  * appliquée par cohérence avec les 3 autres mails.
+ *
+ * Lot 12c (ADR-33, extension) — canal `database` en plus de `mail` : même
+ * contenu neutre, juste persisté pour l'historique in-app candidat.
  */
 class InscriptionConfirmee extends Notification implements ShouldQueue
 {
@@ -25,7 +28,7 @@ class InscriptionConfirmee extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', 'database'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -36,5 +39,18 @@ class InscriptionConfirmee extends Notification implements ShouldQueue
                 'appName' => config('app.name'),
                 'lien' => rtrim((string) config('app.url'), '/').'/candidat',
             ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function toDatabase(object $notifiable): array
+    {
+        return [
+            'categorie' => 'inscription',
+            'titre' => 'Inscription confirmée',
+            'message' => 'Votre compte CASA a bien été créé.',
+            'lien' => '/candidat',
+        ];
     }
 }
