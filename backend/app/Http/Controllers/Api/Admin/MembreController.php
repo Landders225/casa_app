@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\ActiverMembreRequest;
 use App\Http\Requests\Admin\EnregistrerMembreRequest;
+use App\Http\Requests\Admin\ModifierMembreRequest;
 use App\Http\Resources\Admin\MembreResource;
 use App\Models\User;
 use App\Services\GestionCompteEquipe;
@@ -18,7 +18,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  *
  *   GET   /api/admin/membres                          liste (évaluateurs + admins) + charge
  *   POST  /api/admin/membres                          création (rôle validé, mot de passe généré)
- *   PATCH /api/admin/membres/{utilisateur}            { actif: bool } — garde-fous G1/G2
+ *   PATCH /api/admin/membres/{utilisateur}            { actif } et/ou { prenom, nom, poste } (Lot 15a)
  *   POST  /api/admin/membres/{utilisateur}/mot-de-passe   réinitialisation (mot de passe généré)
  *
  * C'est l'ouverture de l'autorisation EN ÉCRITURE : chaque acte est tracé
@@ -73,11 +73,27 @@ class MembreController extends Controller
         ], 201);
     }
 
-    public function activation(ActiverMembreRequest $request, User $utilisateur, GestionCompteEquipe $gestion): MembreResource
+    /**
+     * Deux actions indépendantes, jamais combinées par l'UI (Étape 1, Q3) mais
+     * acceptées séparément ou ensemble par le serveur : `actif` (garde-fous
+     * G1/G2) et/ou `prenom`/`nom`/`poste` (identité, Lot 15a — RH, admin seul).
+     */
+    public function modifier(ModifierMembreRequest $request, User $utilisateur, GestionCompteEquipe $gestion): MembreResource
     {
         $this->assertMembreEquipe($utilisateur);
+        $validated = $request->validated();
 
-        $gestion->definirActivation($utilisateur, $request->validated('actif'), $request->user());
+        if (array_key_exists('actif', $validated)) {
+            $gestion->definirActivation($utilisateur, (bool) $validated['actif'], $request->user());
+        }
+
+        if (array_key_exists('prenom', $validated)) {
+            $gestion->modifierIdentite($utilisateur, [
+                'prenom' => $validated['prenom'],
+                'nom' => $validated['nom'],
+                'poste' => $validated['poste'],
+            ], $request->user());
+        }
 
         return new MembreResource($this->rechargerAvecCharge($utilisateur));
     }

@@ -1,20 +1,25 @@
 import { useState } from 'react'
-import { Alert } from '../../components/ui/Alert.jsx'
-import { FormField } from '../../components/ui/FormField.jsx'
+import { Alert } from '../ui/Alert.jsx'
+import { FormField } from '../ui/FormField.jsx'
 import { apiClient } from '../../lib/apiClient.js'
 import { ApiError } from '../../lib/ApiError.js'
 
 const VIDE = { current_password: '', password: '', password_confirmation: '' }
 
 /**
- * Changement de mot de passe (Lot 13, ADR-32) — `PUT /api/candidat/mot-de-passe`.
+ * Changement de mot de passe (self-service) — partagé entre l'espace candidat
+ * (Lot 13, `PUT /candidat/mot-de-passe`, ADR-32) et l'espace équipe (Lot 15a,
+ * `PUT /equipe/mot-de-passe`) : le composant n'a AUCUN contenu spécifique à une
+ * audience (labels neutres), seul le chemin d'API varie — d'où le partage
+ * plutôt que la duplication (Étape 1, Q1), à l'inverse du choix fait côté
+ * backend (deux contrôleurs distincts, comme `Auth\`/`Candidat\MotDePasseController`).
  *
  * Le mot de passe ACTUEL est toujours demandé (aucune UI ne peut le contourner
  * — le serveur le vérifie de toute façon). Après succès, TOUTES les autres
  * sessions sont coupées côté serveur (pas celle-ci) : on l'indique dans le
  * message, sans rien faire de spécial côté client.
  */
-export function ChangementMotDePasseCard() {
+export function ChangementMotDePasseCard({ endpoint }) {
   const [form, setForm] = useState(VIDE)
   const [errors, setErrors] = useState({})
   const [message, setMessage] = useState(null)
@@ -30,7 +35,7 @@ export function ChangementMotDePasseCard() {
     setMessage(null)
     setSucces(false)
     try {
-      await apiClient.put('/candidat/mot-de-passe', form)
+      await apiClient.put(endpoint, form)
       setSucces(true)
       setForm(VIDE)
     } catch (err) {

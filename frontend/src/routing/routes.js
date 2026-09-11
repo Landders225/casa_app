@@ -13,6 +13,8 @@ export const paths = {
   candidatNotifications: '/candidat/notifications',
   evaluateur: '/evaluateur',
   evaluateurDossiers: '/evaluateur/mes-dossiers',
+  // Partagé évaluateur + administrateur (Lot 15a) — self-service mot de passe.
+  equipeMonCompte: '/equipe/mon-compte',
   admin: '/admin',
   adminCandidatures: '/admin/candidatures',
   adminFilieres: '/admin/filieres',

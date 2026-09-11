@@ -7,6 +7,7 @@ import { ApiError } from '../../lib/ApiError.js'
 import { formatDateFr } from '../../lib/formatDate.js'
 import { ConfirmDialog } from './ConfirmDialog.jsx'
 import { MembreFormModal } from './MembreFormModal.jsx'
+import { ModifierIdentiteModal } from './ModifierIdentiteModal.jsx'
 import { MotDePasseDialog } from './MotDePasseDialog.jsx'
 import { ROLE_LABELS } from './optionLabels.js'
 import { useEquipe } from './useEquipe.js'
@@ -24,11 +25,12 @@ import { useEquipe } from './useEquipe.js'
  */
 export function Equipe() {
   const { user } = useAuth()
-  const { status, items, busyId, creating, creer, definirActivation, reinitialiserMotDePasse } = useEquipe()
+  const { status, items, busyId, creating, creer, definirActivation, reinitialiserMotDePasse, modifierIdentite } = useEquipe()
 
   const [showForm, setShowForm] = useState(false)
   const [confirmActivation, setConfirmActivation] = useState(null) // { membre, actif }
   const [confirmReset, setConfirmReset] = useState(null) // membre
+  const [edition, setEdition] = useState(null) // membre
   const [motDePasse, setMotDePasse] = useState(null) // { titre, email, valeur }
   const [erreur, setErreur] = useState(null)
 
@@ -62,6 +64,11 @@ export function Equipe() {
       setErreur(err instanceof ApiError ? err.message : "L'opération a échoué.")
       setConfirmReset(null)
     }
+  }
+
+  const soumettreEdition = async (form) => {
+    await modifierIdentite(edition.id, form)
+    setEdition(null)
   }
 
   return (
@@ -128,6 +135,14 @@ export function Equipe() {
                     </td>
                     <td>
                       <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline"
+                          disabled={enCours}
+                          onClick={() => setEdition(m)}
+                        >
+                          Modifier
+                        </button>
                         {m.actif ? (
                           <button
                             type="button"
@@ -171,6 +186,15 @@ export function Equipe() {
           saving={creating}
           onCancel={() => setShowForm(false)}
           onSubmit={soumettreCreation}
+        />
+      ) : null}
+
+      {edition ? (
+        <ModifierIdentiteModal
+          membre={edition}
+          saving={busyId === edition.id}
+          onCancel={() => setEdition(null)}
+          onSubmit={soumettreEdition}
         />
       ) : null}
 

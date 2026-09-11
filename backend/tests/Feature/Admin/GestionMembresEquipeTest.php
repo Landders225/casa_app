@@ -337,4 +337,133 @@ class GestionMembresEquipeTest extends TestCase
             ->patchJson('/api/admin/membres/00000000-0000-0000-0000-000000000000', ['actif' => false])
             ->assertNotFound();
     }
+
+    // --- Édition d'identité (Lot 15a) -----------------------------------
+
+    public function test_admin_modifie_prenom_nom_poste_et_trace_l_audit(): void
+    {
+        $eval = $this->creerEvaluateur('eval@cci.ci');
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/admin/membres/{$eval->id}", ['prenom' => 'Aïcha', 'nom' => 'Koffi', 'poste' => 'Jury filière CV'])
+            ->assertOk()
+            ->assertJsonPath('data.prenom', 'Aïcha')
+            ->assertJsonPath('data.nom', 'Koffi')
+            ->assertJsonPath('data.poste', 'Jury filière CV');
+
+        $eval->refresh();
+        $this->assertSame('Aïcha', $eval->membreEquipe->prenom);
+        $this->assertSame('Koffi', $eval->membreEquipe->nom);
+        $this->assertSame('Jury filière CV', $eval->membreEquipe->poste);
+
+        $ligne = JournalAudit::where('action', "Modification d'identité")->firstOrFail();
+        $this->assertSame($this->admin->id, $ligne->auteur_id);
+        $this->assertSame('eval@cci.ci', $ligne->objet);
+        $this->assertStringContainsString('Aïcha', $ligne->nouvelle_valeur);
+        // L'audit ne se réduit pas à un booléen : l'ancienne identité y figure aussi.
+        $this->assertStringContainsString('prenom=', $ligne->ancienne_valeur);
+    }
+
+    public function test_edition_identite_ne_touche_pas_au_statut_actif(): void
+    {
+        $eval = $this->creerEvaluateur('eval@cci.ci');
+        $this->assertTrue($eval->actif);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/admin/membres/{$eval->id}", ['prenom' => 'Nouveau', 'nom' => 'Nom', 'poste' => 'Poste'])
+            ->assertOk();
+
+        $this->assertTrue($eval->fresh()->actif);
+    }
+
+    public function test_edition_identite_partielle_refusee_les_3_champs_sont_lies(): void
+    {
+        $eval = $this->creerEvaluateur('eval@cci.ci');
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/admin/membres/{$eval->id}", ['prenom' => 'Solo'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['nom', 'poste']);
+
+        // Rien n'a changé.
+        $this->assertNotSame('Solo', $eval->fresh()->membreEquipe->prenom);
+        $this->assertDatabaseMissing('journal_audit', ['action' => "Modification d'identité"]);
+    }
+
+    /** @return array<string, array{0: array<string, mixed>, 1: string}> */
+    public static function champsInterdits(): array
+    {
+        return [
+            'role' => [['role' => 'administrateur'], 'role'],
+            'email' => [['email' => 'pirate@cci.ci'], 'email'],
+            'password' => [['password' => 'Piratage2026'], 'password'],
+            'mot_de_passe_hash' => [['mot_de_passe_hash' => '$2y$hack'], 'mot_de_passe_hash'],
+        ];
+    }
+
+    #[DataProvider('champsInterdits')]
+    public function test_edition_identite_avec_un_champ_interdit_glisse_dedans_est_refusee(array $champForge, string $cleErreur): void
+    {
+        $eval = $this->creerEvaluateur('eval@cci.ci');
+        $roleAvant = $eval->role;
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/admin/membres/{$eval->id}", array_merge(
+                ['prenom' => 'Test', 'nom' => 'Test', 'poste' => 'Test'],
+                $champForge,
+            ))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors($cleErreur);
+
+        // Aucune écriture partielle : ni l'identité, ni a fortiori le rôle.
+        $this->assertSame($roleAvant, $eval->fresh()->role);
+        $this->assertNotSame('Test', $eval->fresh()->membreEquipe->prenom);
+    }
+
+    public function test_un_evaluateur_ne_peut_pas_editer_l_identite_meme_la_sienne(): void
+    {
+        $eval = $this->creerEvaluateur('eval@cci.ci');
+
+        // La cible EST l'auteur lui-même — vérifie qu'aucune exception n'est
+        // faite pour « éditer son propre poste ».
+        $this->actingAs($eval)
+            ->patchJson("/api/admin/membres/{$eval->id}", ['prenom' => 'Moi', 'nom' => 'Meme', 'poste' => 'Autopromotion'])
+            ->assertStatus(403);
+
+        $this->assertNotSame('Moi', $eval->fresh()->membreEquipe->prenom);
+    }
+
+    public function test_payload_vide_ni_actif_ni_identite_est_refuse(): void
+    {
+        $eval = $this->creerEvaluateur('eval@cci.ci');
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/admin/membres/{$eval->id}", [])
+            ->assertStatus(422);
+    }
+
+    public function test_actif_et_identite_dans_le_meme_appel_appliquent_les_deux(): void
+    {
+        $eval = $this->creerEvaluateur('eval@cci.ci');
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/admin/membres/{$eval->id}", [
+                'actif' => false, 'prenom' => 'Combiné', 'nom' => 'Test', 'poste' => 'Poste',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.actif', false)
+            ->assertJsonPath('data.prenom', 'Combiné');
+
+        $this->assertDatabaseHas('journal_audit', ['action' => 'Désactivation de compte']);
+        $this->assertDatabaseHas('journal_audit', ['action' => "Modification d'identité"]);
+    }
+
+    public function test_un_id_de_candidat_dans_l_url_repond_404_pour_l_edition_d_identite(): void
+    {
+        $candidat = $this->creerCandidat('candidat@cci.ci');
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/admin/membres/{$candidat->id}", ['prenom' => 'X', 'nom' => 'Y', 'poste' => 'Z'])
+            ->assertNotFound();
+    }
 }

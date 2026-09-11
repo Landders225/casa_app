@@ -76,5 +76,22 @@ export function useEquipe() {
     }
   }, [])
 
-  return { ...state, busyId, creating, creer, definirActivation, reinitialiserMotDePasse, reload: load }
+  /**
+   * PATCH { prenom, nom, poste } (Lot 15a) — un appel DISTINCT de
+   * `definirActivation` (Étape 1, Q3 : l'UI n'envoie jamais les deux à la
+   * fois, même si le serveur les accepterait ensemble). Lève l'ApiError (422
+   * si un champ manque parmi les 3, ou un champ interdit forgé).
+   */
+  const modifierIdentite = useCallback(async (id, identite) => {
+    setBusyId(id)
+    try {
+      const res = await apiClient.patch(`/admin/membres/${id}`, identite)
+      remplacerLigne(res.data)
+      return res.data
+    } finally {
+      setBusyId(null)
+    }
+  }, [])
+
+  return { ...state, busyId, creating, creer, definirActivation, reinitialiserMotDePasse, modifierIdentite, reload: load }
 }

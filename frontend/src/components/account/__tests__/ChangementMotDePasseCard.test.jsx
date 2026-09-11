@@ -10,10 +10,10 @@ vi.mock('../../../lib/apiClient.js', () => ({ apiClient: { put: vi.fn() } }))
 beforeEach(() => vi.clearAllMocks())
 afterEach(() => vi.restoreAllMocks())
 
-describe('ChangementMotDePasseCard (Lot 13)', () => {
-  it('envoie current_password + password + password_confirmation à PUT /candidat/mot-de-passe', async () => {
+describe('ChangementMotDePasseCard (Lot 13, partagé équipe au Lot 15a)', () => {
+  it('envoie current_password + password + password_confirmation à l’endpoint fourni', async () => {
     apiClient.put.mockResolvedValueOnce({ message: 'ok' })
-    render(<ChangementMotDePasseCard />)
+    render(<ChangementMotDePasseCard endpoint="/candidat/mot-de-passe" />)
 
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('Mot de passe actuel'), 'MotDePasse2026')
@@ -29,11 +29,24 @@ describe('ChangementMotDePasseCard (Lot 13)', () => {
     expect(screen.getByLabelText('Mot de passe actuel')).toHaveValue('')
   })
 
+  it('réutilisé côté équipe : envoie au bon endpoint /equipe/mot-de-passe', async () => {
+    apiClient.put.mockResolvedValueOnce({ message: 'ok' })
+    render(<ChangementMotDePasseCard endpoint="/equipe/mot-de-passe" />)
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Mot de passe actuel'), 'MotDePasse2026')
+    await user.type(screen.getByLabelText('Nouveau mot de passe'), 'NouveauMdp2026')
+    await user.type(screen.getByLabelText('Confirmer le nouveau mot de passe'), 'NouveauMdp2026')
+    await user.click(screen.getByRole('button', { name: /changer mon mot de passe/i }))
+
+    expect(apiClient.put).toHaveBeenCalledWith('/equipe/mot-de-passe', expect.any(Object))
+  })
+
   it('mot de passe actuel incorrect -> erreur de champ VERBATIM, rien n\'est vidé côté succès', async () => {
     apiClient.put.mockRejectedValueOnce(new ApiError('validation', {
       status: 422, errors: { current_password: ['Le mot de passe actuel est incorrect.'] },
     }))
-    render(<ChangementMotDePasseCard />)
+    render(<ChangementMotDePasseCard endpoint="/candidat/mot-de-passe" />)
 
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('Mot de passe actuel'), 'Mauvais2026')
@@ -47,7 +60,7 @@ describe('ChangementMotDePasseCard (Lot 13)', () => {
 
   it('mentionne que les AUTRES sessions seront déconnectées', async () => {
     apiClient.put.mockResolvedValueOnce({ message: 'ok' })
-    render(<ChangementMotDePasseCard />)
+    render(<ChangementMotDePasseCard endpoint="/candidat/mot-de-passe" />)
 
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('Mot de passe actuel'), 'MotDePasse2026')

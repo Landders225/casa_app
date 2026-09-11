@@ -34,6 +34,9 @@ export const navConfig = {
           { key: 'evaluations', icon: 'fa-clipboard-check', label: 'Évaluations' },
           { key: 'classement', icon: 'fa-ranking-star', label: 'Classement' },
           { key: 'rapports', icon: 'fa-chart-column', label: 'Rapports' },
+          // Lot 15a — self-service mot de passe, partagé avec l'admin
+          // (maquette : pages/evaluator/profil.html, jamais portée).
+          { key: 'mon-compte', icon: 'fa-user-gear', label: 'Mon compte' },
         ],
       },
     ],
@@ -58,6 +61,8 @@ export const navConfig = {
           // les deux entrées inertes « Évaluateurs » / « Utilisateurs » de la
           // maquette — les candidats n'y sont pas gérés (D-11b-1).
           { key: 'equipe', icon: 'fa-users-gear', label: 'Équipe' },
+          // Lot 15a — self-service mot de passe, partagé avec l'évaluateur.
+          { key: 'mon-compte', icon: 'fa-user-gear', label: 'Mon compte' },
           { key: 'cqp', icon: 'fa-layer-group', label: 'Filières CQP' },
           // Revue admin (2026-09-11, POINTS-OUVERTS) : 4 entrées de la maquette
           // sans écran construit — affichées mais INERTES (même patron que

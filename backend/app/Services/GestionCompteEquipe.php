@@ -2,15 +2,17 @@
 
 namespace App\Services;
 
+use App\Http\Requests\Admin\ModifierMembreRequest;
 use App\Models\JournalAudit;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
- * Actes de gestion sur un compte d'ÉQUIPE existant (Lot 11b, ADR-29) :
- * (dés)activation et réinitialisation du mot de passe. Distinct de
- * {@see ProvisionnementMembreEquipe} (création).
+ * Actes de gestion sur un compte d'ÉQUIPE existant (Lot 11b, ADR-29 ; édition
+ * d'identité ajoutée au Lot 15a) : (dés)activation, réinitialisation du mot de
+ * passe, édition d'identité. Distinct de {@see ProvisionnementMembreEquipe}
+ * (création).
  *
  * Garde-fous métier de la (dés)activation, dans cet ordre :
  *  - **G2** — jamais 0 administrateur actif : refuser de désactiver le DERNIER
@@ -96,5 +98,42 @@ class GestionCompteEquipe
         });
 
         return $motDePasse;
+    }
+
+    /**
+     * Corrige l'identité (prénom/nom/poste) d'un membre d'équipe (Lot 15a) —
+     * un enregistrement RH que seul l'admin édite (jamais le membre lui-même :
+     * la route appelante est `role:administrateur` strict, cf. docstring
+     * {@see ModifierMembreRequest}). Aucun garde-fou
+     * G1/G2 ici : l'identité ne touche pas à l'accès.
+     *
+     * @param  array{prenom: string, nom: string, poste: string}  $identite
+     */
+    public function modifierIdentite(User $cible, array $identite, User $auteur): void
+    {
+        $membre = $cible->membreEquipe;
+        abort_if($membre === null, 404);
+
+        $ancien = "prenom={$membre->prenom}, nom={$membre->nom}, poste={$membre->poste}";
+        $nouveau = "prenom={$identite['prenom']}, nom={$identite['nom']}, poste={$identite['poste']}";
+
+        if ($ancien === $nouveau) {
+            return;
+        }
+
+        DB::transaction(function () use ($membre, $identite, $auteur, $cible, $ancien, $nouveau) {
+            $membre->forceFill($identite)->save();
+
+            JournalAudit::create([
+                'auteur_id' => $auteur->id,
+                'role' => $auteur->role,
+                'action' => "Modification d'identité",
+                'module' => 'Utilisateurs',
+                'objet' => $cible->email,
+                'ancienne_valeur' => $ancien,
+                'nouvelle_valeur' => $nouveau,
+                'resultat' => 'Succès',
+            ]);
+        });
     }
 }

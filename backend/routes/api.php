@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\Candidat\PieceDossierController;
 use App\Http\Controllers\Api\Candidat\ProfilController;
 use App\Http\Controllers\Api\Candidat\ReponseFormulaireController;
 use App\Http\Controllers\Api\Candidat\SoumissionController;
+use App\Http\Controllers\Api\Equipe\MotDePasseController as EquipeMotDePasseController;
 use App\Http\Controllers\Api\Evaluateur\DossierController;
 use App\Http\Controllers\Api\Evaluateur\EntretienController;
 use App\Http\Controllers\Api\Evaluateur\EvaluationController;
@@ -149,7 +150,7 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
         */
         Route::get('/membres', [MembreController::class, 'index']);
         Route::post('/membres', [MembreController::class, 'store']);
-        Route::patch('/membres/{utilisateur}', [MembreController::class, 'activation']);
+        Route::patch('/membres/{utilisateur}', [MembreController::class, 'modifier']);
         Route::post('/membres/{utilisateur}/mot-de-passe', [MembreController::class, 'reinitialiserMotDePasse']);
 
         /*
@@ -254,6 +255,21 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
                 Route::delete('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'destroy']);
             });
         });
+    });
+
+    /*
+    |----------------------------------------------------------------------
+    | Lot 15a — Self-service ÉQUIPE (mot de passe personnel)
+    |----------------------------------------------------------------------
+    | evaluateur ET administrateur (ADR-10) — un membre change SON PROPRE mot
+    | de passe. Distinct de POST /admin/membres/{u}/mot-de-passe (Lot 11b,
+    | réinitialisation PAR UN ADMIN sur un AUTRE compte). Même contrat que
+    | PUT /candidat/mot-de-passe (Lot 13, ADR-32) : mot de passe actuel exigé,
+    | invalide les AUTRES sessions, e-mail de confirmation.
+    */
+    Route::middleware('role:evaluateur,administrateur')->prefix('equipe')->group(function () {
+        Route::put('/mot-de-passe', [EquipeMotDePasseController::class, 'update'])
+            ->middleware('throttle:casa-mot-de-passe');
     });
 
     /*

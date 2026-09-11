@@ -144,4 +144,26 @@ test.describe('Espace administrateur — écran « Équipe » (Lot 11b)', () => 
     await page.waitForURL(/\/evaluateur$/, { timeout: 60_000 })
     await expect(page).toHaveURL(/\/evaluateur$/)
   })
+
+  test('admin corrige l\'identité (Lot 15a) — poste mis à jour, rôle/e-mail absents du formulaire', async ({ page }) => {
+    await login(page, 'admin@casa-demo.ci', PWD)
+    await page.waitForURL(/\/admin$/, { timeout: 60_000 })
+    await page.goto('/admin/equipe')
+
+    const ligne = page.getByRole('row', { name: new RegExp(NEW_EMAIL, 'i') })
+    await ligne.getByRole('button', { name: 'Modifier' }).click()
+
+    const dialog = page.getByRole('dialog', { name: /modifier amina cissé/i })
+    await expect(dialog.getByLabel('Prénom')).toHaveValue('Amina')
+    // Ni rôle ni e-mail dans ce formulaire — pas de porte dérobée possible.
+    await expect(dialog.getByLabel(/rôle/i)).toHaveCount(0)
+    await expect(dialog.getByLabel(/e-mail/i)).toHaveCount(0)
+    await shots(page, 'edition-identite')
+
+    await dialog.getByLabel('Poste', { exact: true }).fill('Jury filière couture — référente')
+    await dialog.getByRole('button', { name: /enregistrer/i }).click()
+
+    await expect(dialog).not.toBeVisible({ timeout: 30_000 })
+    await expect(ligne.getByText('Jury filière couture — référente')).toBeVisible({ timeout: 30_000 })
+  })
 })

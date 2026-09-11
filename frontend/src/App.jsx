@@ -13,6 +13,7 @@ import { Documents } from './pages/candidat/Documents.jsx'
 import { MaCandidature } from './pages/candidat/MaCandidature.jsx'
 import { Notifications } from './pages/candidat/Notifications.jsx'
 import { Profil } from './pages/candidat/Profil.jsx'
+import { MonCompte } from './pages/equipe/MonCompte.jsx'
 import { DossiersList } from './pages/evaluateur/DossiersList.jsx'
 import { Entretien } from './pages/evaluateur/Entretien.jsx'
 import { EvaluateurDashboard } from './pages/evaluateur/EvaluateurDashboard.jsx'
@@ -110,6 +111,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={['candidat']}>
             <CandidatDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={paths.equipeMonCompte}
+        element={
+          <ProtectedRoute roles={['evaluateur', 'administrateur']}>
+            <MonCompte />
           </ProtectedRoute>
         }
       />

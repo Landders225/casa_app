@@ -5,7 +5,7 @@ import { FormField } from '../../components/ui/FormField.jsx'
 import { FullPageSpinner } from '../../components/ui/Spinner.jsx'
 import { useAuth } from '../../auth/useAuth.js'
 import { ApiError } from '../../lib/ApiError.js'
-import { ChangementMotDePasseCard } from './ChangementMotDePasseCard.jsx'
+import { ChangementMotDePasseCard } from '../../components/account/ChangementMotDePasseCard.jsx'
 import { useMaCandidature } from './useMaCandidature.js'
 import { useProfil } from './useProfil.js'
 
@@ -209,7 +209,7 @@ export function Profil() {
             </div>
           </div>
 
-          <ChangementMotDePasseCard />
+          <ChangementMotDePasseCard endpoint="/candidat/mot-de-passe" />
         </div>
       </div>
     </AppShell>

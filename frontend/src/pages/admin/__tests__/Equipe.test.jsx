@@ -168,4 +168,64 @@ describe('Équipe — gestion des comptes (Lot 11b)', () => {
     await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/membres/m-1/mot-de-passe'))
     expect(await screen.findByText('Nn5rTy8uMk3wPq6d')).toBeInTheDocument()
   })
+
+  // --- Édition d'identité (Lot 15a) -----------------------------------
+
+  it('« Modifier » ouvre un modal pré-rempli avec l’identité actuelle', async () => {
+    apiClient.get.mockResolvedValueOnce({ data: [membre()] })
+    renderScreen()
+    await screen.findByText('Awa Traoré')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Modifier' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByLabelText('Prénom')).toHaveValue('Awa')
+    expect(within(dialog).getByLabelText('Nom')).toHaveValue('Traoré')
+    expect(within(dialog).getByLabelText('Poste')).toHaveValue('Jury cuisine')
+    // Ni rôle ni e-mail dans ce formulaire.
+    expect(within(dialog).queryByLabelText(/rôle/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText(/e-mail/i)).not.toBeInTheDocument()
+  })
+
+  it('soumission → PATCH { prenom, nom, poste } SEUL (jamais actif dans le même appel)', async () => {
+    apiClient.get.mockResolvedValueOnce({ data: [membre()] })
+    apiClient.patch.mockResolvedValueOnce({ data: membre({ prenom: 'Aïcha', nom: 'Koné', poste: 'Coordination' }) })
+    renderScreen()
+    await screen.findByText('Awa Traoré')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Modifier' }))
+    const dialog = screen.getByRole('dialog')
+    await user.clear(within(dialog).getByLabelText('Prénom'))
+    await user.type(within(dialog).getByLabelText('Prénom'), 'Aïcha')
+    await user.clear(within(dialog).getByLabelText('Nom'))
+    await user.type(within(dialog).getByLabelText('Nom'), 'Koné')
+    await user.clear(within(dialog).getByLabelText('Poste'))
+    await user.type(within(dialog).getByLabelText('Poste'), 'Coordination')
+    await user.click(within(dialog).getByRole('button', { name: /enregistrer/i }))
+
+    await waitFor(() => expect(apiClient.patch).toHaveBeenCalledWith('/admin/membres/m-1', {
+      prenom: 'Aïcha', nom: 'Koné', poste: 'Coordination',
+    }))
+    expect(await screen.findByText('Aïcha Koné')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('422 (champ manquant côté serveur) → erreur verbatim, modal reste ouvert', async () => {
+    apiClient.get.mockResolvedValueOnce({ data: [membre()] })
+    apiClient.patch.mockRejectedValueOnce(new ApiError('validation', {
+      status: 422,
+      errors: { nom: ['Le prénom, le nom et le poste doivent être envoyés ensemble.'] },
+    }))
+    renderScreen()
+    await screen.findByText('Awa Traoré')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Modifier' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /enregistrer/i }))
+
+    expect(await screen.findByText('Le prénom, le nom et le poste doivent être envoyés ensemble.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
 })
