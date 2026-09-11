@@ -6,14 +6,18 @@
 > qu'un nouveau apparaît. Le **journal figé** des décisions reste `docs/ADR.md`
 > (on n'y réécrit pas l'histoire) ; ici on tient le **présent**.
 >
-> Dernière revue : **Lot 12c** (2026-09-11) — historique in-app des
-> notifications candidat (canal `database`, badge, écran), indiscernabilité du
-> contenu stocké prouvée pour `ResultatsPublies` (extension ADR-33). Avant :
-> **Lot 12b** (les 4 mails métier, ADR-33) ; **Lot 13** (espace candidat :
-> profil réconcilié sur le backend, mot de passe connecté et « oublié »,
-> ADR-32) ; **Lot 12a** (infra d'envoi d'e-mails, ADR-31) ; **Lot 11c** (écran
-> Rapports, ADR-30). Voir aussi la revue de sécurité **Lot 10**
-> ([`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md)).
+> Dernière revue : **revue espace admin** (2026-09-11) — confrontation
+> maquette/backend/écran sur Évaluateurs-Utilisateurs, Filières, Quotas,
+> Grille d'évaluation, Notifications (flux d'activité + modèles d'e-mail) et
+> Paramètres. Filières/quotas/campagne éclatés en 3 lignes distinctes
+> (D-6a-2) ; grille d'évaluation et modèles d'e-mail tracés pour la première
+> fois, tous deux avec garde-fou explicite (barème 🔴 ADR-02, indiscernabilité
+> ADR-33). Avant : **Lot 12c** (historique in-app des notifications candidat,
+> extension ADR-33) ; **Lot 12b** (les 4 mails métier, ADR-33) ; **Lot 13**
+> (espace candidat : profil réconcilié sur le backend, mot de passe connecté
+> et « oublié », ADR-32) ; **Lot 12a** (infra d'envoi d'e-mails, ADR-31) ;
+> **Lot 11c** (écran Rapports, ADR-30). Voir aussi la revue de sécurité
+> **Lot 10** ([`docs/AUDIT-SECURITE.md`](AUDIT-SECURITE.md)).
 
 ## Légende de statut
 
@@ -64,15 +68,25 @@ ci-dessous).
 
 | Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
 |---|---|---|---|---|
-| **Création / édition de campagne et de filière** (dates, quotas, nom, description) | 🟠 Ouvert | Aucun endpoint d'écriture ; en prod ça se fait par `tinker` / SQL (documenté `DEPLOIEMENT.md` § 11.9). Le garde-fou « une seule campagne ouverte » est déjà appliqué | ADR — Points ouverts (**D-6a-2**) ; ADR sur 8d-1 | Endpoints CRUD + écrans + validations (fenêtres de dates, quotas ≥ retenus déjà décidés) |
+| **Création / édition de campagne** (dates, ouverture/clôture, filières rattachées) | 🟠 Ouvert | Aucun endpoint d'écriture ; en prod ça se fait par `tinker` / SQL (documenté `DEPLOIEMENT.md` § 11.9). Le garde-fou « une seule campagne ouverte » est déjà appliqué côté lecture | ADR — Points ouverts (**D-6a-2**) ; ADR sur 8d-1 | Endpoints CRUD + écran + validations (fenêtres de dates) |
+| **Création / édition d'une filière** (nom, description, icône) | 🟠 Ouvert — **volontairement restreint** | Le bouton « Ajouter une filière » est déjà `disabled` **dans la maquette elle-même** (5 CQP prioritaires définis par le projet, pas un catalogue ouvert à étoffer) ; `Filieres.jsx` ne construit QUE le toggle actif/inactif, cohérence déjà vérifiée à l'implémentation (Lot 8d-1) | ADR — Points ouverts (**D-6a-2**) ; maquette `cqp.html` (bouton désactivé) ; `Filieres.jsx` | Endpoint `PATCH` champs + formulaire — **si** le besoin se confirme un jour, pas un manque bloquant |
+| **Édition du quota par campagne** (`campagne_filiere.quota`) | 🟠 Ouvert | Écrit **uniquement par `CampagneSeeder`** aujourd'hui — aucune route ne le lit ni ne l'écrit (`ServiceClassement` le lit seul, pour le calcul retenu/liste_attente/non_retenu). Délibérément porté par l'association campagne↔filière, pas par la filière : **ADR-09** corrige une erreur de modélisation de la maquette, qui traitait le quota comme un attribut permanent de la filière | **ADR-09** ; ADR — Points ouverts (**D-6a-2**) ; maquette `quotas.html` | Endpoint d'édition (probablement rattaché à l'édition de campagne ci-dessus, pas un écran séparé) + validation (quota ≥ retenus déjà décidés) |
+| **Grille d'évaluation** (paramétrage des poids/barème) | 🟠 Ouvert — **ne pas construire sans besoin avéré** | Absent de bout en bout (aucune route, aucun écran, jamais tracé avant la revue admin du 2026-09-11). Le barème est 🔴 (**ADR-02** : ne jamais révéler la grille de notation) — une édition en base crée une surface où la pondération existe en clair côté client, alors qu'aujourd'hui elle ne quitte jamais le serveur. Les scores déjà validés sont figés en snapshot (**ADR-04**) donc pas de risque rétroactif ; le vrai risque est **en cours de campagne** (deux évaluateurs notant avec des poids différents avant/après une modification) — c'est exactement ce que le verrou « grille verrouillée si campagne ouverte » de la maquette (`grille.html`) empêchait, verrou absent puisque la fonctionnalité n'existe pas | Revue admin (2026-09-11) ; **ADR-02**, **ADR-04** ; `GrilleBaremeSeeder` (Lot 1, version 1 figée) ; maquette `grille.html` | **Ne pas construire avant un vrai besoin de faire évoluer le barème.** Si construit un jour : exiger le verrou anti-modification en campagne ouverte (repris de la maquette, absent aujourd'hui) et traiter comme un **lot de sécurité à part** (le barème est 🔴) — le modèle supporte déjà le versionnement (`Grille.version`, `activerGrilleClone` dans les tests Lot 4c/8d-2), donc une nouvelle version plutôt qu'une mutation en place |
+| **Flux d'activité admin** (fil d'alertes système : nouvelles candidatures, dossiers signalés non éligibles, échéances de campagne, actions d'équipe) | 🟠 Ouvert — confort, faible enjeu | Absent (aucune route, aucun écran). Toutes les données existent déjà ailleurs (`journal_audit`, `GET /admin/candidatures`, `GET /admin/campagnes`) — ce serait un écran d'agrégation, pas un nouveau sous-système | Revue admin (2026-09-11) ; maquette `notifications.html` (espace **admin** — à ne pas confondre avec la section « Notifications » candidat/mails de ce fichier) | Écran de synthèse + éventuellement un endpoint d'agrégation dédié |
+| **Paramètres généraux** (nom du projet, organisme porteur, e-mail de contact, langue de l'interface) | 🟠 Ouvert — bénin | Absent — ces valeurs sont aujourd'hui des chaînes en dur côté frontend (vitrine publique), pas une donnée éditable en base | Revue admin (2026-09-11) ; maquette `parametres.html` (onglet « Général ») | Table de configuration + endpoint + écran — faible enjeu |
+| **Paramètres — Sécurité & Système** (onglets maquette `parametres.html`) | 🟠 Ouvert (Sécurité) / confort (Système) | **Sécurité** = changer son propre mot de passe (admin/évaluateur connecté) — **recoupe déjà** *« Changement de mot de passe équipe »* (section Espace candidat ci-dessus, ADR-32 Q5) : pas un manque séparé, un autre point d'entrée UI possible pour la même fonctionnalité. **Système** = valeurs de supervision en lecture seule (dernière sauvegarde, version, statut des services) — faible enjeu | ADR-32 (Q5, voir « Changement de mot de passe équipe ») ; maquette `parametres.html` (onglets « Sécurité »/« Système ») | Rien pour Sécurité (dupliquerait un point déjà tracé) ; éventuel endpoint healthcheck simple pour Système |
 | **Correction exceptionnelle des auto-déclarations candidat** (SC/SE/DI, langues, expériences) | 🟠 Ouvert | Le **backend l'accepte déjà** intégralement (`CorrigerDossierRequest::reponses()`) ; l'UI (Lot 8d-3) ne construit que nationalité / SC.04 diplôme / MO.04 étoiles / commentaire | **ADR-25** (point ouvert explicite) ; `CorrectionDossierModal.jsx` | UI de formulaire pilotée par la structure de la grille — pas de backend à faire |
 | ~~**Export réel des rapports** (Excel / PDF)~~ → voir « Écran Rapports & statistiques » dans **Comptes & équipe** ci-dessous | — | — | — | — |
 
 ## Comptes & équipe
 
-Tout l'espace admin de la maquette est désormais porté : `Évaluateurs` +
-`Utilisateurs` → écran unique « Équipe » (Lot 11b, D-11b-1) ; `Rapports` →
-écran « Rapports & statistiques » (Lot 11c, ADR-30). Plus aucun onglet inerte.
+`Évaluateurs` + `Utilisateurs` → écran unique « Équipe » (Lot 11b, D-11b-1) ;
+`Rapports` → écran « Rapports & statistiques » (Lot 11c, ADR-30). Les 4
+entrées restantes de la maquette (`Quotas`, `Grille d'évaluation`,
+`Notifications`, `Paramètres`) sont désormais **affichées mais inertes**
+dans `navConfig.js` (même patron que `Documents`/`Aide` côté candidat,
+revue admin 2026-09-11) — aucune n'a d'écran (détail ligne par ligne
+ci-dessus et dans la section « Notifications »).
 
 | Sujet | Statut | Pourquoi ouvert | Où c'est tracé | Prérequis / effort |
 |---|---|---|---|---|
@@ -95,6 +109,7 @@ Tout l'espace admin de la maquette est désormais porté : `Évaluateurs` +
 | **SMS** (passerelle) | 🟠 Ouvert | Hors périmètre Lot 12 (e-mail seul). La maquette évoque des notifications, pas de canal SMS explicite | ADR — Points ouverts | Fournisseur SMS + un canal de notification dédié |
 | **Historique in-app des notifications — candidat** (écran « Notifications ») | 🟢 **Traité (Lot 12c — extension ADR-33)** | Canal `database` natif ajouté aux 4 notifications du Lot 12b (`via() => ['mail', 'database']`), table `notifications` créée (migration `uuidMorphs`, PK `User` en UUID). `GET /candidat/notifications` (paginé) + `GET .../compteur` + `PATCH .../{id}/lue` + `POST .../marquer-tout-lu`, scope strict `role:candidat` + `$request->user()`. Indiscernabilité du contenu STOCKÉ (pas seulement du mail) prouvée pour `ResultatsPublies`. Badge non-lues sur la sidebar | **ADR-33** (addendum Lot 12c) ; `Api\Candidat\NotificationController` ; `NotificationTest` ; `Notifications.jsx` + `useNotifications.js` + `NotificationsBadge.jsx` | — |
 | **Historique in-app des notifications — évaluateur/admin** | 🟠 Ouvert | Hors périmètre du Lot 12c (candidat seul, `navConfig.evaluateur`/`administrateur` n'ont d'ailleurs pas d'entrée « Notifications »). Aucune notification métier n'existe aujourd'hui pour l'équipe (affectation, etc.) | Kickoff Lot 12c (périmètre candidat) | Décider d'abord QUELS événements équipe méritent une notification, avant tout écran |
+| **Modèles d'e-mail éditables** (admin — onglet « Modèles de notification » de `parametres.html` dans la maquette) | 🟠 Ouvert — **ne pas ouvrir sans garde-fou** | Absent (aucune route, aucun écran). **ADR-33 garantit l'indiscernabilité des 4 mails métier PARCE QUE leur contenu est codé en dur et testé** (comparaison byte-à-byte, Lot 12b/12c) — un template éditable en base permettrait à un admin de réintroduire une variable de décision (ex. `{decision}`) dans le mail de résultats, recréant exactement la fuite qu'ADR-33 élimine | Revue admin (2026-09-11) ; **ADR-33** ; maquette `parametres.html` (onglet « Modèles de notification ») | Si un jour nécessaire : **jamais un champ libre** — une liste de variables autorisées validées côté serveur (jamais `decision`/`score`/`motif`/`rang`), et rejouer les tests d'indiscernabilité sur le contenu ÉDITÉ, pas seulement sur le code |
 
 ## Sécurité / conformité
 

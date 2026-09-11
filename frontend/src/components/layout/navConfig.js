@@ -59,7 +59,14 @@ export const navConfig = {
           // maquette — les candidats n'y sont pas gérés (D-11b-1).
           { key: 'equipe', icon: 'fa-users-gear', label: 'Équipe' },
           { key: 'cqp', icon: 'fa-layer-group', label: 'Filières CQP' },
+          // Revue admin (2026-09-11, POINTS-OUVERTS) : 4 entrées de la maquette
+          // sans écran construit — affichées mais INERTES (même patron que
+          // Documents/Aide côté candidat), pas silencieusement omises.
+          { key: 'quotas', icon: 'fa-chart-simple', label: 'Quotas' },
+          { key: 'grille', icon: 'fa-sliders', label: "Grille d'évaluation" },
           { key: 'audit', icon: 'fa-clipboard-list', label: "Journal d'audit" },
+          { key: 'notifications', icon: 'fa-bell', label: 'Notifications' },
+          { key: 'parametres', icon: 'fa-gear', label: 'Paramètres' },
         ],
       },
     ],
