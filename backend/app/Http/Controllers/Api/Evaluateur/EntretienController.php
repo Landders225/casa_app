@@ -12,6 +12,7 @@ use App\Models\Grille;
 use App\Models\JournalAudit;
 use App\Models\SousCritereEntretien;
 use App\Notifications\EntretienPlanifie;
+use App\Notifications\EntretienReplanifie;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,11 @@ use Illuminate\Support\Facades\DB;
  *    modification) ; `candidature.statut_interne` INCHANGÉ (reste `evalue`) —
  *    l'avancement fin vit sur `entretien.statut` (D-4c-1) ;
  *  - `presence = 'absent'` → 12 sous-notes figées à 0, non saisissables ;
- *  - une sous-note > max du sous-critère → 422 explicite (pas de clamp silencieux).
+ *  - une sous-note > max du sous-critère → 422 explicite (pas de clamp silencieux) ;
+ *  - notifications (Lot 12b/15b) : `EntretienPlanifie` à la toute première
+ *    planification ; `EntretienReplanifie` si date/heure/lieu changent
+ *    ENSUITE sur un entretien qui existait déjà (comparaison normalisée,
+ *    jamais sur une mise à jour presence/observation/notes seule).
  */
 class EntretienController extends Controller
 {
@@ -57,8 +62,19 @@ class EntretienController extends Controller
 
         // Lot 12b — capturé AVANT la transaction : signal fiable de « première
         // planification » (seul déclencheur du mail de convocation, cf. ADR-33
-        // point d — une replanification ne renvoie pas de mail).
+        // point d). Lot 15b — mêmes valeurs capturées AVANT `fill()`, pour
+        // détecter une replanification (date/heure/lieu modifiés sur un
+        // entretien qui existait déjà) et déclencher `EntretienReplanifie`.
+        // Valeurs déjà NORMALISÉES par le round-trip DB (le `date` est casté
+        // Carbon -> comparé via `toDateString()` des deux côtés ; `heure` n'a
+        // aucun cast, la colonne `time` de Postgres renvoie le même format
+        // quelle que soit la casse d'entrée de la requête — donc jamais de
+        // faux déclenchement/silence dû à un format qui varie sans changement
+        // réel, comme "14:30" vs "14:30:00" côté requête).
         $premierePlanification = $entretien === null;
+        $ancienneDate = $entretien?->date?->toDateString();
+        $ancienneHeure = $entretien?->heure;
+        $ancienLieu = $entretien?->lieu;
 
         $donnees = $request->validated();
 
@@ -122,6 +138,23 @@ class EntretienController extends Controller
                 $entretienPersiste->heure,
                 $entretienPersiste->lieu,
             ));
+        } else {
+            // Lot 15b — replanification : au moins une des 3 valeurs a réellement
+            // changé (comparaison normalisée, cf. capture ci-dessus) ? Une mise à
+            // jour de présence/observation/notes seule ne déclenche rien.
+            $entretienPersiste = $candidature->fresh('entretien')->entretien;
+            $replanifie = $entretienPersiste->date->toDateString() !== $ancienneDate
+                || $entretienPersiste->heure !== $ancienneHeure
+                || $entretienPersiste->lieu !== $ancienLieu;
+
+            if ($replanifie) {
+                $candidature->loadMissing('candidat.utilisateur');
+                $candidature->candidat->utilisateur->notify(new EntretienReplanifie(
+                    $entretienPersiste->date->format('d/m/Y'),
+                    $entretienPersiste->heure,
+                    $entretienPersiste->lieu,
+                ));
+            }
         }
 
         return new EntretienResource($this->etat($candidature->fresh()));

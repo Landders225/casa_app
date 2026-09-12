@@ -20,10 +20,13 @@ import { useProfil } from './useProfil.js'
  * `date_naissance` reste éditable : une correction qui sortirait de la tranche
  * 18-30 ans est refusée par le serveur (422, message affiché tel quel).
  *
- * Bandeau si la candidature est déjà SOUMISE (`date_soumission` non nul, Lot
- * 8b-3) : une correction ici ne modifie pas le dossier déjà transmis à
- * l'évaluateur (qui lit le profil en direct) — verrouiller sélectivement
- * l'identité post-soumission reste un point ouvert (POINTS-OUVERTS).
+ * Verrouillage identité post-soumission (Lot 15b) : si la candidature est déjà
+ * SOUMISE (`date_soumission` non nul, Lot 8b-3), les 5 champs d'identité
+ * (prénom/nom/sexe/date de naissance/CNI) sont désactivés visuellement ET
+ * exclus du payload envoyé au serveur — le serveur les refuse de toute façon
+ * (`prohibited`, `MettreAJourProfilRequest`), mais les envoyer quand même
+ * casserait la mise à jour des 2 champs qui restent éditables (téléphone,
+ * ville). `telephone` / `ville_residence` ne sont jamais concernés.
  */
 function calculerAge(dateNaissance) {
   if (!dateNaissance) return null
@@ -38,7 +41,8 @@ function calculerAge(dateNaissance) {
   return age
 }
 
-const CHAMPS_EDITABLES = ['prenom', 'nom', 'sexe', 'date_naissance', 'cni', 'telephone', 'ville_residence']
+const CHAMPS_VERROUILLABLES = ['prenom', 'nom', 'sexe', 'date_naissance', 'cni']
+const CHAMPS_TOUJOURS_EDITABLES = ['telephone', 'ville_residence']
 
 export function Profil() {
   const { user } = useAuth()
@@ -71,6 +75,8 @@ export function Profil() {
     )
   }
 
+  const dejaSoumis = candidature.status === 'ready' && Boolean(candidature.dateSoumission)
+
   const set = (champ) => (e) => setForm((f) => ({ ...f, [champ]: e.target.value }))
 
   const submit = async (e) => {
@@ -79,8 +85,14 @@ export function Profil() {
     setMessage(null)
     setSucces(false)
     try {
-      // Seuls les 7 champs éditables partent — jamais email/residence_ci/etc.
-      const patch = Object.fromEntries(CHAMPS_EDITABLES.map((c) => [c, form[c]]))
+      // Si le dossier est déjà soumis, les 5 champs d'identité sont EXCLUS du
+      // payload (pas seulement désactivés) : le serveur les refuse (prohibited)
+      // dès qu'ils sont présents, même à valeur inchangée — les envoyer quand
+      // même empêcherait de sauvegarder un simple changement de téléphone/ville.
+      const champsAEnvoyer = dejaSoumis
+        ? CHAMPS_TOUJOURS_EDITABLES
+        : [...CHAMPS_VERROUILLABLES, ...CHAMPS_TOUJOURS_EDITABLES]
+      const patch = Object.fromEntries(champsAEnvoyer.map((c) => [c, form[c]]))
       await enregistrer(patch)
       setSucces(true)
     } catch (err) {
@@ -94,7 +106,6 @@ export function Profil() {
   }
 
   const age = calculerAge(form.date_naissance)
-  const dejaSoumis = candidature.status === 'ready' && Boolean(candidature.dateSoumission)
 
   return (
     <AppShell title="Mon profil">
@@ -108,8 +119,9 @@ export function Profil() {
       {dejaSoumis ? (
         <div style={{ marginBottom: 'var(--space-5)' }}>
           <Alert variant="info">
-            Votre dossier est déjà transmis. Une correction ici ne modifie pas le dossier remis à
-            l'évaluateur — contactez l'équipe si votre identité doit y être rectifiée.
+            Votre dossier est déjà transmis. Les champs d'identité (prénom, nom, sexe, date de
+            naissance, numéro CNI) sont verrouillés — contactez l'équipe si une correction doit y
+            être apportée. Téléphone et ville de résidence restent modifiables.
           </Alert>
         </div>
       ) : null}
@@ -133,8 +145,8 @@ export function Profil() {
 
           <form onSubmit={submit} noValidate>
             <div className="form-row">
-              <FormField label="Prénom" error={errors.prenom} inputProps={{ value: form.prenom, onChange: set('prenom'), required: true }} />
-              <FormField label="Nom" error={errors.nom} inputProps={{ value: form.nom, onChange: set('nom'), required: true }} />
+              <FormField label="Prénom" error={errors.prenom} inputProps={{ value: form.prenom, onChange: set('prenom'), required: true, disabled: dejaSoumis }} />
+              <FormField label="Nom" error={errors.nom} inputProps={{ value: form.nom, onChange: set('nom'), required: true, disabled: dejaSoumis }} />
             </div>
 
             <div className="form-row">
@@ -143,7 +155,7 @@ export function Profil() {
                 type="date"
                 error={errors.date_naissance}
                 hint={age === null ? undefined : `Âge calculé : ${age} ans`}
-                inputProps={{ value: form.date_naissance, onChange: set('date_naissance'), required: true }}
+                inputProps={{ value: form.date_naissance, onChange: set('date_naissance'), required: true, disabled: dejaSoumis }}
               />
               <div className="form-group">
                 <label className="label" htmlFor="profil-sexe">Sexe</label>
@@ -153,6 +165,7 @@ export function Profil() {
                   value={form.sexe}
                   onChange={set('sexe')}
                   required
+                  disabled={dejaSoumis}
                 >
                   <option value="F">Féminin</option>
                   <option value="H">Masculin</option>
@@ -166,7 +179,7 @@ export function Profil() {
             </div>
 
             <div className="form-row">
-              <FormField label="Numéro CNI / récépissé" error={errors.cni} inputProps={{ value: form.cni, onChange: set('cni'), required: true }} />
+              <FormField label="Numéro CNI / récépissé" error={errors.cni} inputProps={{ value: form.cni, onChange: set('cni'), required: true, disabled: dejaSoumis }} />
               <FormField
                 label="Téléphone"
                 type="tel"

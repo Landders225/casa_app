@@ -3,6 +3,7 @@
 namespace Tests\Feature\Candidat;
 
 use App\Models\Candidat;
+use App\Models\Candidature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -141,5 +142,92 @@ class ProfilCandidatTest extends TestCase
         $user = User::factory()->create(['role' => 'candidat']); // pas de ligne candidat
 
         $this->actingAs($user)->getJson('/api/candidat/profil')->assertStatus(404);
+    }
+
+    // --- Verrouillage identité post-soumission (Lot 15b) --------------------
+
+    /**
+     * Candidat avec une candidature réellement SOUMISE (passe par le vrai
+     * endpoint de soumission, pas un `forceFill` — `date_soumission` posée
+     * comme en production).
+     */
+    private function creerCandidatDossierSoumis(): User
+    {
+        $this->seedReferentiels();
+        $user = $this->creerCandidat('soumis@example.ci');
+
+        $id = $this->actingAs($user)
+            ->postJson('/api/candidatures', ['filiere_id' => $this->idFiliere('cuisine')])
+            ->json('data.id');
+
+        $candidature = Candidature::findOrFail($id);
+        $this->rendreCandidatureComplete($candidature);
+
+        $this->actingAs($user)->postJson("/api/candidatures/{$id}/soumettre")->assertOk();
+
+        return $user->fresh();
+    }
+
+    public function test_chacun_des_5_champs_identite_refuse_seul_si_dossier_soumis(): void
+    {
+        $user = $this->creerCandidatDossierSoumis();
+
+        foreach ([
+            'prenom' => 'Nouveau',
+            'nom' => 'Nom',
+            'sexe' => 'H',
+            'date_naissance' => '2001-01-01',
+            'cni' => 'CI999999999',
+        ] as $champ => $valeur) {
+            $this->actingAs($user)->patchJson('/api/candidat/profil', [$champ => $valeur])
+                ->assertStatus(422)
+                ->assertJsonValidationErrors($champ);
+        }
+    }
+
+    public function test_5_champs_identite_refuses_ensemble_si_dossier_soumis(): void
+    {
+        $user = $this->creerCandidatDossierSoumis();
+
+        $this->actingAs($user)->patchJson('/api/candidat/profil', [
+            'prenom' => 'Nouveau', 'nom' => 'Nom', 'sexe' => 'H',
+            'date_naissance' => '2001-01-01', 'cni' => 'CI999999999',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['prenom', 'nom', 'sexe', 'date_naissance', 'cni']);
+    }
+
+    public function test_telephone_et_ville_toujours_modifiables_si_dossier_soumis(): void
+    {
+        $user = $this->creerCandidatDossierSoumis();
+
+        $this->actingAs($user)->patchJson('/api/candidat/profil', [
+            'telephone' => '0102030405', 'ville_residence' => 'San-Pédro',
+        ])->assertOk()
+            ->assertJsonPath('data.telephone', '0102030405')
+            ->assertJsonPath('data.ville_residence', 'San-Pédro');
+
+        $this->assertDatabaseHas('candidat', [
+            'utilisateur_id' => $user->id, 'telephone' => '0102030405', 'ville_residence' => 'San-Pédro',
+        ]);
+    }
+
+    public function test_identite_reste_modifiable_avant_soumission(): void
+    {
+        // Non-régression explicite : le brouillon (jamais soumis) n'est pas concerné.
+        $user = $this->creerCandidat('brouillon@example.ci');
+
+        $this->actingAs($user)->patchJson('/api/candidat/profil', ['prenom' => 'Modifie'])
+            ->assertOk()
+            ->assertJsonPath('data.prenom', 'Modifie');
+    }
+
+    public function test_message_explicite_sur_un_champ_identite_verrouille(): void
+    {
+        $user = $this->creerCandidatDossierSoumis();
+
+        $response = $this->actingAs($user)->patchJson('/api/candidat/profil', ['nom' => 'Nouveau'])
+            ->assertStatus(422);
+
+        $this->assertStringContainsString('déjà transmis', $response->json('errors.nom.0'));
     }
 }

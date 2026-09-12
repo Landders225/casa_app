@@ -11,7 +11,8 @@ use Illuminate\Notifications\Notification;
  * Convocation à l'entretien (Lot 12b, ADR-33) — envoyée UNE SEULE FOIS, à la
  * première planification (première saisie de date/heure/lieu par l'évaluateur,
  * `EntretienController::update`). Une replanification ultérieure ne redéclenche
- * pas ce mail (point ouvert 🟠, hors périmètre de ce lot).
+ * JAMAIS cette classe-ci — elle déclenche `EntretienReplanifie` (Lot 15b), une
+ * classe dédiée, si au moins une des 3 valeurs a réellement changé.
  *
  * Résidu documenté (ADR-33, Étape 1 point d) : seuls les candidats éligibles et
  * affectés peuvent structurellement recevoir ce mail (le dossier doit être

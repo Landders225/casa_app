@@ -36,6 +36,15 @@ const LIEUX_ENTRETIEN = ['Le Plateau', '2 Plateaux Vallons']
  *
  * Le score AFFICHÉ (total, détail par rubrique, sous-notes) vient toujours de
  * la réponse serveur — jamais recalculé ici (ADR-02, ADR-04).
+ *
+ * Modifier la planification (Lot 15b) — tant que l'entretien n'est pas
+ * verrouillé (`entretien.verrouille === false`, même contrainte que côté
+ * serveur : 409 sinon), un bouton dans `EntretienNotation` réutilise CE MÊME
+ * composant `Planification` (pré-rempli, formulaire d'édition plutôt que
+ * l'écran de notation, `PUT` identique) pour corriger date/heure/lieu — c'est
+ * ce qui rend atteignable la ré-notification `EntretienReplanifie` : sans ce
+ * bouton, le mécanisme serveur existait mais aucun évaluateur ne pouvait
+ * réellement l'atteindre.
  */
 export function Entretien() {
   const { id } = useParams()
@@ -107,10 +116,19 @@ export function Entretien() {
   )
 }
 
-function Planification({ dossier, saving, error, onSave }) {
-  const [date, setDate] = useState('')
-  const [heure, setHeure] = useState('')
-  const [lieu, setLieu] = useState(LIEUX_ENTRETIEN[0])
+/**
+ * Réutilisé pour DEUX usages (Lot 15b) : la planification initiale (`initial`
+ * absent, champs vides) ET la modification d'un entretien déjà planifié mais
+ * pas encore verrouillé (`initial` fourni, champs pré-remplis, `onCancel`
+ * affiche un bouton retour). Même formulaire, même endpoint (`PUT .../entretien`
+ * avec `{date, heure, lieu}`) — c'est ce PUT qui, côté serveur, distingue les
+ * deux cas et déclenche `EntretienPlanifie` (création) ou `EntretienReplanifie`
+ * (modification réelle d'un entretien existant, cf. `EntretienController`).
+ */
+function Planification({ dossier, saving, error, initial = null, submitLabel, onCancel, onSave }) {
+  const [date, setDate] = useState(initial?.date || '')
+  const [heure, setHeure] = useState(initial?.heure || '')
+  const [lieu, setLieu] = useState(initial?.lieu || LIEUX_ENTRETIEN[0])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -132,7 +150,7 @@ function Planification({ dossier, saving, error, onSave }) {
           <p className="caption">{dossier.numero_dossier} · {dossier.filiere?.nom}</p>
         </div>
       </div>
-      <h4 style={{ marginBottom: 'var(--space-4)' }}>Planifier l'entretien</h4>
+      <h4 style={{ marginBottom: 'var(--space-4)' }}>{initial ? 'Modifier la planification' : "Planifier l'entretien"}</h4>
 
       {error ? (
         <div style={{ marginBottom: 'var(--space-4)' }}>
@@ -159,9 +177,16 @@ function Planification({ dossier, saving, error, onSave }) {
             ))}
           </select>
         </div>
-        <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
-          {saving ? 'Planification…' : <><i className="fa-solid fa-calendar-check" aria-hidden="true" /> Planifier l'entretien</>}
-        </button>
+        <div className="flex gap-3">
+          {onCancel ? (
+            <button type="button" className="btn btn-outline btn-block" disabled={saving} onClick={onCancel}>
+              Annuler
+            </button>
+          ) : null}
+          <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
+            {saving ? 'Enregistrement…' : <><i className="fa-solid fa-calendar-check" aria-hidden="true" /> {submitLabel || "Planifier l'entretien"}</>}
+          </button>
+        </div>
       </form>
     </div>
   )
@@ -176,6 +201,7 @@ function EntretienNotation({ dossier, entretien, saving, validating, error, onSa
   const [saved, setSaved] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [correcting, setCorrecting] = useState(false)
+  const [editingPlanification, setEditingPlanification] = useState(false)
   const { corrigerEntretien, correcting: savingCorrection, error: correctionError, resetError: resetCorrectionError } = useCorrection()
 
   const editable = !entretien.verrouille
@@ -218,6 +244,28 @@ function EntretienNotation({ dossier, entretien, saving, validating, error, onSa
     }
   }
 
+  const submitReplanification = async (patch) => {
+    // Même endpoint que la planification initiale (`PUT .../entretien` avec
+    // {date, heure, lieu}) — c'est le serveur qui, en comparant aux valeurs
+    // persistées, décide si ça déclenche EntretienReplanifie (Lot 15b).
+    await onSave(patch)
+    setEditingPlanification(false)
+  }
+
+  if (editingPlanification) {
+    return (
+      <Planification
+        dossier={dossier}
+        saving={saving}
+        error={error}
+        initial={{ date: entretien.date, heure: (entretien.heure || '').slice(0, 5), lieu: entretien.lieu }}
+        submitLabel="Enregistrer la nouvelle planification"
+        onCancel={() => setEditingPlanification(false)}
+        onSave={submitReplanification}
+      />
+    )
+  }
+
   return (
     <>
       <div className="card" style={{ marginBottom: 'var(--space-6)' }}>
@@ -234,6 +282,11 @@ function EntretienNotation({ dossier, entretien, saving, validating, error, onSa
             <br />
             <i className="fa-solid fa-location-dot" aria-hidden="true" /> {entretien.lieu}
           </div>
+          {editable ? (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditingPlanification(true)}>
+              <i className="fa-solid fa-pen" aria-hidden="true" /> Modifier la planification
+            </button>
+          ) : null}
           <Link to={evaluateurDossierPath(dossier.id)} className="btn btn-outline btn-sm">Voir la fiche complète</Link>
         </div>
       </div>

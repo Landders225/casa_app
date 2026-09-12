@@ -220,6 +220,79 @@ describe('Entretien — notation : le score AFFICHÉ vient toujours de la répon
   })
 })
 
+describe('Entretien — modifier la planification (Lot 15b)', () => {
+  it('le bouton apparaît tant que l’entretien n’est pas verrouillé', async () => {
+    mockGet(dossier(), entretienApercu())
+    renderScreen()
+    await screen.findByRole('heading', { name: 'Présentation', level: 3 })
+
+    expect(screen.getByRole('button', { name: /modifier la planification/i })).toBeInTheDocument()
+  })
+
+  it('aucun bouton une fois l’entretien verrouillé (même contrainte que le serveur, 409)', async () => {
+    mockGet(dossier(), entretienSnapshot())
+    renderScreen()
+    await screen.findByText('🔒 ENTRETIEN VALIDÉ')
+
+    expect(screen.queryByRole('button', { name: /modifier la planification/i })).not.toBeInTheDocument()
+  })
+
+  it('ouvre le formulaire PRÉ-REMPLI avec les valeurs actuelles, PUT envoie les nouvelles, retour à la notation', async () => {
+    mockGet(dossier(), entretienApercu({ presence: 'present' }))
+    renderScreen()
+    await screen.findByRole('heading', { name: 'Présentation', level: 3 })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /modifier la planification/i }))
+
+    expect(await screen.findByRole('heading', { name: 'Modifier la planification' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Date')).toHaveValue('2026-07-06')
+    expect(screen.getByLabelText('Heure')).toHaveValue('09:00')
+    expect(screen.getByLabelText('Lieu')).toHaveValue('Le Plateau')
+
+    await user.clear(screen.getByLabelText('Date'))
+    await user.type(screen.getByLabelText('Date'), '2026-07-10')
+    await user.clear(screen.getByLabelText('Heure'))
+    await user.type(screen.getByLabelText('Heure'), '15:00')
+    await user.selectOptions(screen.getByLabelText('Lieu'), '2 Plateaux Vallons')
+
+    apiClient.put.mockResolvedValueOnce({
+      data: {
+        dossier_verrouille: true,
+        entretien: entretienApercu({ presence: 'present', date: '2026-07-10', heure: '15:00', lieu: '2 Plateaux Vallons' }),
+      },
+    })
+    await user.click(screen.getByRole('button', { name: /enregistrer la nouvelle planification/i }))
+
+    await waitFor(() => expect(apiClient.put).toHaveBeenCalledWith('/evaluateur/candidatures/c-1/entretien', {
+      date: '2026-07-10', heure: '15:00', lieu: '2 Plateaux Vallons',
+    }))
+    // Le PUT de replanification ne renvoie PAS `notes`/`presence` — la notation
+    // en cours (présence déjà « present ») n'est jamais touchée par ce flux.
+    expect(apiClient.put.mock.calls[0][1]).not.toHaveProperty('presence')
+    expect(apiClient.put.mock.calls[0][1]).not.toHaveProperty('notes')
+
+    // Retour automatique à l'écran de notation, header à jour (source = réponse serveur).
+    expect(await screen.findByRole('heading', { name: 'Présentation', level: 3 })).toBeInTheDocument()
+    expect(screen.getByText(/2 Plateaux Vallons/)).toBeInTheDocument()
+  })
+
+  it('« Annuler » revient à la notation sans appeler le serveur', async () => {
+    mockGet(dossier(), entretienApercu())
+    renderScreen()
+    await screen.findByRole('heading', { name: 'Présentation', level: 3 })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /modifier la planification/i }))
+    await screen.findByRole('heading', { name: 'Modifier la planification' })
+
+    await user.click(screen.getByRole('button', { name: 'Annuler' }))
+
+    expect(await screen.findByRole('heading', { name: 'Présentation', level: 3 })).toBeInTheDocument()
+    expect(apiClient.put).not.toHaveBeenCalled()
+  })
+})
+
 describe('Entretien — verrouillage visuel RÉEL après validation (ADR-04)', () => {
   it('valider -> fieldset nativement désactivé, boutons remplacés par la bannière, snapshot affiché', async () => {
     mockGet(dossier(), entretienApercu({ presence: 'present' }))

@@ -126,6 +126,56 @@ describe('Profil — écran « Mon profil » (Lot 13)', () => {
     expect(screen.queryByText(/votre dossier est déjà transmis/i)).not.toBeInTheDocument()
   })
 
+  describe('verrouillage identité post-soumission (Lot 15b)', () => {
+    function mockApiSoumis() {
+      mockApi({ candidature: { status: 200, data: { date_soumission: '2026-06-01T00:00:00Z', statut_public: 'en_cours_de_traitement' } } })
+    }
+
+    it('les 5 champs d\'identité sont désactivés, téléphone et ville restent actifs', async () => {
+      mockApiSoumis()
+      renderScreen()
+      await screen.findByLabelText('Prénom')
+
+      expect(screen.getByLabelText('Prénom')).toBeDisabled()
+      expect(screen.getByLabelText('Nom')).toBeDisabled()
+      expect(screen.getByLabelText('Sexe')).toBeDisabled()
+      expect(screen.getByLabelText('Date de naissance')).toBeDisabled()
+      expect(screen.getByLabelText('Numéro CNI / récépissé')).toBeDisabled()
+      expect(screen.getByLabelText('Téléphone')).toBeEnabled()
+      expect(screen.getByLabelText('Ville de résidence')).toBeEnabled()
+    })
+
+    it('le PATCH exclut les 5 champs verrouillés, même si un seul change', async () => {
+      mockApiSoumis()
+      apiClient.patch.mockResolvedValueOnce({ data: profil({ telephone: '0102030405' }) })
+      renderScreen()
+      await screen.findByLabelText('Prénom')
+
+      const user = userEvent.setup()
+      await user.clear(screen.getByLabelText('Téléphone'))
+      await user.type(screen.getByLabelText('Téléphone'), '0102030405')
+      await user.click(screen.getByRole('button', { name: /enregistrer les modifications/i }))
+
+      await waitFor(() => expect(apiClient.patch).toHaveBeenCalledWith('/candidat/profil', {
+        telephone: '0102030405', ville_residence: 'Abidjan',
+      }))
+      const envoye = apiClient.patch.mock.calls[0][1]
+      for (const champ of ['prenom', 'nom', 'sexe', 'date_naissance', 'cni']) {
+        expect(envoye).not.toHaveProperty(champ)
+      }
+    })
+
+    it('dossier non soumis : les 7 champs restent actifs et envoyés (non-régression)', async () => {
+      mockApi() // 404 -> pas encore soumis
+      renderScreen()
+      await screen.findByLabelText('Prénom')
+
+      expect(screen.getByLabelText('Prénom')).toBeEnabled()
+      expect(screen.getByLabelText('Sexe')).toBeEnabled()
+      expect(screen.getByLabelText('Numéro CNI / récépissé')).toBeEnabled()
+    })
+  })
+
   it('la section « Sécurité » (changement de mot de passe) est présente', async () => {
     mockApi()
     renderScreen()

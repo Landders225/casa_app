@@ -5,6 +5,7 @@ namespace Tests\Feature\Evaluateur;
 use App\Models\Candidature;
 use App\Models\User;
 use App\Notifications\EntretienPlanifie;
+use App\Notifications\EntretienReplanifie;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -18,6 +19,10 @@ use Tests\TestCase;
  * date/heure/lieu). Contenu : uniquement date/heure/lieu, jamais de score ou
  * de barème (résidu de risque documenté en ADR-33 point d : structurellement,
  * seuls des candidats éligibles et affectés peuvent recevoir ce mail).
+ *
+ * Une replanification ultérieure ne redéclenche JAMAIS cette classe — elle
+ * déclenche `EntretienReplanifie` (Lot 15b), couverte en détail (contenu,
+ * indiscernabilité, canaux) par `EntretienReplanifieNotificationTest`.
  */
 class EntretienPlanifieNotificationTest extends TestCase
 {
@@ -70,7 +75,7 @@ class EntretienPlanifieNotificationTest extends TestCase
         Notification::assertSentTimes(EntretienPlanifie::class, 1);
     }
 
-    public function test_aucun_2e_mail_a_une_replanification(): void
+    public function test_replanification_declenche_entretien_replanifie_pas_un_2e_entretien_planifie(): void
     {
         Notification::fake();
 
@@ -78,12 +83,14 @@ class EntretienPlanifieNotificationTest extends TestCase
             'date' => '2026-07-06', 'heure' => '09:00', 'lieu' => 'Le Plateau',
         ])->assertOk();
 
-        // Replanification : heure/lieu changent — pas de 2e mail (point ouvert 🟠 hors Lot 12b).
+        // Replanification : heure/lieu changent — EntretienPlanifie ne repart JAMAIS
+        // une 2e fois ; c'est EntretienReplanifie (Lot 15b) qui prend le relais.
         $this->actingAs($this->evaluateur)->putJson($this->url(), [
             'date' => '2026-07-07', 'heure' => '14:00', 'lieu' => '2 Plateaux Vallons',
         ])->assertOk();
 
         Notification::assertSentTimes(EntretienPlanifie::class, 1);
+        Notification::assertSentTimes(EntretienReplanifie::class, 1);
     }
 
     public function test_aucun_mail_a_la_saisie_de_presence_notes_sans_replanification(): void
@@ -97,6 +104,7 @@ class EntretienPlanifieNotificationTest extends TestCase
         $this->actingAs($this->evaluateur)->putJson($this->url(), ['presence' => 'present'])->assertOk();
 
         Notification::assertSentTimes(EntretienPlanifie::class, 1);
+        Notification::assertSentTimes(EntretienReplanifie::class, 0);
     }
 
     public function test_notification_est_mise_en_file_pas_envoyee_en_sync(): void

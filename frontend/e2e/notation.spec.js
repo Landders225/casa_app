@@ -10,6 +10,11 @@ import { expect, test } from '@playwright/test'
  * SON dossier (les 6 de la seeder sont déjà évalués/verrouillés) et posent une
  * vérification déjà faite (couverte en détail par l'E2E du Lot 8c-1 — pas
  * reproduite ici, cet E2E se concentre sur la NOTATION).
+ *
+ * Lot 15b — un 2ᵉ candidat de la même seeder (Mariam) prouve « planifier ->
+ * MODIFIER la planification -> 2ᵉ mail réel (log SMTP) », VRAI parcours
+ * navigateur (le bouton « Modifier la planification » est ce qui rend le
+ * mécanisme serveur `EntretienReplanifie` réellement atteignable).
  */
 
 // Racine du dépôt — portable (CI Linux comprise), plus de chemin Windows en dur.
@@ -22,6 +27,10 @@ const psql = (sql) =>
     input: sql,
     stdio: ['pipe', 'pipe', 'pipe'],
   }).toString().trim()
+const backendLog = () =>
+  execSync('docker compose exec -T backend sh -c "cat storage/logs/laravel.log 2>/dev/null || true"', { cwd: APP, stdio: 'pipe' }).toString()
+const clearBackendLog = () =>
+  execSync('docker compose exec -T backend sh -c "truncate -s 0 storage/logs/laravel.log 2>/dev/null || true"', { cwd: APP, stdio: 'pipe' })
 
 const PWD = 'Demo2026!'
 
@@ -48,6 +57,7 @@ test.describe.configure({ mode: 'serial', timeout: 240_000 })
 
 test.describe('Notation dossier /65 + entretien /35 (Lot 8c-2)', () => {
   let koffiId
+  let mariamId
 
   test.beforeAll(() => {
     artisan('migrate:fresh --seed --force')
@@ -67,6 +77,15 @@ test.describe('Notation dossier /65 + entretien /35 (Lot 8c-2)', () => {
         values ('${koffiId}', true, 'bac', now())
         on conflict (candidature_id) do update
         set nationalite_confirmee = true, diplome_verifie = 'bac', verifie_le = now();
+    `)
+
+    // Mariam (Lot 15b) — dossier déjà verrouillé par le seeder (inchangé), on
+    // repart juste sans entretien (le seeder en crée un déjà `valide` pour les
+    // 6 candidats) pour tester planification -> MODIFICATION -> 2e mail.
+    mariamId = psql("select c.id from candidature c join candidat ca on ca.id = c.candidat_id where ca.prenom = 'Mariam'")
+    psql(`
+      delete from note_sous_critere_entretien where entretien_id = '${mariamId}';
+      delete from entretien where candidature_id = '${mariamId}';
     `)
   })
 
@@ -147,5 +166,52 @@ test.describe('Notation dossier /65 + entretien /35 (Lot 8c-2)', () => {
     await expect(page.getByRole('button', { name: 'Valider définitivement' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Présent' })).toBeDisabled()
     await shots(page, 'entretien-verrouille')
+  })
+
+  test('modifier la planification (Lot 15b) -> 2e mail réel, notation non affectée', async ({ page }) => {
+    clearBackendLog()
+    await login(page, 'eval-classement@casa-demo.ci')
+    await page.waitForURL(/\/evaluateur$/, { timeout: 60_000 })
+
+    await page.goto(`/evaluateur/candidatures/${mariamId}/entretien`)
+    await expect(page.getByRole('heading', { name: "Planifier l'entretien" })).toBeVisible({ timeout: 30_000 })
+    await page.getByLabel('Date').fill('2026-07-15')
+    await page.getByLabel('Heure').fill('11:00')
+    await page.getByLabel('Lieu').selectOption('Le Plateau')
+    await page.getByRole('button', { name: /planifier l'entretien/i }).click()
+    await expect(page.getByText('Présence')).toBeVisible({ timeout: 30_000 })
+
+    // Aucune UI ne permettait de modifier la planification avant ce lot —
+    // c'est ce bouton qui rend EntretienReplanifie réellement atteignable.
+    await page.getByRole('button', { name: /modifier la planification/i }).click()
+    await expect(page.getByRole('heading', { name: 'Modifier la planification' })).toBeVisible({ timeout: 30_000 })
+    // Pré-rempli avec les valeurs ACTUELLES, pas un formulaire vide.
+    await expect(page.getByLabel('Date')).toHaveValue('2026-07-15')
+    await expect(page.getByLabel('Heure')).toHaveValue('11:00')
+    await expect(page.getByLabel('Lieu')).toHaveValue('Le Plateau')
+
+    await page.getByLabel('Date').fill('2026-07-20')
+    await page.getByLabel('Heure').fill('16:30')
+    await page.getByLabel('Lieu').selectOption('2 Plateaux Vallons')
+    await shots(page, 'entretien-replanification')
+    await page.getByRole('button', { name: /enregistrer la nouvelle planification/i }).click()
+
+    // Retour à la notation — le flux existant n'est pas cassé par la modification.
+    await expect(page.getByText('Présence')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('2 Plateaux Vallons')).toBeVisible()
+    await page.getByRole('button', { name: 'Présent' }).click()
+    await page.getByRole('button', { name: 'Enregistrer' }).click()
+    await expect(page.getByText('Entretien enregistré.')).toBeVisible({ timeout: 30_000 })
+
+    // Notifications ShouldQueue : dev n'a pas de service `worker` (Lot 12a —
+    // réservé à prod), on draine la file explicitement, comme profil-mot-de-passe.spec.js.
+    artisan('queue:work --stop-when-empty')
+
+    // Preuve réelle du 2e mail (MAIL_MAILER=log) — pas EntretienPlanifie une 2e fois.
+    const logs = backendLog()
+    expect(logs).toContain('Modification de votre entretien')
+    expect(logs).toContain('20/07/2026')
+    expect(logs).toContain('16:30')
+    expect(logs).toContain('2 Plateaux Vallons')
   })
 })
