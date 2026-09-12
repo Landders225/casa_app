@@ -5,13 +5,20 @@
 # ici, ce sera affiné avec le vrai code applicatif.
 FROM php:8.3-fpm-alpine
 
+# gd (+ libpng/libjpeg/freetype) : requis par phpoffice/phpspreadsheet (Lot
+# 15c, export Excel des rapports) — pas utilisé pour des images applicatives,
+# c'est une dépendance dure du writer .xlsx de la lib.
 RUN apk add --no-cache \
         postgresql-dev \
         libzip-dev \
         zip \
         unzip \
         git \
-    && docker-php-ext-install pdo pdo_pgsql zip
+        libpng-dev \
+        libjpeg-turbo-dev \
+        freetype-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_pgsql zip gd
 
 # Composer (binaire officiel, pas de réinstallation depuis les sources)
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

@@ -45,11 +45,11 @@ export function useRapports() {
 
   const [exporting, setExporting] = useState(false)
 
-  const telechargerCsv = useCallback(async () => {
+  const telecharger = useCallback(async (chemin) => {
     setExporting(true)
     try {
       const suffix = campagne ? `?campagne=${encodeURIComponent(campagne)}` : ''
-      const { blob, filename } = await apiClient.getBlob(`/admin/rapports/export.csv${suffix}`)
+      const { blob, filename } = await apiClient.getBlob(`${chemin}${suffix}`)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -63,5 +63,10 @@ export function useRapports() {
     }
   }, [campagne])
 
-  return { ...state, campagne, setCampagne, campagnes, telechargerCsv, exporting }
+  const telechargerCsv = useCallback(() => telecharger('/admin/rapports/export.csv'), [telecharger])
+  // Lot 15c — même service d'agrégation que le CSV (ServiceRapports), juste un
+  // autre format de présentation ; PDF reste "à venir" (pas construit ce lot).
+  const telechargerXlsx = useCallback(() => telecharger('/admin/rapports/export.xlsx'), [telecharger])
+
+  return { ...state, campagne, setCampagne, campagnes, telechargerCsv, telechargerXlsx, exporting }
 }

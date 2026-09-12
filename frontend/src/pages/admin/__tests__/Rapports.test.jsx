@@ -98,12 +98,28 @@ describe('Rapports & statistiques (Lot 11c)', () => {
     await waitFor(() => expect(apiClient.getBlob).toHaveBeenCalledWith('/admin/rapports/export.csv'))
   })
 
-  it('les boutons Excel / PDF sont désactivés (« à venir »)', async () => {
+  it('le bouton Excel déclenche le téléchargement via getBlob (Lot 15c)', async () => {
+    mockApi(payload())
+    apiClient.getBlob.mockResolvedValueOnce({ blob: new Blob(['x']), filename: 'casa-rapport.xlsx' })
+    URL.createObjectURL = vi.fn(() => 'blob:x')
+    URL.revokeObjectURL = vi.fn()
+    HTMLAnchorElement.prototype.click = vi.fn()
+
+    renderScreen()
+    await screen.findByText(/protection contre la ré-identification/i)
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /^excel$/i }))
+
+    await waitFor(() => expect(apiClient.getBlob).toHaveBeenCalledWith('/admin/rapports/export.xlsx'))
+  })
+
+  it('le bouton PDF reste désactivé (« à venir »)', async () => {
     mockApi(payload())
     renderScreen()
     await screen.findByText(/protection contre la ré-identification/i)
 
-    expect(screen.getByRole('button', { name: /excel/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /pdf/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^excel$/i })).toBeEnabled()
   })
 })

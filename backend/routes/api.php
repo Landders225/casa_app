@@ -159,11 +159,12 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
         |------------------------------------------------------------------
         | Agrégats pour le CoPil. Garde-fou k-anonymat : suppression des
         | petites cellules (< 5), villes rares fondues, aucune cross-tab,
-        | JAMAIS une ligne individuelle. Écran + export CSV = même service
-        | d'agrégation, donc même masquage.
+        | JAMAIS une ligne individuelle. Écran + export CSV + export Excel
+        | (Lot 15c) = même service d'agrégation, donc même masquage.
         */
         Route::get('/rapports', [RapportController::class, 'index']);
         Route::get('/rapports/export.csv', [RapportController::class, 'exportCsv']);
+        Route::get('/rapports/export.xlsx', [RapportController::class, 'exportXlsx']);
 
         /*
         |------------------------------------------------------------------

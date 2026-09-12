@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Domain\Rapports\RapportCsv;
+use App\Domain\Rapports\RapportExcel;
 use App\Domain\Rapports\ServiceRapports;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Admin\RapportResource;
@@ -16,14 +17,15 @@ use Symfony\Component\HttpFoundation\Response;
  *
  *   GET /api/admin/rapports?campagne={uuid|toutes}       agrégats (JSON)
  *   GET /api/admin/rapports/export.csv?campagne=…        mêmes agrégats (CSV)
+ *   GET /api/admin/rapports/export.xlsx?campagne=…       mêmes agrégats (Excel, Lot 15c)
  *
  * `role:administrateur` seul — JAMAIS un évaluateur (même via le recouvrement
  * ADR-10 : ce sont des stats globales de pilotage, pas son travail d'évaluation),
  * JAMAIS un candidat.
  *
- * Les deux points de sortie passent par la MÊME {@see ServiceRapports} : le
+ * Les trois points de sortie passent par la MÊME {@see ServiceRapports} : le
  * garde-fou k-anonymat (suppression des petites cellules, aucune cross-tab,
- * aucune ligne individuelle) s'applique à l'identique à l'écran et à l'export.
+ * aucune ligne individuelle) s'applique à l'identique à l'écran et aux deux exports.
  *
  * `campagne` :
  *  - absent  → campagne COURANTE (ouverte, sinon la plus récente) — le CoPil
@@ -48,6 +50,18 @@ class RapportController extends Controller
 
         return response($csv->generer($donnees), 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$fichier.'"',
+        ]);
+    }
+
+    public function exportXlsx(Request $request, RapportExcel $excel): Response
+    {
+        $donnees = $this->rapports->agreger($this->campagne($request));
+        $nom = $donnees['perimetre']['campagne']['nom'] ?? 'toutes-campagnes';
+        $fichier = 'casa-rapport-'.Str::slug($nom).'-'.now()->format('Y-m-d').'.xlsx';
+
+        return response($excel->generer($donnees), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="'.$fichier.'"',
         ]);
     }

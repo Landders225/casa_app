@@ -11,6 +11,7 @@ use App\Models\Grille;
 use App\Models\User;
 use Database\Seeders\GrilleBaremeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\Feature\Evaluateur\CreeContexteEvaluation;
 use Tests\TestCase;
 
@@ -118,7 +119,7 @@ class RapportsStatistiquesTest extends TestCase
 
     public function test_admin_seul_accede_evaluateur_et_candidat_403_invite_401(): void
     {
-        $urls = ['/api/admin/rapports', '/api/admin/rapports/export.csv'];
+        $urls = ['/api/admin/rapports', '/api/admin/rapports/export.csv', '/api/admin/rapports/export.xlsx'];
         $candidat = $this->creerCandidat('c@cci.ci');
 
         // Invité D'ABORD — aucun `actingAs` avant (l'état d'auth persiste sur $this).
@@ -293,5 +294,115 @@ class RapportsStatistiquesTest extends TestCase
         $this->assertStringContainsString('Femmes;3', $csv);
         $this->assertStringContainsString('Hommes;2', $csv);
         $this->assertStringNotContainsString('Femmes;n/d', $csv);
+    }
+
+    // --- Excel (Lot 15c) : même garde-fou, relu en RELISANT le classeur ----
+
+    /**
+     * Relit le classeur .xlsx généré et concatène toutes les valeurs de
+     * cellules (toutes feuilles, toutes lignes) en une seule chaîne — pour
+     * pouvoir appliquer les mêmes assertions `assertStringContainsString`
+     * qu'au CSV. Aucun raccourci : on ouvre vraiment le fichier binaire produit.
+     */
+    private function texteDuClasseur(string $binaire): string
+    {
+        return implode(';', $this->cellulesDuClasseur($binaire));
+    }
+
+    /**
+     * Toutes les valeurs de cellules non vides, toutes feuilles confondues.
+     *
+     * @return list<string>
+     */
+    private function cellulesDuClasseur(string $binaire): array
+    {
+        $chemin = tempnam(sys_get_temp_dir(), 'casa_xlsx_');
+        file_put_contents($chemin, $binaire);
+
+        try {
+            $classeur = IOFactory::load($chemin);
+            $valeurs = [];
+            foreach ($classeur->getAllSheets() as $feuille) {
+                foreach ($feuille->getRowIterator() as $ligne) {
+                    foreach ($ligne->getCellIterator() as $cellule) {
+                        $valeur = $cellule->getValue();
+                        if ($valeur !== null && $valeur !== '') {
+                            $valeurs[] = (string) $valeur;
+                        }
+                    }
+                }
+            }
+
+            return $valeurs;
+        } finally {
+            @unlink($chemin);
+        }
+    }
+
+    /**
+     * Reconstruit les paires « libellé (colonne A) => valeur (colonne B) »
+     * du classeur — reflète exactement `RapportExcel::paire()`.
+     *
+     * @return array<string, mixed>
+     */
+    private function pairesDuClasseur(string $binaire): array
+    {
+        $chemin = tempnam(sys_get_temp_dir(), 'casa_xlsx_');
+        file_put_contents($chemin, $binaire);
+
+        try {
+            $feuille = IOFactory::load($chemin)->getActiveSheet();
+            $paires = [];
+            foreach ($feuille->getRowIterator() as $ligne) {
+                $numero = $ligne->getRowIndex();
+                $libelle = $feuille->getCell("A{$numero}")->getValue();
+                if ($libelle !== null && $libelle !== '') {
+                    $paires[(string) $libelle] = $feuille->getCell("B{$numero}")->getValue();
+                }
+            }
+
+            return $paires;
+        } finally {
+            @unlink($chemin);
+        }
+    }
+
+    public function test_le_xlsx_applique_le_meme_masquage_que_l_ecran(): void
+    {
+        // Base de 3 → tout est masqué.
+        $this->candidature(opts: ['sexe' => 'F']);
+        $this->candidature(opts: ['sexe' => 'H']);
+        $this->candidature(opts: ['sexe' => 'F']);
+
+        $reponse = $this->actingAs($this->admin)->get('/api/admin/rapports/export.xlsx')->assertOk();
+        $this->assertStringContainsString(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            (string) $reponse->headers->get('content-type'),
+        );
+        $this->assertStringContainsString('attachment; filename=', (string) $reponse->headers->get('content-disposition'));
+        $this->assertStringContainsString('.xlsx', (string) $reponse->headers->get('content-disposition'));
+
+        $texte = $this->texteDuClasseur($reponse->getContent());
+        $this->assertStringContainsString('n/d', $texte);
+        // Jamais un nom de candidat dans le classeur.
+        foreach (['Prenom0', 'Nom0', 'CASA-2026-'] as $interdit) {
+            $this->assertStringNotContainsString($interdit, $texte);
+        }
+    }
+
+    public function test_le_xlsx_contient_les_valeurs_reelles_au_dessus_du_seuil(): void
+    {
+        foreach (['F', 'F', 'F', 'H', 'H'] as $sexe) {
+            $this->candidature(opts: ['sexe' => $sexe]);
+        }
+
+        $binaire = $this->actingAs($this->admin)->get('/api/admin/rapports/export.xlsx')->assertOk()->getContent();
+
+        // Les effectifs réels (3 et 2) apparaissent comme valeurs NUMÉRIQUES
+        // (pas la chaîne "n/d") — même garde-fou que le CSV, valeurs réelles
+        // au-dessus du seuil.
+        $paires = $this->pairesDuClasseur($binaire);
+        $this->assertSame(3, $paires['Femmes']);
+        $this->assertSame(2, $paires['Hommes']);
     }
 }

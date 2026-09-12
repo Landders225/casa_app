@@ -31,11 +31,14 @@ function ChartCard({ titre, children }) {
  * de score sont dans le payload). Les graphiques sont du SVG maison.
  *
  * Garde-fou k-anonymat 100 % serveur : une répartition renvoyée `null` s'affiche
- * « effectif insuffisant » ; un taux `null` s'affiche « n/d ». L'export CSV
- * passe par le même service — le masquage y est identique.
+ * « effectif insuffisant » ; un taux `null` s'affiche « n/d ». Les exports CSV
+ * ET Excel (`.xlsx`, Lot 15c) passent par le même service — le masquage y est
+ * identique. PDF reste désactivé « à venir » (pas construit ce lot — le CSV
+ * couvre déjà la donnée brute, Excel la présentation exploitable ; un PDF
+ * répond à un besoin différent — document figé/officiel — non confirmé).
  */
 export function Rapports() {
-  const { status, data, campagne, setCampagne, campagnes, telechargerCsv, exporting } = useRapports()
+  const { status, data, campagne, setCampagne, campagnes, telechargerCsv, telechargerXlsx, exporting } = useRapports()
 
   const seuil = data?.perimetre?.seuil_masquage ?? 5
 
@@ -69,8 +72,8 @@ export function Rapports() {
           <button type="button" className="btn btn-outline btn-sm" disabled={exporting || status !== 'ready'} onClick={telechargerCsv}>
             <i className="fa-solid fa-file-csv" aria-hidden="true" /> {exporting ? 'Export…' : 'Exporter (CSV)'}
           </button>
-          <button type="button" className="btn btn-outline btn-sm" disabled title="Export Excel — à venir">
-            <i className="fa-solid fa-file-excel" aria-hidden="true" /> Excel
+          <button type="button" className="btn btn-outline btn-sm" disabled={exporting || status !== 'ready'} onClick={telechargerXlsx}>
+            <i className="fa-solid fa-file-excel" aria-hidden="true" /> {exporting ? 'Export…' : 'Excel'}
           </button>
           <button type="button" className="btn btn-outline btn-sm" disabled title="Rapport PDF — à venir">
             <i className="fa-solid fa-file-pdf" aria-hidden="true" /> PDF

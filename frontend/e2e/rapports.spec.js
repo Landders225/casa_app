@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
 
@@ -9,6 +10,9 @@ import { expect, test } from '@playwright/test'
  * ville) SANS classement calculé → les répartitions à effectif ≥ 5 (F/H,
  * scores, villes, présence) s'affichent, celle des décisions (0 décision) est
  * masquée par le garde-fou k-anonymat. Idéal pour capturer les deux états.
+ *
+ * Lot 15c — export Excel activé (même service d'agrégation que le CSV, PDF
+ * reste « à venir »).
  */
 
 const APP = fileURLToPath(new URL('../..', import.meta.url))
@@ -110,8 +114,26 @@ test.describe('Espace administrateur — Rapports & statistiques (Lot 11c)', () 
     expect(contenu).toContain('Candidatures par filière')
     expect(contenu).not.toMatch(/CASA-2026-9|Démo/)
 
-    // Les boutons Excel / PDF restent désactivés.
-    await expect(page.getByRole('button', { name: /^Excel$/ })).toBeDisabled()
+    // Le bouton PDF reste désactivé (pas construit ce lot).
     await expect(page.getByRole('button', { name: /^PDF$/ })).toBeDisabled()
+  })
+
+  test('admin → export Excel (Lot 15c) : téléchargement d’un vrai .xlsx, mêmes agrégats', async ({ page }) => {
+    await login(page, 'admin@casa-demo.ci')
+    await page.waitForURL(/\/admin$/, { timeout: 60_000 })
+    await page.goto('/admin/rapports')
+    await expect(page.getByRole('heading', { level: 2, name: /Rapports & statistiques/i })).toBeVisible({ timeout: 30_000 })
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: /^Excel$/ }).click(),
+    ])
+    expect(download.suggestedFilename()).toMatch(/casa-rapport-.*\.xlsx/)
+
+    // Le fichier téléchargé est un VRAI classeur .xlsx (signature ZIP — un
+    // .xlsx est une archive ZIP) — pas juste un nom de fichier qui y ressemble.
+    const chemin = await download.path()
+    const entete = readFileSync(chemin).subarray(0, 4)
+    expect(entete.toString('hex')).toBe('504b0304') // "PK\x03\x04" — signature ZIP
   })
 })
