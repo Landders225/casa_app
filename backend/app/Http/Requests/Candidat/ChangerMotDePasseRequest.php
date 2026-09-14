@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\Candidat;
 
+use App\Rules\PolitiqueMotDePasse;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\Validator;
 
 /**
@@ -37,7 +37,7 @@ class ChangerMotDePasseRequest extends FormRequest
             'current_password' => ['required', 'string'],
             'password' => [
                 'required', 'string', 'confirmed', 'different:current_password',
-                Password::min(10)->letters()->numbers()->mixedCase(),
+                PolitiqueMotDePasse::regles(),
             ],
         ];
     }
@@ -63,6 +63,7 @@ class ChangerMotDePasseRequest extends FormRequest
             'current_password.required' => 'Le mot de passe actuel est obligatoire.',
             'password.confirmed' => 'La confirmation du nouveau mot de passe ne correspond pas.',
             'password.different' => "Le nouveau mot de passe doit être différent de l'actuel.",
+            'password.uncompromised' => PolitiqueMotDePasse::MESSAGE_COMPROMIS,
         ];
     }
 }

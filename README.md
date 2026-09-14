@@ -99,6 +99,26 @@ docker compose ps
 
 **Point d'entrée unique** : http://localhost:8080 (frontend). API : http://localhost:8080/api/\*. Sonde de santé backend : http://localhost:8080/up.
 
+### Prévisualiser les e-mails en dev (Mailpit, opt-in — Lot 15d)
+
+Par défaut, `MAIL_MAILER=log` : les e-mails sont écrits dans les logs backend
+(`docker compose logs backend`), pas envoyés. Pour les voir dans une vraie
+boîte de réception locale, avec rendu HTML/texte, sans configurer de
+fournisseur SMTP :
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.mail.yml up -d
+```
+
+Interface Mailpit : http://localhost:8025 — chaque e-mail envoyé par CASA
+(inscription, entretien, résultats, mot de passe…) y apparaît en quelques
+secondes. Aucune authentification, aucune donnée ne sort de la machine.
+
+**Revenir au mode par défaut** (`MAIL_MAILER=log`) : relancer sans le `-f`
+supplémentaire — `docker compose up -d backend`. Cet overlay ne modifie
+**aucun** autre mode (prod, test-local, Apache) : voir
+`docker-compose.mail.yml` pour le détail.
+
 ## Configuration de production (Lot 9b/9c — ADR-27, ADR-28)
 
 > **Guide pas-à-pas complet : [`docs/DEPLOIEMENT.md`](docs/DEPLOIEMENT.md)** — d'un Ubuntu vierge à une instance qui tourne, chaque commande en entier, checklist post-déploiement et maintenance. La section ci-dessous en est le résumé.

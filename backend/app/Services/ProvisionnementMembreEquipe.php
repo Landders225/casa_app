@@ -5,16 +5,19 @@ namespace App\Services;
 use App\Models\JournalAudit;
 use App\Models\MembreEquipe;
 use App\Models\User;
+use App\Rules\PolitiqueMotDePasse;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rules\Password;
 
 /**
  * Création d'un compte MEMBRE D'ÉQUIPE (évaluateur OU administrateur) — socle
  * partagé par `casa:create-membre` et `casa:create-admin` (Lot 11a).
  *
  * Le sous-type exact vit sur `utilisateur.role` (ADR-10), jamais dupliqué dans
- * `membre_equipe`. Règle de mot de passe IDENTIQUE à l'inscription (ADR-16 :
- * `Password::min(10)->letters()->numbers()->mixedCase()`).
+ * `membre_equipe`. Règle de mot de passe IDENTIQUE à l'inscription — voir
+ * {@see PolitiqueMotDePasse} (ADR-16, HIBP au Lot 15d) — CE mot de passe-ci
+ * est TAPÉ par l'admin au clavier (`casa:create-admin`/`casa:create-membre`),
+ * contrairement au mot de passe PROVISOIRE généré par `genererMotDePasse()`
+ * ci-dessous, qui n'a pas besoin d'être vérifié contre HIBP.
  *
  * Ne crée JAMAIS un `candidat` : les rôles autorisés par cette voie sont
  * strictement {evaluateur, administrateur} (`ROLES`) — triple garde : défaut
@@ -35,7 +38,7 @@ class ProvisionnementMembreEquipe
      */
     public static function motDePasseRules(): array
     {
-        return ['required', 'string', 'confirmed', Password::min(10)->letters()->numbers()->mixedCase()];
+        return ['required', 'string', 'confirmed', PolitiqueMotDePasse::regles()];
     }
 
     /**
@@ -59,6 +62,7 @@ class ProvisionnementMembreEquipe
     {
         return [
             'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
+            'password.uncompromised' => PolitiqueMotDePasse::MESSAGE_COMPROMIS,
         ];
     }
 

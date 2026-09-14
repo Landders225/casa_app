@@ -1,0 +1,38 @@
+# =============================================================================
+#  CASA — Overlay MAILPIT (Lot 15d) — prévisualisation des e-mails en DEV.
+#
+#  Strictement OPT-IN : sans ce fichier, rien ne change (MAIL_MAILER reste ce
+#  que backend/.env définit — `log` par défaut, lecture des mails dans les
+#  logs backend, comme depuis le Lot 12a). Ne redéfinit RIEN d'autre que
+#  `backend.environment` (MAIL_*) et l'ajout du service `mailpit` — aucun des
+#  autres modes (dev par défaut, prod, test-local, Apache) n'est touché.
+#
+#  Activation :
+#    docker compose -f docker-compose.yml -f docker-compose.mail.yml up -d
+#
+#  Interface web (liste des e-mails reçus) : http://localhost:${MAILPIT_UI_PORT:-8025}
+#
+#  Désactivation : repasser par le `docker compose up -d` habituel (sans ce
+#  -f) — `backend` retrouve alors MAIL_MAILER=log au prochain redémarrage
+#  (les variables `environment:` de cet overlay ne s'appliquent plus).
+# =============================================================================
+
+services:
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    networks: [casa]
+
+  backend:
+    # Écrase MAIL_MAILER/MAIL_HOST/MAIL_PORT du backend/.env bind-monté —
+    # Mailpit n'exige aucune authentification, port SMTP 1025 par défaut.
+    environment:
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_SCHEME: ""
+    depends_on:
+      mailpit:
+        condition: service_started

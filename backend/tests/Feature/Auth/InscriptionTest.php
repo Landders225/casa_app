@@ -4,8 +4,10 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use App\Notifications\InscriptionConfirmee;
+use App\Rules\PolitiqueMotDePasse;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -108,6 +110,23 @@ class InscriptionTest extends TestCase
             'sans minuscule' => ['MOTDEPASSE2026'],
             'sans chiffre' => ['MotDePasseSansChiffre'],
         ];
+    }
+
+    /**
+     * Lot 15d — preuve de CÂBLAGE du garde-fou HIBP sur CET endpoint (le
+     * mécanisme lui-même — fail-open compris — est testé une seule fois,
+     * `Security\HibpMotDePasseTest`).
+     */
+    public function test_mot_de_passe_compromis_hibp_est_refuse(): void
+    {
+        $hash = strtoupper(sha1('MotDePasse2026'));
+        $this->fakerHibp(['api.pwnedpasswords.com/*' => Http::response(substr($hash, 5).':5000000')]);
+
+        $this->fromSpa()->postJson('/api/register', $this->payload())
+            ->assertStatus(422)
+            ->assertJsonPath('errors.password.0', PolitiqueMotDePasse::MESSAGE_COMPROMIS);
+
+        $this->assertDatabaseCount('utilisateur', 0);
     }
 
     public function test_confirmation_mot_de_passe_incoherente_422(): void

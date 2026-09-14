@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Rules\PolitiqueMotDePasse;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 
 /**
  * Inscription d'un candidat (Lot 7, public) — comble ADR-13.
@@ -38,9 +38,10 @@ class RegisterRequest extends FormRequest
     {
         return [
             'email' => ['required', 'string', 'email:rfc', 'max:255', Rule::unique('utilisateur', 'email')],
-            // Longueur d'abord (NIST) ; pas de symbole imposé (Q4a), pas de
-            // contrôle HaveIBeenPwned en v1 (Q4b — durcissement futur).
-            'password' => ['required', 'string', 'confirmed', Password::min(10)->letters()->numbers()->mixedCase()],
+            // Longueur d'abord (NIST) ; pas de symbole imposé (Q4a). Contrôle
+            // HaveIBeenPwned activé au Lot 15d (Q4b) — fail-open natif si HIBP
+            // est injoignable, cf. PolitiqueMotDePasse.
+            'password' => ['required', 'string', 'confirmed', PolitiqueMotDePasse::regles()],
 
             'prenom' => ['required', 'string', 'max:100'],
             'nom' => ['required', 'string', 'max:100'],
@@ -78,6 +79,7 @@ class RegisterRequest extends FormRequest
             'email.unique' => 'Un compte existe déjà pour cette adresse e-mail.',
             'email.email' => "L'adresse e-mail n'est pas valide.",
             'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
+            'password.uncompromised' => PolitiqueMotDePasse::MESSAGE_COMPROMIS,
             'date_naissance.before' => 'La date de naissance doit être dans le passé.',
             'cgu.accepted' => "Vous devez accepter les conditions d'utilisation pour créer un compte.",
             'residence_ci.required' => 'Le lieu de résidence doit être précisé.',

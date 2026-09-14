@@ -5,6 +5,7 @@ namespace Tests\Feature\Console;
 use App\Models\MembreEquipe;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -107,6 +108,28 @@ class CreateMembreTest extends TestCase
             ->assertExitCode(2);
 
         $this->assertDatabaseMissing('utilisateur', ['email' => 'faible@cci.ci']);
+        $this->assertDatabaseCount('journal_audit', 0);
+    }
+
+    /**
+     * Lot 15d — preuve de CÂBLAGE du garde-fou HIBP sur CE point d'entrée CLI
+     * (partagé par `casa:create-admin` — même `ProvisionnementMembreEquipe::
+     * motDePasseRules()`, le mécanisme lui-même est testé une seule fois,
+     * `Security\HibpMotDePasseTest`). Ne s'applique PAS au mot de passe
+     * PROVISOIRE généré par l'écran admin (`genererMotDePasse()`) — un autre
+     * code, une chaîne aléatoire, jamais soumise à ce contrôle.
+     */
+    public function test_refuse_un_mot_de_passe_compromis_hibp(): void
+    {
+        $hash = strtoupper(sha1('MotDePasse2026'));
+        $this->fakerHibp(['api.pwnedpasswords.com/*' => Http::response(substr($hash, 5).':5000000')]);
+
+        $this->artisan('casa:create-membre', ['email' => 'compromis@cci.ci'])
+            ->expectsQuestion(self::PWD_PROMPT, 'MotDePasse2026')
+            ->expectsQuestion('Confirmer le mot de passe', 'MotDePasse2026')
+            ->assertExitCode(2);
+
+        $this->assertDatabaseMissing('utilisateur', ['email' => 'compromis@cci.ci']);
         $this->assertDatabaseCount('journal_audit', 0);
     }
 

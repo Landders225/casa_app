@@ -4,17 +4,52 @@ namespace App\Providers;
 
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Validation\UncompromisedVerifier;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\NotPwnedVerifier;
+use Illuminate\Validation\ValidationServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // --- HIBP (Lot 15d) : timeout resserré à 3 s -----------------------
+        // Laravel utilise 30 s par défaut — trop long pour ne pas geler
+        // perceptiblement une inscription si l'API est lente. Le comportement
+        // fail-open (exception réseau OU réponse non-2xx -> mot de passe
+        // accepté) est NATIF à `NotPwnedVerifier`, pas modifié ici — voir
+        // App\Rules\PolitiqueMotDePasse pour le détail du mécanisme.
         //
+        // `ValidationServiceProvider` est un DeferrableProvider (contrat
+        // Laravel 11+, plus l'ancien `$defer = true`) : `UncompromisedVerifier`
+        // reste listé dans `deferredServices` même après un `singleton()` ici,
+        // et est ré-enregistré (donc écrasé, retour à 30 s) dès la PREMIÈRE
+        // résolution de `validator`/`validation.presence`/`UncompromisedVerifier`
+        // n'importe où dans l'app — piège vérifié en écrivant le test de ce
+        // lot (le timeout ressortait à 30, pas 3, sans cette ligne). On force
+        // donc le chargement EAGER du provider différé D'ABORD (`loadedProviders`
+        // le marque chargé, plus jamais ré-enregistré ensuite), PUIS on
+        // rebinde par-dessus — dans cet ordre précis.
+        //
+        // `HttpFactory` bindé SINGLETON pour une raison distincte : sans ça,
+        // `NotPwnedVerifier` (qui reçoit sa Factory par injection de
+        // constructeur, `$app[HttpFactory::class]`) et la façade `Http::`
+        // (utilisée par `Http::fake()` en test) résolvent chacune leur PROPRE
+        // instance — `NotPwnedVerifier` finit avec une Factory jamais stubée
+        // et tape le vrai réseau en test, piège vérifié en écrivant
+        // `HibpMotDePasseTest`.
+        $this->app->singleton(HttpFactory::class);
+        $this->app->register(ValidationServiceProvider::class);
+
+        $this->app->singleton(
+            UncompromisedVerifier::class,
+            fn ($app) => new NotPwnedVerifier($app[HttpFactory::class], 3),
+        );
     }
 
     public function boot(): void

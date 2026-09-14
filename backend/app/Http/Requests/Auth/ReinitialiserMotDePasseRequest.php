@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Rules\PolitiqueMotDePasse;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Password;
 
 /**
  * Réinitialisation effective — candidat DÉCONNECTÉ, muni du lien reçu par
@@ -31,7 +31,7 @@ class ReinitialiserMotDePasseRequest extends FormRequest
         return [
             'token' => ['required', 'string'],
             'email' => ['required', 'string', 'email:rfc', 'max:255'],
-            'password' => ['required', 'string', 'confirmed', Password::min(10)->letters()->numbers()->mixedCase()],
+            'password' => ['required', 'string', 'confirmed', PolitiqueMotDePasse::regles()],
         ];
     }
 
@@ -42,6 +42,7 @@ class ReinitialiserMotDePasseRequest extends FormRequest
     {
         return [
             'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
+            'password.uncompromised' => PolitiqueMotDePasse::MESSAGE_COMPROMIS,
         ];
     }
 }

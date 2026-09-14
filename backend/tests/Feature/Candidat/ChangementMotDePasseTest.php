@@ -5,9 +5,11 @@ namespace Tests\Feature\Candidat;
 use App\Models\JournalAudit;
 use App\Models\User;
 use App\Notifications\MotDePasseModifie;
+use App\Rules\PolitiqueMotDePasse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -109,6 +111,24 @@ class ChangementMotDePasseTest extends TestCase
             'current_password' => 'password',
             'password' => 'faible', 'password_confirmation' => 'faible',
         ])->assertStatus(422)->assertJsonValidationErrors('password');
+    }
+
+    /**
+     * Lot 15d — preuve de CÂBLAGE du garde-fou HIBP sur CET endpoint (le
+     * mécanisme lui-même est testé une seule fois, `Security\HibpMotDePasseTest`).
+     */
+    public function test_nouveau_mot_de_passe_compromis_hibp_est_refuse(): void
+    {
+        $user = $this->creerCandidat('cand@cci.ci');
+        $hash = strtoupper(sha1('NouveauMdp2026'));
+        $this->fakerHibp(['api.pwnedpasswords.com/*' => Http::response(substr($hash, 5).':5000000')]);
+
+        $this->actingAs($user)->putJson('/api/candidat/mot-de-passe', [
+            'current_password' => 'password',
+            'password' => 'NouveauMdp2026', 'password_confirmation' => 'NouveauMdp2026',
+        ])->assertStatus(422)->assertJsonPath('errors.password.0', PolitiqueMotDePasse::MESSAGE_COMPROMIS);
+
+        $this->assertTrue(Hash::check('password', $user->fresh()->mot_de_passe_hash)); // inchangé
     }
 
     public function test_confirmation_qui_ne_correspond_pas_refusee(): void
