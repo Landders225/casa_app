@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert } from '../../components/ui/Alert.jsx'
-import { FormField } from '../../components/ui/FormField.jsx'
+import { ChampMotDePasse } from '../../components/ui/ChampMotDePasse.jsx'
 import { apiClient } from '../../lib/apiClient.js'
 import { ApiError } from '../../lib/ApiError.js'
 import { paths } from '../../routing/routes.js'
@@ -104,9 +104,8 @@ export function NouveauMotDePasse() {
               ) : null}
 
               <form onSubmit={handleSubmit} noValidate>
-                <FormField
+                <ChampMotDePasse
                   label="Nouveau mot de passe"
-                  type="password"
                   icon="fa-key"
                   hint="Au moins 10 caractères, avec majuscule, minuscule et chiffre."
                   inputProps={{
@@ -116,9 +115,8 @@ export function NouveauMotDePasse() {
                     required: true,
                   }}
                 />
-                <FormField
+                <ChampMotDePasse
                   label="Confirmer le nouveau mot de passe"
-                  type="password"
                   icon="fa-key"
                   inputProps={{
                     value: passwordConfirmation,

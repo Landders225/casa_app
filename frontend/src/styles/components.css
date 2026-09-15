@@ -126,6 +126,18 @@
   color: var(--casa-text-tertiary); width: 1.1em; height: 1.1em; pointer-events: none;
 }
 
+/* Élément à droite (ex. bouton œil de ChampMotDePasse) — CLIQUABLE, donc pas
+   de pointer-events: none, contrairement à l'icône à gauche ci-dessus. */
+.input-icon-wrap.has-trailing .input { padding-right: 2.6rem; }
+.input-icon-wrap .toggle-password {
+  position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  width: 1.8rem; height: 1.8rem; padding: 0; border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--casa-text-tertiary); cursor: pointer;
+}
+.input-icon-wrap .toggle-password:hover { color: var(--casa-text-secondary); }
+.input-icon-wrap .toggle-password:focus-visible { box-shadow: var(--shadow-focus); outline: none; }
+
 /* Checkbox / Radio */
 .check-row, .radio-row {
   display: flex; align-items: flex-start; gap: var(--space-3);

@@ -78,6 +78,18 @@ describe('NouveauMotDePasse (Lot 13, ADR-32)', () => {
     expect(await screen.findByText('Le mot de passe doit contenir au moins 10 caractères.')).toBeInTheDocument()
   })
 
+  it('le bouton œil affiche le mot de passe saisi sans envoyer de requête', async () => {
+    renderPage()
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Nouveau mot de passe'), 'NouveauMdp2026')
+
+    await user.click(screen.getAllByRole('button', { name: 'Afficher le mot de passe' })[0])
+
+    expect(screen.getByLabelText('Nouveau mot de passe')).toHaveAttribute('type', 'text')
+    expect(screen.getByLabelText('Nouveau mot de passe')).toHaveValue('NouveauMdp2026')
+    expect(apiClient.post).not.toHaveBeenCalled()
+  })
+
   it('lien incomplet (token ou email manquant) -> formulaire non affiché, aucun appel réseau', () => {
     renderPage('?token=abc123') // pas d'email
     expect(screen.getByText(/lien de réinitialisation est incomplet/i)).toBeInTheDocument()

@@ -126,6 +126,21 @@ describe('InscriptionPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/trop de tentatives/i)
   })
 
+  it('les deux boutons œil (mot de passe + confirmation) basculent indépendamment', async () => {
+    useAuth.mockReturnValue({ register: vi.fn() })
+    renderInscription()
+    const user = setup()
+    await user.type(screen.getByLabelText('Mot de passe'), 'MotDePasse2026')
+    await user.type(screen.getByLabelText('Confirmer le mot de passe'), 'MotDePasse2026')
+
+    const boutonsAfficher = screen.getAllByRole('button', { name: 'Afficher le mot de passe' })
+    expect(boutonsAfficher).toHaveLength(2)
+
+    await user.click(boutonsAfficher[0])
+    expect(screen.getByLabelText('Mot de passe')).toHaveAttribute('type', 'text')
+    expect(screen.getByLabelText('Confirmer le mot de passe')).toHaveAttribute('type', 'password') // l'autre champ n'a pas bougé
+  })
+
   it('avertit quand l\'âge saisi est hors 18-30 (indice, sans bloquer)', async () => {
     useAuth.mockReturnValue({ register: vi.fn() })
     renderInscription()

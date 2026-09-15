@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Alert } from '../ui/Alert.jsx'
-import { FormField } from '../ui/FormField.jsx'
+import { ChampMotDePasse } from '../ui/ChampMotDePasse.jsx'
 import { apiClient } from '../../lib/apiClient.js'
 import { ApiError } from '../../lib/ApiError.js'
 
@@ -70,22 +70,19 @@ export function ChangementMotDePasseCard({ endpoint }) {
       ) : null}
 
       <form onSubmit={submit} noValidate>
-        <FormField
+        <ChampMotDePasse
           label="Mot de passe actuel"
-          type="password"
           error={errors.current_password}
           inputProps={{ value: form.current_password, onChange: set('current_password'), autoComplete: 'current-password', required: true }}
         />
-        <FormField
+        <ChampMotDePasse
           label="Nouveau mot de passe"
-          type="password"
           error={errors.password}
           hint="Au moins 10 caractères, avec majuscule, minuscule et chiffre."
           inputProps={{ value: form.password, onChange: set('password'), autoComplete: 'new-password', required: true }}
         />
-        <FormField
+        <ChampMotDePasse
           label="Confirmer le nouveau mot de passe"
-          type="password"
           inputProps={{ value: form.password_confirmation, onChange: set('password_confirmation'), autoComplete: 'new-password', required: true }}
         />
         <button type="submit" className={`btn btn-outline btn-block${saving ? ' is-loading' : ''}`} disabled={saving}>

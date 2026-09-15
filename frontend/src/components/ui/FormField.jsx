@@ -6,11 +6,16 @@ import { useId } from 'react'
  *
  * `error` (chaîne ou tableau de chaînes) affiche le premier message et met le
  * champ en état `is-error` + `aria-invalid`.
+ *
+ * `trailing` (nœud React optionnel) — élément affiché à DROITE, à l'intérieur
+ * de `.input-icon-wrap` (ex. le bouton œil de `ChampMotDePasse`). Rétrocompatible :
+ * absent par défaut, aucun appel existant de `FormField` n'est affecté.
  */
 export function FormField({
   label,
   type = 'text',
   icon = null,
+  trailing = null,
   error = null,
   hint = null,
   inputProps = {},
@@ -37,10 +42,11 @@ export function FormField({
       <label className="label" htmlFor={id}>
         {label}
       </label>
-      {icon ? (
-        <div className="input-icon-wrap">
-          <i className={`fa-solid ${icon}`} aria-hidden="true" />
+      {icon || trailing ? (
+        <div className={`input-icon-wrap${trailing ? ' has-trailing' : ''}`}>
+          {icon ? <i className={`fa-solid ${icon}`} aria-hidden="true" /> : null}
           {field}
+          {trailing}
         </div>
       ) : (
         field

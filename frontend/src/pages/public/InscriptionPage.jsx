@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { PublicHeader } from '../../components/public/PublicHeader.jsx'
 import { PublicFooter } from '../../components/public/PublicFooter.jsx'
 import { Alert } from '../../components/ui/Alert.jsx'
+import { ChampMotDePasse } from '../../components/ui/ChampMotDePasse.jsx'
 import { Checkbox } from '../../components/ui/Checkbox.jsx'
 import { FormField } from '../../components/ui/FormField.jsx'
 import { useAuth } from '../../auth/useAuth.js'
@@ -202,16 +203,14 @@ export function InscriptionPage() {
           </div>
 
           <div className="form-row">
-            <FormField
+            <ChampMotDePasse
               label="Mot de passe"
-              type="password"
               error={fieldErrors.password}
               hint="Au moins 10 caractères, avec majuscules, minuscules et chiffres."
               inputProps={{ value: form.password, onChange: set('password'), autoComplete: 'new-password', required: true }}
             />
-            <FormField
+            <ChampMotDePasse
               label="Confirmer le mot de passe"
-              type="password"
               error={fieldErrors.password_confirmation}
               inputProps={{
                 value: form.password_confirmation,

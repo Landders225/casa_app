@@ -83,6 +83,21 @@ describe('LoginPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/trop de tentatives/i)
   })
 
+  it('le bouton œil bascule l’affichage sans déclencher la connexion', async () => {
+    const login = vi.fn()
+    useAuth.mockReturnValue({ login })
+    renderLogin()
+
+    await userEvent.type(screen.getByLabelText('Mot de passe'), 'UnMotDePasse2026')
+    expect(screen.getByLabelText('Mot de passe')).toHaveAttribute('type', 'password')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Afficher le mot de passe' }))
+
+    expect(screen.getByLabelText('Mot de passe')).toHaveAttribute('type', 'text')
+    expect(screen.getByLabelText('Mot de passe')).toHaveValue('UnMotDePasse2026')
+    expect(login).not.toHaveBeenCalled() // pas de soumission déclenchée par le clic sur l'œil
+  })
+
   it('propose un lien « Mot de passe oublié ? » (Lot 13)', () => {
     useAuth.mockReturnValue({ login: vi.fn() })
     renderLogin()

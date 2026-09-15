@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth.js'
 import { Alert } from '../../components/ui/Alert.jsx'
+import { ChampMotDePasse } from '../../components/ui/ChampMotDePasse.jsx'
 import { FormField } from '../../components/ui/FormField.jsx'
 import { ApiError } from '../../lib/ApiError.js'
 import { paths, roleHome } from '../../routing/routes.js'
@@ -126,9 +127,8 @@ export function LoginPage() {
                 required: true,
               }}
             />
-            <FormField
+            <ChampMotDePasse
               label="Mot de passe"
-              type="password"
               icon="fa-key"
               inputProps={{
                 value: password,

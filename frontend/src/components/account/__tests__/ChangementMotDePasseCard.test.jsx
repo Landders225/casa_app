@@ -58,6 +58,24 @@ describe('ChangementMotDePasseCard (Lot 13, partagé équipe au Lot 15a)', () =>
     expect(screen.queryByText(/mot de passe a été modifié/i)).not.toBeInTheDocument()
   })
 
+  it('les 3 champs (actuel/nouveau/confirmation) ont chacun leur bouton œil, indépendants, sans soumettre', async () => {
+    apiClient.put.mockResolvedValue({ message: 'ok' })
+    render(<ChangementMotDePasseCard endpoint="/candidat/mot-de-passe" />)
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Mot de passe actuel'), 'MotDePasse2026')
+
+    const boutonsAfficher = screen.getAllByRole('button', { name: 'Afficher le mot de passe' })
+    expect(boutonsAfficher).toHaveLength(3)
+
+    await user.click(boutonsAfficher[0])
+    expect(screen.getByLabelText('Mot de passe actuel')).toHaveAttribute('type', 'text')
+    expect(screen.getByLabelText('Nouveau mot de passe')).toHaveAttribute('type', 'password')
+    expect(screen.getByLabelText('Confirmer le nouveau mot de passe')).toHaveAttribute('type', 'password')
+    // Cliquer sur l'œil n'a rien envoyé à l'API.
+    expect(apiClient.put).not.toHaveBeenCalled()
+  })
+
   it('mentionne que les AUTRES sessions seront déconnectées', async () => {
     apiClient.put.mockResolvedValueOnce({ message: 'ok' })
     render(<ChangementMotDePasseCard endpoint="/candidat/mot-de-passe" />)
