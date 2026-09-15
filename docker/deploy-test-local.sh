@@ -77,7 +77,16 @@ fi
 
 # --- 2. Build + démarrage --------------------------------------------
 say "Build + démarrage (quelques minutes au premier lancement)"
-"${DC[@]}" up -d --build
+# --force-recreate (pas juste --build) : ce script est IDEMPOTENT, donc aussi
+# le chemin de MISE À JOUR (relancé après un `git pull`). `up -d --build` seul
+# ne recrée QUE les services dont l'image a changé — nginx (image stock, sans
+# `build:`) n'est jamais concerné et continuerait de pointer vers l'ancienne IP
+# Docker de `backend`/`worker` recréés. Les 4 confs nginx ré-résolvent
+# maintenant `backend`/`frontend` en continu (resolver 127.0.0.11 valid=10s,
+# voir docker/nginx/*.conf) donc ce n'est plus un point de panne — mais on
+# garde `--force-recreate` en ceinture-et-bretelles, sans coût réel ici (down
+# time nul, healthchecks attendus juste après).
+"${DC[@]}" up -d --build --force-recreate
 echo -n "  Attente des services healthy "
 for _ in $(seq 1 72); do
     n=$("${DC[@]}" ps --format '{{.Health}}' | grep -c healthy || true)

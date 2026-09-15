@@ -329,7 +329,7 @@ Puis recréer les conteneurs qui lisent cette config (l'entrypoint refait
 `config:cache` avec les nouvelles valeurs) :
 
 ```bash
-dcp up -d --force-recreate backend worker
+dcp up -d --force-recreate backend worker nginx
 ```
 
 ### 9.2 Valider la configuration
@@ -343,7 +343,7 @@ Envoi **synchrone** — le résultat s'affiche immédiatement :
 - **succès** → vérifier la réception (et le dossier « indésirables ») ;
 - **échec** → le message d'erreur exact du serveur SMTP s'affiche
   (« Authentication failed », « Connection refused », certificat…) — **jamais le
-  mot de passe**. Corriger les `MAIL_*`, `--force-recreate backend worker`,
+  mot de passe**. Corriger les `MAIL_*`, `--force-recreate backend worker nginx`,
   réessayer.
 
 Pour tester **en plus** la chaîne asynchrone complète (config → file → worker →
@@ -537,24 +537,37 @@ docker run --rm -v casa_documents_data:/data -v /srv/backups:/in alpine \
 
 ```bash
 cd /srv/casa
-/srv/casa/scripts-hote/backup-db.sh          # sauvegarde d'abord
+/srv/casa/scripts-hote/backup-db.sh                      # sauvegarde d'abord
 git fetch --tags
-git checkout v1.1.0                           # le nouveau tag
+git checkout v1.1.0                                       # le nouveau tag
 
-dcp up -d --build                             # reconstruit + recrée backend, worker, frontend, nginx
+dcp up -d --build --force-recreate                        # reconstruit ET recrée TOUS les services
 #   -> l'entrypoint refait les caches avec le code neuf
-dcp exec backend php artisan migrate --force  # migrations éventuelles
-dcp exec backend php artisan queue:restart    # au cas où un ancien worker traîne
+dcp exec backend php artisan migrate --force               # migrations éventuelles
+dcp exec backend php artisan queue:restart                 # au cas où un ancien worker traîne
 
-dcp ps                                        # 5x healthy (worker inclus)
+dcp ps                                                      # 5x healthy (worker inclus)
 # rejouer la checklist § 11 (au moins 1, 5, 8, 9, 10)
 ```
+
+> ⚠️ **`--force-recreate` est nécessaire ici, pas juste `--build`.** `up -d
+> --build` seul ne recrée QUE les services dont l'image a changé (`backend`,
+> `frontend`) — jamais `nginx` (image stock, sans `build:` dans le compose).
+> Or `nginx` ne résout `backend`/`frontend` en interne (DNS Docker) qu'une
+> fois au démarrage de son worker : un `backend` recréé change d'IP Docker, et
+> un `nginx` non recréé continue de taper l'ancienne IP → **502 silencieux sur
+> tout `/api`**, login en échec sans message clair. Depuis Lot 15e, les 4
+> confs nginx (`docker/nginx/*.conf`) ré-résolvent `backend`/`frontend` en
+> continu (`resolver 127.0.0.11 valid=10s`) : même sans `--force-recreate`, un
+> `nginx` non recréé s'auto-corrige en ≤ 10 s. `--force-recreate` reste
+> recommandé en ceinture-et-bretelles (zéro downtime supplémentaire ici) —
+> voir aussi § 12.9 pour ce symptôme en diagnostic.
 
 **Rollback** si la nouvelle version pose problème :
 
 ```bash
 git checkout v1.0.0
-dcp up -d --build
+dcp up -d --build --force-recreate
 # si une migration doit être défaite : dcp exec backend php artisan migrate:rollback --force
 # sinon, restaurer la base depuis la sauvegarde d'avant mise à jour (§ 12.3)
 ```
@@ -572,7 +585,7 @@ Mettre cette valeur dans `backend/.env.production` (`TRUSTED_PROXIES=172.20.0.0/
 puis recréer les conteneurs applicatifs :
 
 ```bash
-dcp up -d --force-recreate backend worker
+dcp up -d --force-recreate backend worker nginx
 ```
 
 (L'entrypoint refait `config:cache` avec la nouvelle valeur — c'est ce mécanisme
@@ -581,12 +594,15 @@ qui résout le piège « `config:cache` fige l'env », ADR-28.)
 ### 12.6 Après TOUT changement d'un `.env.production`
 
 ```bash
-dcp up -d --force-recreate backend worker     # les caches sont refaits au redémarrage
+dcp up -d --force-recreate backend worker nginx   # les caches sont refaits au redémarrage
 ```
 
 `worker` inclus : il lit la même config (`backend/.env.production`) et met en
 cache à son démarrage — un changement `MAIL_*` ou `DB_*` non répercuté au worker
-laisserait les e-mails partir avec l'ancienne config.
+laisserait les e-mails partir avec l'ancienne config. `nginx` inclus : un
+`backend`/`worker` recréé change d'IP Docker ; `nginx` ne la ré-apprend qu'à
+son propre démarrage/reload (mitigé depuis Lot 15e par une ré-résolution
+DNS automatique en ≤ 10 s, voir § 12.9 — mais on garde le réflexe).
 
 Ne **jamais** éditer un `.env` et attendre que ça prenne : sans recreate, les
 caches figés gardent l'ancienne valeur.
@@ -618,10 +634,11 @@ depuis l'espace admin — c'est une donnée, pas un log serveur.
 | Symptôme | Cause probable | Correctif |
 |---|---|---|
 | `nginx` ne démarre pas, `cannot load certificate` | `docker/nginx/tls/` vide | rejouer § 6.1 (`gen-selfsigned.sh`), puis `dcp up -d nginx` |
-| `backend` `unhealthy`, logs `SQLSTATE… password authentication failed` | `DB_PASSWORD` ≠ `POSTGRES_PASSWORD` | aligner les deux, `dcp up -d --force-recreate backend` |
-| `backend` logs `No application encryption key` | `APP_KEY` vide dans `backend/.env.production` | générer (§ 4.2), `dcp up -d --force-recreate backend` |
-| Login → boucle, ou `419` systématique **dans le navigateur** | `SESSION_DOMAIN` ou `SANCTUM_STATEFUL_DOMAINS` ne matchent pas le host servi | corriger au host exact, `--force-recreate backend` |
-| `500` sur toutes les pages après un changement d'env | caches incohérents | `dcp exec backend php artisan config:clear` puis `dcp up -d --force-recreate backend` |
+| `backend` `unhealthy`, logs `SQLSTATE… password authentication failed` | `DB_PASSWORD` ≠ `POSTGRES_PASSWORD` | aligner les deux, `dcp up -d --force-recreate backend nginx` |
+| `backend` logs `No application encryption key` | `APP_KEY` vide dans `backend/.env.production` | générer (§ 4.2), `dcp up -d --force-recreate backend nginx` |
+| Login → boucle, ou `419` systématique **dans le navigateur** | `SESSION_DOMAIN` ou `SANCTUM_STATEFUL_DOMAINS` ne matchent pas le host servi | corriger au host exact, `--force-recreate backend nginx` |
+| `500` sur toutes les pages après un changement d'env | caches incohérents | `dcp exec backend php artisan config:clear` puis `dcp up -d --force-recreate backend nginx` |
+| `nginx` passe `unhealthy` juste après un `up -d --build`/`--force-recreate backend` (healthcheck `/up` en échec, logs `connect() failed … upstream: "fastcgi://<IP>:9000"`) | `backend` (ou `worker`) recréé a changé d'IP Docker ; `nginx` avait mis en cache l'ancienne (résolution DNS faite une seule fois, au démarrage/reload du worker nginx) — **502 silencieux sur tout `/api`**, login en échec sans message clair côté navigateur | Depuis Lot 15e : rien à faire, `nginx` ré-résout `backend`/`frontend` automatiquement en ≤ 10 s (`resolver 127.0.0.11 valid=10s` dans les 4 confs `docker/nginx/*.conf`) — `docker compose ps nginx` redevient `healthy` seul. Si ça persiste au-delà de 15-20 s : `dcp up -d --force-recreate nginx` en dernier recours. **Signal rapide** : `docker compose ps nginx --format '{{.Health}}'` (ou `docker inspect <conteneur> --format '{{json .State.Health}}'` pour le détail des tentatives) bascule sur `unhealthy` après quelques échecs consécutifs du healthcheck `/up` — c'est le signal le plus rapide, avant même qu'un utilisateur ne signale un login cassé. |
 | Erreur CSP dans la console navigateur après ajout d'une lib front | la lib charge une ressource externe (CDN, police) | inliner l'asset, ou ajuster la CSP dans `casa.prod.conf` (cf. ADR-27) et `dcp exec nginx nginx -s reload` |
 | Disque plein | images / volumes orphelins | `docker system df` puis `docker system prune` (⚠️ pas `-a --volumes` sans réfléchir) |
 | Besoin de créer / modifier une **campagne** (dates, quotas) | pas d'UI de création (point ouvert **D-6a-2**, cf. `docs/POINTS-OUVERTS.md`) | `dcp exec backend php artisan tinker` puis `INSERT`/`UPDATE` sur `campagne` ; garde-fou « une seule ouverte » appliqué par l'app |
@@ -939,7 +956,7 @@ Base de données + référentiel + e-mail + comptes de l'équipe : **identiques 
 dca exec backend php artisan migrate --force
 dca exec backend php artisan casa:seed-referentiel
 # E-mail (§ 9) : renseigner MAIL_* dans backend/.env.production, puis
-#   dca up -d --force-recreate backend worker
+#   dca up -d --force-recreate backend worker nginx
 #   dca exec backend php artisan casa:test-email vous@mon-domaine.ci
 dca exec backend php artisan casa:create-admin coordination@mon-domaine.ci
 dca exec backend php artisan casa:create-membre alice.diallo@mon-domaine.ci   # un par évaluateur (§ 10.2)
@@ -1112,11 +1129,14 @@ vérifier l'absence d'erreur CSP dans la console.
 
 ### 15.8 Ce qui change pour la maintenance (§ 12)
 
-- **Mise à jour** : `git fetch --tags && git checkout <tag> && dca up -d --build`
-  puis `dca exec backend php artisan migrate --force`.
+- **Mise à jour** : `git fetch --tags && git checkout <tag> && dca up -d --build --force-recreate`
+  puis `dca exec backend php artisan migrate --force`. (`--force-recreate` : voir
+  l'encadré § 12.4 — `up -d --build` seul ne recrée pas `nginx`, qui ne ré-apprend
+  sinon l'IP Docker de `backend`/`frontend` recréés qu'à son propre redémarrage ;
+  mitigé depuis Lot 15e par une ré-résolution DNS automatique en ≤ 10 s.)
 - **Sauvegardes / restauration / logs** : identiques au § 12, en remplaçant
   `dcp` par `dca`.
-- **Après un changement d'`.env.production`** : `dca up -d --force-recreate backend`.
+- **Après un changement d'`.env.production`** : `dca up -d --force-recreate backend worker nginx`.
 - **Cohabitation** : le projet Compose s'appelle `casa` (réseau `casa_casa`,
   conteneurs `casa-*`) — aucun risque de collision avec les autres piles Docker
   du serveur. Seul le port `8090` (loopback) est pris ; Apache et les autres
@@ -1125,9 +1145,10 @@ vérifier l'absence d'erreur CSP dans la console.
   | Symptôme | Cause | Correctif |
   |---|---|---|
   | Apache renvoie **502 Bad Gateway** | CASA (`:8090`) est arrêté ou pas `healthy` | `dca ps` ; `dca up -d` ; `dca logs -f nginx` |
-  | Login en **boucle** / **419** | `SESSION_DOMAIN` / `SANCTUM_STATEFUL_DOMAINS` ≠ domaine servi, ou `X-Forwarded-Proto` absent (module `headers` non activé) | vérifier les 2 vars = `casa.mon-domaine.ci` ; `a2enmod headers` ; `--force-recreate backend` |
+  | Apache renvoie **502**, `dca ps` montre `nginx` **`unhealthy`** juste après un `up -d --build`/`--force-recreate backend` (logs `nginx` : `connect() failed … upstream: "fastcgi://<IP>:9000"`) | `backend`/`worker` recréé a changé d'IP Docker ; `nginx` (conteneur CASA, pas Apache) avait mis en cache l'ancienne — résolution DNS faite une seule fois, au démarrage/reload de son worker | Depuis Lot 15e : rien à faire, `nginx` ré-résout automatiquement en ≤ 10 s (`resolver 127.0.0.11 valid=10s`, voir `docker/nginx/casa.apache.conf`) — `dca ps` remontre `nginx healthy` seul. Persiste au-delà de 15-20 s ? `dca up -d --force-recreate nginx` en dernier recours. |
+  | Login en **boucle** / **419** | `SESSION_DOMAIN` / `SANCTUM_STATEFUL_DOMAINS` ≠ domaine servi, ou `X-Forwarded-Proto` absent (module `headers` non activé) | vérifier les 2 vars = `casa.mon-domaine.ci` ; `a2enmod headers` ; `--force-recreate backend nginx` |
   | `$request->ip()` (logs, rate-limiting) = **IP interne** `172.31.243.x` au lieu de l'IP client, et/ou `$request->isSecure()` faux (URLs `http://` générées) | `docker network inspect casa_casa` ≠ `TRUSTED_PROXIES` (souvent après avoir changé `CASA_SUBNET` sans `dca down`) | aligner `CASA_SUBNET` / `TRUSTED_PROXIES` / `set_real_ip_from` sur le sous-réseau **réel** ; `dca down && dca up -d` |
-  | Rate-limiting **contournable** avec un `X-Forwarded-For` forgé (test § 15.7 n°5 → 65 × 200) | `TRUSTED_PROXIES` trop **large** (`*` ou un `/8`) → Laravel remonte trop loin dans la chaîne | remettre exactement `= CASA_SUBNET` ; `dca up -d --force-recreate backend` |
+  | Rate-limiting **contournable** avec un `X-Forwarded-For` forgé (test § 15.7 n°5 → 65 × 200) | `TRUSTED_PROXIES` trop **large** (`*` ou un `/8`) → Laravel remonte trop loin dans la chaîne | remettre exactement `= CASA_SUBNET` ; `dca up -d --force-recreate backend nginx` |
   | `build` échoue sur `getaddrinfo` / `Could not resolve host` (npm, composer) | DNS des conteneurs Docker cassé | `/etc/docker/daemon.json` → `{"dns":["8.8.8.8","1.1.1.1"]}` ; `sudo systemctl restart docker` ; relancer (§ 15.1) |
   | Page blanche, **erreurs CSP** | une lib front charge une ressource externe | ajuster la CSP dans `docker/nginx/casa.apache.conf` puis `dca exec nginx nginx -s reload` |
   | `apache2ctl configtest` : **AH00526** sur `<IfFile>` | Apache < 2.4.34 | mettre à jour, ou retirer les blocs `<IfFile>` et gérer le `:443` manuellement |
@@ -1383,13 +1404,13 @@ MAIL_FROM_ADDRESS="no-reply@<votre-domaine>"
 ```
 
 ```bash
-dca up -d --force-recreate backend worker
+dca up -d --force-recreate backend worker nginx
 dca exec backend php artisan casa:test-email <votre-email>
 ```
 Envoi **synchrone** (pas de flag) — le résultat s'affiche immédiatement :
 - **succès** → vérifier la réception (et les indésirables) ;
 - **échec** → le message d'erreur exact du serveur SMTP s'affiche (jamais le
-  mot de passe) ; corriger, `--force-recreate backend worker`, réessayer.
+  mot de passe) ; corriger, `--force-recreate backend worker nginx`, réessayer.
 
 Optionnel, pour tester aussi la chaîne asynchrone complète :
 ```bash
