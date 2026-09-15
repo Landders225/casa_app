@@ -130,10 +130,13 @@ class ReinitialisationMotDePasseTest extends TestCase
         $user = $this->creerCandidat('cand@cci.ci');
         $token = Password::broker()->createToken($user);
 
-        $this->fromSpa()->postJson('/api/mot-de-passe/reinitialiser', [
+        $reponse = $this->fromSpa()->postJson('/api/mot-de-passe/reinitialiser', [
             'token' => $token, 'email' => 'cand@cci.ci',
             'password' => 'faible', 'password_confirmation' => 'faible',
         ])->assertStatus(422)->assertJsonValidationErrors('password');
+
+        // Lot — bug traduction (2026-09-15) : message français lisible, pas une clé brute.
+        $this->assertSame('Le champ mot de passe doit contenir au moins 10 caractères.', $reponse->json('errors.password.0'));
     }
 
     /**

@@ -105,6 +105,9 @@ class CreateMembreTest extends TestCase
         $this->artisan('casa:create-membre', ['email' => 'faible@cci.ci'])
             ->expectsQuestion(self::PWD_PROMPT, 'court1A')
             ->expectsQuestion('Confirmer le mot de passe', 'court1A')
+            // Lot — bug traduction (2026-09-15) : message français lisible, pas une clé brute
+            // (CreerMembreEquipeCommand imprime $validator->errors()->first('password')).
+            ->expectsOutputToContain('Le champ mot de passe doit contenir au moins 10 caractères.')
             ->assertExitCode(2);
 
         $this->assertDatabaseMissing('utilisateur', ['email' => 'faible@cci.ci']);

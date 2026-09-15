@@ -113,10 +113,13 @@ class ChangementMotDePasseTest extends TestCase
     {
         $user = $this->membre($role);
 
-        $this->actingAs($user)->putJson('/api/equipe/mot-de-passe', [
+        $reponse = $this->actingAs($user)->putJson('/api/equipe/mot-de-passe', [
             'current_password' => 'password',
             'password' => 'faible', 'password_confirmation' => 'faible',
         ])->assertStatus(422)->assertJsonValidationErrors('password');
+
+        // Lot — bug traduction (2026-09-15) : message français lisible, pas une clé brute.
+        $this->assertSame('Le champ mot de passe doit contenir au moins 10 caractères.', $reponse->json('errors.password.0'));
     }
 
     /**
