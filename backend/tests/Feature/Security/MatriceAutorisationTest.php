@@ -182,6 +182,10 @@ class MatriceAutorisationTest extends TestCase
             ['post', "/api/admin/campagnes/{$campagne->id}/publier"],
             ['post', "/api/admin/campagnes/{$campagne->id}/classement"],
             ['patch', "/api/admin/campagnes/{$campagne->id}"],
+            // Lot 17 — création / édition / quotas.
+            ['post', '/api/admin/campagnes'],
+            ['put', "/api/admin/campagnes/{$campagne->id}"],
+            ['put', "/api/admin/campagnes/{$campagne->id}/quotas"],
             ['patch', "/api/admin/filieres/{$filiere->id}"],
             ['get', '/api/admin/membres'],
             ['post', '/api/admin/membres'],

@@ -44,19 +44,42 @@ class CampagnesListeTest extends TestCase
         $this->assertContains('Cohorte 2 — 2027', $noms);
     }
 
+    /**
+     * Lot 17 : la liste blanche s'ÉTEND (filieres/quota + 3 indicateurs, pour
+     * alimenter l'écran Quotas — Étape 1 Q4/Q5), mais reste STRICTE : ni
+     * description, ni timestamps, ni rien du classement lui-même (rang, motifs).
+     */
     public function test_liste_blanche_stricte_champs_de_gestion_seulement(): void
     {
         $reponse = $this->actingAs($this->admin)->getJson('/api/admin/campagnes')->assertOk();
 
         foreach ($reponse->json('data') as $ligne) {
-            $this->assertSame(['id', 'nom', 'statut', 'date_ouverture', 'date_cloture', 'places_totales'], array_keys($ligne));
+            $this->assertSame(
+                ['id', 'nom', 'statut', 'date_ouverture', 'date_cloture', 'places_totales', 'classement_calcule', 'classement_perime', 'publiee', 'filieres'],
+                array_keys($ligne),
+            );
+            foreach ($ligne['filieres'] as $f) {
+                $this->assertSame(['id', 'code', 'nom', 'quota'], array_keys($f));
+            }
         }
 
-        // Ni la description, ni les quotas par filière (relation `filieres`), ni les timestamps.
+        // Ni la description, ni les timestamps, ni rien du classement lui-même.
         $body = $reponse->getContent();
-        foreach (['description', 'quota', 'filieres', 'created_at', 'updated_at'] as $interdit) {
+        foreach (['description', 'created_at', 'updated_at', 'rang', 'motif_interne', 'motif_communicable'] as $interdit) {
             $this->assertStringNotContainsString($interdit, $body);
         }
+    }
+
+    public function test_liste_expose_les_filieres_et_quotas_de_chaque_campagne(): void
+    {
+        $reponse = $this->actingAs($this->admin)->getJson('/api/admin/campagnes')->assertOk();
+
+        $cohorte1 = collect($reponse->json('data'))->firstWhere('nom', 'Cohorte 1 — 2026');
+        $this->assertCount(5, $cohorte1['filieres']); // 5 CQP seedées, quota 24 chacune
+        $this->assertSame(24, $cohorte1['filieres'][0]['quota']);
+        $this->assertFalse($cohorte1['classement_calcule']);
+        $this->assertFalse($cohorte1['classement_perime']);
+        $this->assertFalse($cohorte1['publiee']);
     }
 
     public function test_campagnes_admin_only_403(): void

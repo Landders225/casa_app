@@ -128,8 +128,12 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
         Route::get('/candidatures', [CandidatureSupervisionController::class, 'index']);
         // Filières : activation / désactivation.
         Route::patch('/filieres/{filiere}', [AdminFiliereController::class, 'changerStatut']);
-        // Campagnes : liste (Lot 8d-1) + transitions d'état (ouvrir / clôturer).
+        // Campagnes : liste (Lot 8d-1) + transitions d'état (ouvrir / clôturer)
+        // + création / édition / quotas (Lot 17, D-6a-2).
         Route::get('/campagnes', [AdminCampagneController::class, 'index']);
+        Route::post('/campagnes', [AdminCampagneController::class, 'store']);
+        Route::put('/campagnes/{campagne}', [AdminCampagneController::class, 'mettreAJour']);
+        Route::put('/campagnes/{campagne}/quotas', [AdminCampagneController::class, 'modifierQuotas']);
         Route::patch('/campagnes/{campagne}', [AdminCampagneController::class, 'changerStatut']);
         // Évaluateurs : liste (Lot 8d-1) — sélecteur d'affectation + filtre supervision.
         Route::get('/evaluateurs', [AdminEvaluateurController::class, 'index']);

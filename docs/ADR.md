@@ -601,6 +601,29 @@ Découvert en écrivant l'E2E : `Entretien.jsx` ne proposait **aucune UI** pour 
 
 ---
 
+## ADR-34 — Admin : gestion des campagnes et quotas par l'interface (Lot 17)
+
+**Contexte.** Modifier une campagne (nom, dates) ou ses quotas par filière n'était possible qu'en CLI/tinker (D-6a-2, tracé depuis le Lot 6a). Ce lot ferme le manque avec un vrai écran admin, sans dupliquer ni fragiliser deux mécanismes déjà en place et éprouvés : le garde-fou « une seule campagne ouverte » (Lot 6a) et le calcul du classement (Lot 5a, `decision_candidature` PERSISTÉ, explicitement rejouable à volonté tant qu'aucune `publication` n'existe).
+
+**Décision — 3 écritures, séparées par nature, jamais mélangées à une transition d'état :**
+- `POST /admin/campagnes` — création, TOUJOURS `statut = 'brouillon'` (`statut` envoyé par le client est ignoré, pas juste par défaut) : le passage à `ouverte` reste exclusivement `PATCH /admin/campagnes/{id}` (Lot 6a, inchangé) — une création ne peut donc STRUCTURELLEMENT jamais violer le garde-fou « une seule ouverte », sans qu'aucune vérification ne soit dupliquée ici. Filières choisissables limitées aux `actif = true` (réutilise `GET /api/filieres`, déjà public) ; création de filière elle-même hors périmètre (D-6a-2, volontairement restreint, confirmé inchangé).
+- `PUT /admin/campagnes/{id}` — nom/dates. Distinction délibérée entre effet cosmétique et effet réel sur le processus : une campagne `cloturee` a les DATES verrouillées (409 si modifiées — elles ont porté la fenêtre officielle de la cohorte), le NOM reste éditable (aucun effet sur le déroulé déjà eu lieu).
+- `PUT /admin/campagnes/{id}/quotas` — le point le plus délicat (Étape 1, Q2). **Bloqué en dur (409) dès qu'une `publication` existe** : au-delà de ce point, `ClassementController::calculer()` se bloque déjà lui-même (409), donc un quota qui changerait créerait un décalage PERMANENT avec des décisions déjà communiquées aux candidats — aucune exception. **Avant publication**, un quota reste éditable même si un classement a déjà été calculé (c'est l'usage normal : ajuster puis recalculer, le calcul étant conçu comme un aperçu rejouable) — mais le classement existant est alors marqué `campagne.classement_perime = true`. Volontairement un **drapeau structurel**, pas un avertissement que l'écran pourrait choisir d'ignorer : il bloque `POST .../publier` (422, message explicite), est exposé aussi bien par `GET /admin/campagnes` que par `GET .../classement`, et ne se lève QUE par un recalcul explicite (`POST .../classement`, qui le remet à `false` en repersistant `decision_candidature` avec les quotas actuels). **Alternative écartée** : la validation « quota ≥ retenus déjà décidés » suggérée dans `POINTS-OUVERTS.md` à l'origine — ne couvre pas la hausse de quota (qui change aussi qui est retenu) ; le drapeau structurel couvre les deux directions uniformément, sans recalcul silencieux ni blocage disproportionné du flux normal.
+
+**Conséquence pratique du choix « marquer périmé » plutôt que « recalculer automatiquement ».** Un recalcul automatique en side-effect d'une simple édition de quota a été envisagé puis écarté : un recalcul reste un ACTE (il réévalue qui est retenu/liste d'attente/non retenu) que l'admin doit explicitement déclencher et pouvoir relire avant publication — l'automatiser aurait déplacé la décision hors de la vue de l'admin au moment même où elle compte le plus. La péremption rend la désynchronisation **visible et bloquante** sans jamais réécrire une décision sans un geste explicite.
+
+**Audit.** Une ligne détaillée par appel à `PUT .../quotas` listant CHAQUE filière effectivement modifiée (`Nom : ancien → nouveau`, séparées par `;` — pas une ligne vague « quotas modifiés ») ; une ligne distincte « Classement marqué périmé » quand la péremption se déclenche ; idempotent (aucune ligne si rien ne change réellement, même patron que `FiliereController::changerStatut`).
+
+**Écran.** `pages/admin/Quotas.jsx` — un ONGLET DISTINCT de `Campagnes.jsx` (Étape 1, Q5) : active l'entrée de navigation « Quotas », présente mais inerte depuis la revue admin du 2026-09-11 (`POINTS-OUVERTS.md`). Deux natures d'action différentes, jamais fusionnées : `Campagnes.jsx` reste la transition d'état (ouvrir/clôturer, inchangé, zéro régression), `Quotas.jsx` porte la création et l'édition nom/dates/quotas. Aucune règle de garde-fou n'est devinée côté client — chaque état (`publiee`, `classement_perime`, `classement_calcule`) vient tel quel de l'API et gouverne ce que l'écran affiche/permet.
+
+**Preuve.** `CampagneCreationTest`, `CampagneEditionTest`, `CampagneQuotaTest` (le garde-fou central prouvé par assertion directe sur `decision_candidature` : les rangs/décisions persistés ne bougent PAS après une édition de quota post-calcul, seul un `POST .../classement` explicite les change) + `MatriceAutorisationTest` étendue (3 nouvelles routes) + `Quotas.test.jsx` (confirmation explicite avant péremption, quotas verrouillés si publiée). Non-régression complète : suite backend entière (518 tests) et suite frontend entière (582 tests) vertes, y compris les lots 5a/6a/8d-1/8d-2 explicitement rejoués.
+
+**Point ouvert.** Aucun attach/detach de filière sur une campagne EXISTANTE (seule l'édition de quota des filières déjà rattachées à la création est couverte) — signalé, pas un manque bloquant : une filière mal choisie à la création d'un `brouillon` se corrige aujourd'hui en recréant la campagne.
+
+**Divergences maquette.** Aucune (l'écran « Quotas » de la maquette était vide/inerte ; ce lot lui donne un contenu réel, pas un portage).
+
+---
+
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)
 
 > **Inventaire vivant à jour : [`docs/POINTS-OUVERTS.md`](POINTS-OUVERTS.md)** (Lot 9c, ADR-28).
@@ -614,7 +637,7 @@ Découvert en écrivant l'E2E : `Entretien.jsx` ne proposait **aucune UI** pour 
 
 - ~~**Endpoint d'affectation** d'un dossier à un évaluateur~~ — **livré au Lot 6a** (`POST /api/admin/affectations`, cf. ADR-14).
 - ~~**Correction exceptionnelle** admin (score verrouillé), **remplacement** (indisponible → promotion liste d'attente), **élimination manuelle** (D-6a-3)~~ — **livré au Lot 6b** (cf. ADR-15).
-- Création de campagne / édition nom·description·quota de filière (D-6a-2).
+- ~~Création de campagne / édition nom·description·quota de filière (D-6a-2)~~ — **livré au Lot 17** (cf. ADR-34).
 - **Score final /100** (`computeScoreFinal` = dossier /65 + entretien /35) et **classement par filière** (`rankCandidatsParFiliere` : départage mixité > vulnérabilité > expérience secteur > motivation) — lot ultérieur.
 - Détail des policies Laravel par endpoint (matrice complète rôle × action).
 - Stratégie de rate limiting / anti-bruteforce sur l'authentification.

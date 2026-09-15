@@ -28,6 +28,12 @@ const NAV_LINKS = {
     candidatures: paths.adminCandidatures,
     cqp: paths.adminFilieres,
     campagnes: paths.adminCampagnes,
+    // Lot 17 — active l'entrée « Quotas » de la maquette, jusque-là inerte
+    // (POINTS-OUVERTS, revue admin du 2026-09-11) : création de campagne +
+    // édition nom/dates/quotas, un ÉCRAN DISTINCT de `Campagnes.jsx`
+    // (transitions d'état ouvrir/clôturer) — deux natures d'action
+    // différentes (Étape 1, Q5), pas fusionnées.
+    quotas: paths.adminQuotas,
     equipe: paths.adminEquipe,
     'mon-compte': paths.equipeMonCompte,
     rapports: paths.adminRapports,

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
@@ -20,13 +21,14 @@ class Campagne extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['nom', 'statut', 'date_ouverture', 'date_cloture', 'places_totales', 'description'];
+    protected $fillable = ['nom', 'statut', 'date_ouverture', 'date_cloture', 'places_totales', 'description', 'classement_perime'];
 
     protected function casts(): array
     {
         return [
             'date_ouverture' => 'date',
             'date_cloture' => 'date',
+            'classement_perime' => 'boolean',
         ];
     }
 
@@ -37,6 +39,19 @@ class Campagne extends Model
     {
         return $this->belongsToMany(Filiere::class, 'campagne_filiere', 'campagne_id', 'filiere_id')
             ->withPivot('quota');
+    }
+
+    /**
+     * `decision_candidature` des candidatures de cette campagne, à travers
+     * `candidature` (Lot 17) — sert uniquement à détecter, EFFICACEMENT (une
+     * seule sous-requête EXISTS via `withExists`, pas de N+1), si un
+     * classement a déjà été calculé pour cette campagne (`GET /admin/campagnes`).
+     *
+     * @return HasManyThrough<DecisionCandidature, Candidature, $this>
+     */
+    public function decisionsCandidature(): HasManyThrough
+    {
+        return $this->hasManyThrough(DecisionCandidature::class, Candidature::class, 'campagne_id', 'candidature_id');
     }
 
     /**

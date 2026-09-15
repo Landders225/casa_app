@@ -70,7 +70,7 @@ describe('Campagnes — GET /admin/campagnes (nouvel endpoint) + transitions', (
     expect(await screen.findByText(/une autre campagne est déjà ouverte/i)).toBeInTheDocument()
   })
 
-  it('aucun bouton "Nouvelle campagne" — création hors backend (D-6a-2)', async () => {
+  it('aucun bouton "Nouvelle campagne" ici — création vit sur l’écran Quotas (Lot 17), pas fusionnée', async () => {
     apiClient.get.mockResolvedValueOnce({ data: [campagne()] })
     renderScreen()
     await screen.findByText('Cohorte 1 — 2026')

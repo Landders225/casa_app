@@ -72,6 +72,14 @@ class ClassementController extends Controller
                 $decision->save();
             }
 
+            // Lot 17 — un recalcul EXPLICITE resynchronise le classement avec
+            // les quotas actuels : lève `classement_perime` s'il était vrai
+            // (cf. CampagneController::modifierQuotas). Idempotent : pas de
+            // ligne d'audit si déjà à jour.
+            if ($campagne->classement_perime) {
+                $campagne->forceFill(['classement_perime' => false])->save();
+            }
+
             JournalAudit::create([
                 'auteur_id' => $request->user()->id,
                 'role' => $request->user()->role,
@@ -179,6 +187,11 @@ class ClassementController extends Controller
             'version_algorithme' => ServiceClassement::VERSION,
             'liste_attente_taille' => ServiceClassement::TAILLE_LISTE_ATTENTE,
             'calcule' => $decisions->isNotEmpty(),
+            // Lot 17 — un quota a été modifié depuis ce calcul (sans recalcul
+            // explicite depuis) : les chiffres ci-dessous ne reflètent plus
+            // les quotas actuels. L'écran les affiche masqués/grisés derrière
+            // ce drapeau plutôt qu'à l'identique d'un classement à jour.
+            'perime' => (bool) $campagne->classement_perime,
             'publie' => $campagne->publication !== null,
             // Traçabilité de l'acte notarial (Lot 8d-2, Étape 1 Q3) : survit au
             // rechargement de la page, contrairement à la seule réponse du POST

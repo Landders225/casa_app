@@ -54,6 +54,16 @@ class PublicationController extends Controller
             'Aucune décision : calculez le classement (POST /classement) avant de publier.',
         );
 
+        // Lot 17 — un quota a été modifié depuis ce calcul (`classement_perime`,
+        // cf. CampagneController::modifierQuotas) : publier maintenant fige des
+        // décisions qui ne reflètent plus les quotas actuels. Un recalcul
+        // explicite (POST /classement) est requis avant toute publication.
+        abort_if(
+            $campagne->classement_perime,
+            422,
+            'Le classement est périmé (des quotas ont été modifiés depuis le dernier calcul) : recalculez-le (POST /classement) avant de publier.',
+        );
+
         $membreEquipeId = $request->user()->membreEquipe?->id;
         abort_if(
             $membreEquipeId === null,

@@ -17,8 +17,9 @@ const LABEL = { ouverte: 'Ouverte', brouillon: 'Brouillon', cloturee: 'Clôturé
  * UNIQUEMENT de `statut` renvoyé par l'API (aucune règle de transition
  * devinée côté client). Le garde-fou « une seule campagne ouverte » et
  * l'irréversibilité de la clôture restent 100 % serveur (409/422 affichés
- * tels quels). Pas de création (D-6a-2, hors backend) : pas de bouton
- * « Nouvelle campagne ».
+ * tels quels). Pas de bouton « Nouvelle campagne » ICI — la création (et
+ * l'édition nom/dates/quotas) vit sur l'écran Quotas (Lot 17, D-6a-2),
+ * délibérément un écran distinct (deux natures d'action différentes).
  */
 export function Campagnes() {
   const { status, items, changing, error, changerStatut } = useCampagnes()
