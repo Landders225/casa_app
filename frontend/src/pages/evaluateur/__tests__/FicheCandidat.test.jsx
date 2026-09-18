@@ -84,6 +84,25 @@ describe('FicheCandidat — la zone 🔴 est affichée LÉGITIMEMENT (inversion 
     expect(screen.getByText('Terminale')).toBeInTheDocument() // sc02
   })
 
+  it('Lot 18 — le numéro CMU du candidat est affiché sur l’onglet profil', async () => {
+    apiClient.get.mockResolvedValueOnce({ data: dossier({ candidat: { ...dossier().candidat, numero_cmu: 'CMU000111222' } }) })
+    renderFiche()
+
+    expect(await screen.findByRole('heading', { name: 'Awa Konan' })).toBeInTheDocument()
+    const row = screen.getByText('Numéro CMU').closest('.qa-row')
+    expect(within(row).getByText('CMU000111222')).toBeInTheDocument()
+  })
+
+  it('Lot 18, Étape 1 (point d) — dossier ANTÉRIEUR sans CMU : affiché « — », aucune erreur', async () => {
+    // Fixture par défaut : `numero_cmu` absent, exactement un dossier créé avant ce lot.
+    apiClient.get.mockResolvedValueOnce({ data: dossier() })
+    renderFiche()
+
+    expect(await screen.findByRole('heading', { name: 'Awa Konan' })).toBeInTheDocument()
+    const row = screen.getByText('Numéro CMU').closest('.qa-row')
+    expect(within(row).getByText('—')).toBeInTheDocument()
+  })
+
   it('éligible + aucun critère -> bannière succès, jamais de calcul client', async () => {
     apiClient.get.mockResolvedValueOnce({ data: dossier() })
     renderFiche()

@@ -24,7 +24,7 @@ import { StepDisponibilite } from './wizard/steps/StepDisponibilite.jsx'
 import { StepDocuments } from './wizard/steps/StepDocuments.jsx'
 import { StepRecap } from './wizard/steps/StepRecap.jsx'
 
-const PROFIL_FIELDS = ['prenom', 'nom', 'sexe', 'date_naissance', 'cni', 'telephone', 'ville_residence']
+const PROFIL_FIELDS = ['prenom', 'nom', 'sexe', 'date_naissance', 'cni', 'numero_cmu', 'telephone', 'ville_residence']
 
 function AlreadySubmitted() {
   return (

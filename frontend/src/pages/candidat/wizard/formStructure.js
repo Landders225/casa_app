@@ -224,7 +224,7 @@ export const EXPERIENCE_DUREES = [
   { value: 'plus_12', label: 'Plus de 12 mois' },
 ]
 
-/** Étape 9 — Pièces du dossier (référentiel `type_document`, 6 obligatoires). */
+/** Étape 9 — Pièces du dossier (référentiel `type_document`, 7 obligatoires). */
 export const PIECES_DOSSIER = [
   { code: 'cni', label: 'Carte Nationale d’Identité' },
   { code: 'residence', label: 'Certificat de résidence' },
@@ -232,6 +232,9 @@ export const PIECES_DOSSIER = [
   { code: 'cv', label: 'Curriculum Vitae (CV)' },
   { code: 'lettre', label: 'Lettre de motivation' },
   { code: 'photo', label: 'Photo d’identité' },
+  // Lot 18 — hors maquette (demande projet). Même patron que "Curriculum
+  // Vitae (CV)" ci-dessus : nom complet d'abord, sigle entre parenthèses.
+  { code: 'cmu', label: 'Couverture Maladie Universelle (CMU)' },
 ]
 
 /** Formats acceptés par l'upload (backend `ContraintesFichier`). */

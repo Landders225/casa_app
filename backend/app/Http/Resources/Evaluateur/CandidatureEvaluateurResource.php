@@ -66,6 +66,10 @@ class CandidatureEvaluateurResource extends JsonResource
                 'sexe' => $this->candidat->sexe,
                 'date_naissance' => $this->candidat->date_naissance?->toDateString(),
                 'cni' => $this->candidat->cni,
+                // Lot 18 : `null` pour un dossier antérieur à ce lot (colonne
+                // nullable) — le frontend l'affiche « — », même patron que les
+                // autres champs facultatifs ci-dessus, aucun cas spécial ici.
+                'numero_cmu' => $this->candidat->numero_cmu,
                 'telephone' => $this->candidat->telephone,
                 'ville_residence' => $this->candidat->ville_residence,
                 'residence_ci' => (bool) $this->candidat->residence_ci,

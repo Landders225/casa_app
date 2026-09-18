@@ -15,7 +15,8 @@ vi.mock('../../../auth/useAuth.js', () => ({ useAuth: vi.fn() }))
 function profil(over = {}) {
   return {
     id: 'c1', prenom: 'Awa', nom: 'Koné', sexe: 'F', date_naissance: '2003-05-01',
-    cni: 'CI123456789', telephone: '0700000000', ville_residence: 'Abidjan', residence_ci: true,
+    cni: 'CI123456789', numero_cmu: 'CMU123456789',
+    telephone: '0700000000', ville_residence: 'Abidjan', residence_ci: true,
     ...over,
   }
 }
@@ -42,7 +43,7 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('Profil — écran « Mon profil » (Lot 13)', () => {
-  it('rend les 7 champs éditables réconciliés sur le backend', async () => {
+  it('rend les 8 champs éditables réconciliés sur le backend (Lot 18 : numero_cmu ajouté)', async () => {
     mockApi()
     renderScreen()
 
@@ -51,6 +52,7 @@ describe('Profil — écran « Mon profil » (Lot 13)', () => {
     expect(screen.getByLabelText('Date de naissance')).toHaveValue('2003-05-01')
     expect(screen.getByLabelText('Sexe')).toHaveValue('F')
     expect(screen.getByLabelText('Numéro CNI / récépissé')).toHaveValue('CI123456789')
+    expect(screen.getByLabelText('Numéro CMU')).toHaveValue('CMU123456789')
     expect(screen.getByLabelText('Téléphone')).toHaveValue('0700000000')
     expect(screen.getByLabelText('Ville de résidence')).toHaveValue('Abidjan')
   })
@@ -75,7 +77,7 @@ describe('Profil — écran « Mon profil » (Lot 13)', () => {
     expect(screen.getByText(/âge calculé/i)).toBeInTheDocument()
   })
 
-  it('enregistre uniquement les 7 champs éditables, jamais email/residence_ci', async () => {
+  it('enregistre uniquement les 8 champs éditables, jamais email/residence_ci', async () => {
     mockApi()
     apiClient.patch.mockResolvedValueOnce({ data: profil({ telephone: '0102030405' }) })
     renderScreen()
@@ -88,7 +90,7 @@ describe('Profil — écran « Mon profil » (Lot 13)', () => {
 
     await waitFor(() => expect(apiClient.patch).toHaveBeenCalledWith('/candidat/profil', {
       prenom: 'Awa', nom: 'Koné', sexe: 'F', date_naissance: '2003-05-01',
-      cni: 'CI123456789', telephone: '0102030405', ville_residence: 'Abidjan',
+      cni: 'CI123456789', numero_cmu: 'CMU123456789', telephone: '0102030405', ville_residence: 'Abidjan',
     }))
     const envoye = apiClient.patch.mock.calls[0][1]
     expect(envoye).not.toHaveProperty('email')
@@ -131,7 +133,7 @@ describe('Profil — écran « Mon profil » (Lot 13)', () => {
       mockApi({ candidature: { status: 200, data: { date_soumission: '2026-06-01T00:00:00Z', statut_public: 'en_cours_de_traitement' } } })
     }
 
-    it('les 5 champs d\'identité sont désactivés, téléphone et ville restent actifs', async () => {
+    it('les 5 champs d\'identité sont désactivés, téléphone/ville/CMU restent actifs', async () => {
       mockApiSoumis()
       renderScreen()
       await screen.findByLabelText('Prénom')
@@ -143,9 +145,10 @@ describe('Profil — écran « Mon profil » (Lot 13)', () => {
       expect(screen.getByLabelText('Numéro CNI / récépissé')).toBeDisabled()
       expect(screen.getByLabelText('Téléphone')).toBeEnabled()
       expect(screen.getByLabelText('Ville de résidence')).toBeEnabled()
+      expect(screen.getByLabelText('Numéro CMU')).toBeEnabled()
     })
 
-    it('le PATCH exclut les 5 champs verrouillés, même si un seul change', async () => {
+    it('le PATCH exclut les 5 champs verrouillés, même si un seul change (numero_cmu envoyé)', async () => {
       mockApiSoumis()
       apiClient.patch.mockResolvedValueOnce({ data: profil({ telephone: '0102030405' }) })
       renderScreen()
@@ -157,7 +160,7 @@ describe('Profil — écran « Mon profil » (Lot 13)', () => {
       await user.click(screen.getByRole('button', { name: /enregistrer les modifications/i }))
 
       await waitFor(() => expect(apiClient.patch).toHaveBeenCalledWith('/candidat/profil', {
-        telephone: '0102030405', ville_residence: 'Abidjan',
+        numero_cmu: 'CMU123456789', telephone: '0102030405', ville_residence: 'Abidjan',
       }))
       const envoye = apiClient.patch.mock.calls[0][1]
       for (const champ of ['prenom', 'nom', 'sexe', 'date_naissance', 'cni']) {
@@ -165,7 +168,7 @@ describe('Profil — écran « Mon profil » (Lot 13)', () => {
       }
     })
 
-    it('dossier non soumis : les 7 champs restent actifs et envoyés (non-régression)', async () => {
+    it('dossier non soumis : les 8 champs restent actifs et envoyés (non-régression)', async () => {
       mockApi() // 404 -> pas encore soumis
       renderScreen()
       await screen.findByLabelText('Prénom')
@@ -173,6 +176,7 @@ describe('Profil — écran « Mon profil » (Lot 13)', () => {
       expect(screen.getByLabelText('Prénom')).toBeEnabled()
       expect(screen.getByLabelText('Sexe')).toBeEnabled()
       expect(screen.getByLabelText('Numéro CNI / récépissé')).toBeEnabled()
+      expect(screen.getByLabelText('Numéro CMU')).toBeEnabled()
     })
   })
 

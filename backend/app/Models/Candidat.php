@@ -31,6 +31,7 @@ class Candidat extends Model
         'sexe',
         'date_naissance',
         'cni',
+        'numero_cmu',
         'telephone',
         'ville_residence',
         'residence_ci',

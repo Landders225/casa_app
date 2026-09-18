@@ -27,6 +27,13 @@ final class ContraintesFichier
         'image/png' => 'png',
     ];
 
-    /** Les 6 types de pièces du dossier (référentiel `type_document`). */
-    public const TYPES_DOSSIER = ['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo'];
+    /**
+     * Les 7 types de pièces du dossier (référentiel `type_document`) — `cmu`
+     * ajouté au Lot 18. SOURCE UNIQUE consommée par la contrainte de route
+     * `whereIn` (upload/suppression, `routes/api.php`) et par
+     * `ValidateurCompletude` (diff des pièces manquantes) : y ajouter un type
+     * suffit à le rendre obligatoire de bout en bout, rien d'autre à modifier
+     * côté contrôleur.
+     */
+    public const TYPES_DOSSIER = ['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo', 'cmu'];
 }

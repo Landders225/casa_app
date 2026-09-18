@@ -76,7 +76,7 @@ describe('Documents — écran candidat (Lot 14)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/n'ont pas pu être charg/i)
   })
 
-  it('soumis -> liste les 6 pièces (déposé/manquant), compteur correct', async () => {
+  it('soumis -> liste les 7 pièces (déposé/manquant), compteur correct (Lot 18 : cmu ajoutée)', async () => {
     mockCandidature(() => Promise.resolve({
       data: payload({
         pieces_dossier: [
@@ -87,9 +87,10 @@ describe('Documents — écran candidat (Lot 14)', () => {
     }))
     renderScreen()
 
-    expect(await screen.findByText('2/6 déposées')).toBeInTheDocument()
+    expect(await screen.findByText('2/7 déposées')).toBeInTheDocument()
     expect(screen.getByText('Carte Nationale d’Identité')).toBeInTheDocument()
-    expect(screen.getAllByText('Manquant')).toHaveLength(4) // résidence, diplôme, lettre, photo
+    expect(screen.getByText('Couverture Maladie Universelle (CMU)')).toBeInTheDocument()
+    expect(screen.getAllByText('Manquant')).toHaveLength(5) // résidence, diplôme, lettre, photo, cmu
 
     // Téléchargement : l'URL vient EXACTEMENT de la réponse serveur, jamais reconstruite.
     const lienCni = screen.getByRole('link', { name: /cni\.pdf/i })

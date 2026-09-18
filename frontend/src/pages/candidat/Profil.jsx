@@ -25,8 +25,9 @@ import { useProfil } from './useProfil.js'
  * (prénom/nom/sexe/date de naissance/CNI) sont désactivés visuellement ET
  * exclus du payload envoyé au serveur — le serveur les refuse de toute façon
  * (`prohibited`, `MettreAJourProfilRequest`), mais les envoyer quand même
- * casserait la mise à jour des 2 champs qui restent éditables (téléphone,
- * ville). `telephone` / `ville_residence` ne sont jamais concernés.
+ * casserait la mise à jour des champs qui restent éditables (téléphone,
+ * ville, numéro CMU). `telephone` / `ville_residence` / `numero_cmu` (Lot 18)
+ * ne sont jamais concernés par ce verrou.
  */
 function calculerAge(dateNaissance) {
   if (!dateNaissance) return null
@@ -42,7 +43,9 @@ function calculerAge(dateNaissance) {
 }
 
 const CHAMPS_VERROUILLABLES = ['prenom', 'nom', 'sexe', 'date_naissance', 'cni']
-const CHAMPS_TOUJOURS_EDITABLES = ['telephone', 'ville_residence']
+// Lot 18 : `numero_cmu` rejoint ce tier — pas un fait d'identité vérifié sur
+// pièce comme `cni`, jamais verrouillé après soumission.
+const CHAMPS_TOUJOURS_EDITABLES = ['numero_cmu', 'telephone', 'ville_residence']
 
 export function Profil() {
   const { user } = useAuth()
@@ -59,7 +62,7 @@ export function Profil() {
       // oxlint-disable-next-line react/set-state-in-effect -- initialise le brouillon local depuis la réponse serveur, une fois chargée
       setForm({
         prenom: profil.prenom, nom: profil.nom, sexe: profil.sexe,
-        date_naissance: profil.date_naissance, cni: profil.cni,
+        date_naissance: profil.date_naissance, cni: profil.cni, numero_cmu: profil.numero_cmu,
         telephone: profil.telephone, ville_residence: profil.ville_residence,
       })
     }
@@ -121,7 +124,7 @@ export function Profil() {
           <Alert variant="info">
             Votre dossier est déjà transmis. Les champs d'identité (prénom, nom, sexe, date de
             naissance, numéro CNI) sont verrouillés — contactez l'équipe si une correction doit y
-            être apportée. Téléphone et ville de résidence restent modifiables.
+            être apportée. Téléphone, ville de résidence et numéro CMU restent modifiables.
           </Alert>
         </div>
       ) : null}
@@ -188,11 +191,18 @@ export function Profil() {
               />
             </div>
 
-            <FormField
-              label="Ville de résidence"
-              error={errors.ville_residence}
-              inputProps={{ value: form.ville_residence, onChange: set('ville_residence'), required: true }}
-            />
+            <div className="form-row">
+              <FormField
+                label="Numéro CMU"
+                error={errors.numero_cmu}
+                inputProps={{ value: form.numero_cmu, onChange: set('numero_cmu'), required: true }}
+              />
+              <FormField
+                label="Ville de résidence"
+                error={errors.ville_residence}
+                inputProps={{ value: form.ville_residence, onChange: set('ville_residence'), required: true }}
+              />
+            </div>
 
             <button type="submit" className={`btn btn-primary btn-block${saving ? ' is-loading' : ''}`} disabled={saving}>
               Enregistrer les modifications

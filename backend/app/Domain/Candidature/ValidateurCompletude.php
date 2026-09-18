@@ -45,7 +45,10 @@ final class ValidateurCompletude
         $r = $candidature->reponseFormulaire;
 
         // --- Identité (candidat) ---
-        foreach (['prenom', 'nom', 'date_naissance', 'cni'] as $champ) {
+        // `numero_cmu` (Lot 18) est ici pour la MÉCANIQUE (champ requis sur
+        // `candidat`), pas pour la sémantique : ce n'est pas un fait
+        // d'identité, juste le même point d'appel `blank($c?->{$champ})`.
+        foreach (['prenom', 'nom', 'date_naissance', 'cni', 'numero_cmu'] as $champ) {
             if (blank($c?->{$champ})) {
                 $erreurs["identite.{$champ}"][] = 'Information obligatoire manquante.';
             }
@@ -104,7 +107,7 @@ final class ValidateurCompletude
             }
         }
 
-        // --- Pièces du dossier : les 6 types ---
+        // --- Pièces du dossier : les 7 types (ContraintesFichier::TYPES_DOSSIER) ---
         $presents = $candidature->piecesDossier->pluck('type_document_code')->all();
         $manquants = array_values(array_diff(ContraintesFichier::TYPES_DOSSIER, $presents));
         if ($manquants !== []) {

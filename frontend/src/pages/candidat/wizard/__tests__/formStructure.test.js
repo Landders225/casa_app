@@ -59,8 +59,8 @@ describe('formStructure — contrat backend', () => {
     expect(DISPONIBILITE.di05.field).toBe('acces_deux_plateaux_vallons')
   })
 
-  it('les 6 pièces du dossier', () => {
-    expect(PIECES_DOSSIER.map((p) => p.code)).toEqual(['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo'])
+  it('les 7 pièces du dossier (Lot 18 : cmu ajoutée)', () => {
+    expect(PIECES_DOSSIER.map((p) => p.code)).toEqual(['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo', 'cmu'])
   })
 
   it('ne propose jamais SC.04 / note en étoiles / nationalité', () => {

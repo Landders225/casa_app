@@ -62,7 +62,11 @@ export const EXPERIENCE_DUREES = { moins_6: 'Moins de 6 mois', '6_12': '6 à 12 
 /** Échelle d'auto-évaluation Langues / Informatique (0 à 3), déclarée par le candidat. */
 export const NIVEAUX = ['Débutant', 'Élémentaire', 'Intermédiaire', 'Avancé']
 
-/** Les 6 pièces du dossier (référentiel `type_document`). */
+/**
+ * Les 7 pièces du dossier (référentiel `type_document`) — copie DÉLIBÉRÉMENT
+ * dupliquée de `pages/candidat/wizard/formStructure.js` (étanchéité
+ * candidat/évaluateur, `noBridge.test.js` — pas une dette à corriger).
+ */
 export const PIECES_DOSSIER = [
   { code: 'cni', label: 'Carte Nationale d’Identité' },
   { code: 'residence', label: 'Certificat de résidence' },
@@ -70,6 +74,7 @@ export const PIECES_DOSSIER = [
   { code: 'cv', label: 'Curriculum Vitae (CV)' },
   { code: 'lettre', label: 'Lettre de motivation' },
   { code: 'photo', label: 'Photo d’identité' },
+  { code: 'cmu', label: 'Couverture Maladie Universelle (CMU)' },
 ]
 
 /** SC.04 — vérifié par l'évaluateur, jamais déclaré par le candidat (ADR-07). */

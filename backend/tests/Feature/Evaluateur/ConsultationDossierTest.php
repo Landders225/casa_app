@@ -64,6 +64,31 @@ class ConsultationDossierTest extends TestCase
             ->assertJsonPath('data.criteres_eliminatoires', []);
     }
 
+    /** Lot 18 — le numéro CMU se lit comme les autres champs `candidat` déjà exposés. */
+    public function test_fiche_expose_le_numero_cmu(): void
+    {
+        $c = $this->candidatureAffectee($this->candidat, $this->evaluateur);
+
+        $this->actingAs($this->evaluateur)->getJson("/api/evaluateur/candidatures/{$c->id}")
+            ->assertOk()
+            ->assertJsonPath('data.candidat.numero_cmu', fn ($v) => $v !== null);
+    }
+
+    /**
+     * Lot 18, Étape 1 (point d) — un dossier ANTÉRIEUR à ce lot n'a pas de CMU :
+     * la fiche reste un 200 normal, `numero_cmu` vaut simplement `null`
+     * (colonne nullable), aucune erreur. Le frontend l'affiche « — ».
+     */
+    public function test_fiche_dossier_ancien_sans_cmu_ne_declenche_aucune_erreur(): void
+    {
+        $ancien = $this->creerCandidat('ancien@casa-demo.ci', ['numero_cmu' => null]);
+        $c = $this->candidatureAffectee($ancien, $this->evaluateur);
+
+        $this->actingAs($this->evaluateur)->getJson("/api/evaluateur/candidatures/{$c->id}")
+            ->assertOk()
+            ->assertJsonPath('data.candidat.numero_cmu', null);
+    }
+
     public function test_filtre_par_statut_interne(): void
     {
         $this->candidatureAffectee($this->candidat, $this->evaluateur);

@@ -5,6 +5,11 @@ import { FormField } from '../../../../components/ui/FormField.jsx'
  * Étape 1 — état civil, écrit via `PATCH /api/candidat/profil` (Lot 7).
  * `email` en lecture seule (non éditable — flux dédié, D-7-2). `residence_ci`
  * absent (fixé à l'inscription — Lot 7 Q2b). Ville = champ libre (D-8b1).
+ *
+ * `numero_cmu` (Lot 18) — au même niveau que `telephone`/`ville_residence` :
+ * toujours obligatoire (le justificatif l'est aussi, cf. `StepDocuments.jsx`)
+ * mais JAMAIS verrouillé post-soumission (contrairement à `cni` ci-dessus),
+ * puisque ce n'est pas un fait d'identité vérifié sur pièce.
  */
 export function StepIdentite({ email, draft, setDraft, errors }) {
   const set = (k) => (e) => setDraft((d) => ({ ...d, [k]: e.target.value }))
@@ -46,12 +51,20 @@ export function StepIdentite({ email, draft, setDraft, errors }) {
         />
       </div>
 
-      <FormField
-        label="Ville de résidence"
-        error={errors.ville_residence}
-        hint="Ex. Abidjan - Cocody, Bouaké, San-Pédro…"
-        inputProps={{ value: draft.ville_residence, onChange: set('ville_residence') }}
-      />
+      <div className="form-row">
+        <FormField
+          label="Numéro CMU"
+          error={errors.numero_cmu}
+          hint="Couverture Maladie Universelle"
+          inputProps={{ value: draft.numero_cmu, onChange: set('numero_cmu'), required: true }}
+        />
+        <FormField
+          label="Ville de résidence"
+          error={errors.ville_residence}
+          hint="Ex. Abidjan - Cocody, Bouaké, San-Pédro…"
+          inputProps={{ value: draft.ville_residence, onChange: set('ville_residence') }}
+        />
+      </div>
 
       <div className="form-group">
         <label className="label" htmlFor="id-email">Adresse e-mail</label>

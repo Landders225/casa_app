@@ -129,4 +129,69 @@ class SoumissionTest extends TestCase
         $this->actingAs($autre)->postJson("/api/candidatures/{$this->candidature->id}/soumettre")
             ->assertStatus(404);
     }
+
+    // --- Lot 18 — CMU (numéro + justificatif), obligatoires à la soumission ---
+
+    public function test_soumission_sans_numero_cmu_refusee_422(): void
+    {
+        $this->rendreCandidatureComplete($this->candidature);
+        $this->user->candidat->forceFill(['numero_cmu' => null])->save();
+
+        $this->soumettre()
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['identite.numero_cmu']);
+
+        $this->assertSame('brouillon', $this->candidature->fresh()->statut_interne);
+    }
+
+    public function test_soumission_sans_justificatif_cmu_refusee_422(): void
+    {
+        $c = $this->rendreCandidatureComplete($this->candidature);
+        $c->piecesDossier()->where('type_document_code', 'cmu')->delete();
+
+        $this->soumettre()
+            ->assertStatus(422)
+            ->assertJsonPath('errors.pieces_dossier.0', fn ($m) => str_contains($m, 'cmu'));
+    }
+
+    public function test_soumission_avec_numero_et_justificatif_cmu_reussit(): void
+    {
+        $this->user->candidat->forceFill(['numero_cmu' => 'CMU000111222'])->save();
+        $this->rendreCandidatureComplete($this->candidature); // dépose bien la pièce 'cmu' (ContraintesFichier::TYPES_DOSSIER)
+
+        $this->soumettre()->assertOk();
+        $this->assertSame('soumis', $this->candidature->fresh()->statut_interne);
+    }
+
+    /**
+     * Preuve STRUCTURELLE de non-rétroactivité (Étape 1, point a) : une
+     * candidature déjà soumise AVANT ce lot (donc sans numéro ni justificatif
+     * CMU) ne repasse jamais par `ValidateurCompletude` — `SoumissionController`
+     * refuse (409 « déjà soumise ») avant tout calcul de complétude. Simule
+     * l'« ancien » dossier en forçant `date_soumission` directement (bypass de
+     * l'endpoint, comme le ferait une candidature réellement antérieure au Lot 18).
+     */
+    public function test_candidature_deja_soumise_sans_cmu_reste_valide_aucune_revalidation(): void
+    {
+        $this->rendreCandidatureComplete($this->candidature);
+        $this->user->candidat->forceFill(['numero_cmu' => null])->save();
+        $this->candidature->piecesDossier()->where('type_document_code', 'cmu')->delete();
+        $this->candidature->forceFill([
+            'statut_interne' => 'soumis',
+            'statut_eligibilite_interne' => 'eligible',
+            'date_soumission' => now()->subMonths(6), // « avant le Lot 18 »
+        ])->saveQuietly();
+
+        // Rejouer /soumettre sur ce dossier : 409 (déjà soumise), PAS 422 —
+        // la preuve que la complétude n'est jamais recalculée après coup.
+        $this->soumettre()
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Cette candidature a déjà été soumise.');
+
+        // Le dossier reste lisible normalement par son propriétaire, CMU
+        // absente sans que rien ne casse.
+        $this->actingAs($this->user)->getJson('/api/candidature')
+            ->assertOk()
+            ->assertJsonPath('data.statut_public', 'en_cours_de_traitement');
+    }
 }

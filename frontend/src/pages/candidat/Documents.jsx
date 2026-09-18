@@ -143,7 +143,7 @@ export function Documents() {
       <div className="card" style={{ maxWidth: 720, marginBottom: 'var(--space-6)' }}>
         <div className="card-header">
           <h3>Pièces du dossier</h3>
-          <span className="badge badge-neutral">{s.piecesDossier.length}/6 déposées</span>
+          <span className="badge badge-neutral">{s.piecesDossier.length}/{PIECES_DOSSIER.length} déposées</span>
         </div>
         {PIECES_DOSSIER.map((type) => {
           const piece = piecesParCode[type.code]

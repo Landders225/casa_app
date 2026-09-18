@@ -1,4 +1,4 @@
-import { stepIndex } from './formStructure.js'
+import { PIECES_DOSSIER, stepIndex } from './formStructure.js'
 
 /**
  * Complétude CÔTÉ CLIENT — miroir de App\Domain\Candidature\ValidateurCompletude.
@@ -24,7 +24,10 @@ export function stepErrors(key, { profil, candidature, reponses, experiences, pi
 
   switch (key) {
     case 'identite':
-      for (const f of ['prenom', 'nom', 'date_naissance', 'cni']) {
+      // `numero_cmu` (Lot 18) est ici pour la MÉCANIQUE (même champ requis
+      // sur le profil candidat), pas pour la sémantique — ce n'est pas un
+      // fait d'identité, cf. `MettreAJourProfilRequest` (backend).
+      for (const f of ['prenom', 'nom', 'date_naissance', 'cni', 'numero_cmu']) {
         if (!filled(profil?.[f])) e[f] = 'Information obligatoire.'
       }
       break
@@ -87,7 +90,7 @@ export function stepErrors(key, { profil, candidature, reponses, experiences, pi
       break
 
     case 'documents': {
-      const manquants = ['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo'].filter((t) => !pieces[t])
+      const manquants = PIECES_DOSSIER.map((p) => p.code).filter((t) => !pieces[t])
       if (manquants.length) e.pieces_dossier = `${manquants.length} pièce(s) restante(s) à déposer.`
       break
     }
@@ -125,6 +128,7 @@ export function submitErrorLabel(key) {
     'identite.nom': 'Nom',
     'identite.date_naissance': 'Date de naissance',
     'identite.cni': 'Numéro CNI / récépissé',
+    'identite.numero_cmu': 'Numéro CMU',
     cqp_confirme: 'Confirmation de la filière',
     pieces_dossier: 'Pièces justificatives',
   }

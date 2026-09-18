@@ -244,6 +244,8 @@ export function FicheCandidat() {
               <QaRow q="Date de naissance" a={formatDateFr(dossier.candidat?.date_naissance)} />
               <QaRow q="Sexe" a={dossier.candidat?.sexe === 'F' ? 'Féminin' : 'Masculin'} />
               <QaRow q="CNI" a={dossier.candidat?.cni || '—'} />
+              {/* Lot 18 — `— ` pour un dossier antérieur (colonne nullable côté serveur, aucune erreur). */}
+              <QaRow q="Numéro CMU" a={dossier.candidat?.numero_cmu || '—'} />
               <QaRow q="Téléphone" a={dossier.candidat?.telephone || '—'} />
               <QaRow q="Ville de résidence" a={dossier.candidat?.ville_residence || '—'} />
               <QaRow q="Réside en Côte d’Ivoire" a={dossier.candidat?.residence_ci ? 'Oui' : 'Non'} />

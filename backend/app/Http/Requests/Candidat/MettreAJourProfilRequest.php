@@ -9,7 +9,7 @@ use Illuminate\Validation\Rule;
  * Mise à jour du profil candidat (Lot 7) — propriétaire uniquement.
  *
  *   PATCH /api/candidat/profil
- *   { prenom?, nom?, sexe?, date_naissance?, cni?, telephone?, ville_residence? }
+ *   { prenom?, nom?, sexe?, date_naissance?, cni?, numero_cmu?, telephone?, ville_residence? }
  *
  * PATCH partiel : tous les champs sont `sometimes`.
  *
@@ -27,8 +27,10 @@ use Illuminate\Validation\Rule;
  * exactement les champs « identité stable » que l'évaluateur a déjà vérifiés
  * sur pièce (ADR-07) ; l'évaluateur lit `candidature.candidat` EN DIRECT (pas
  * un snapshot), donc les corriger après coup changerait ce qu'il a déjà vu.
- * `telephone` / `ville_residence` restent éditables dans tous les cas
- * (coordonnées pratiques, sans impact sur le dossier déjà transmis). Signal
+ * `telephone` / `ville_residence` / `numero_cmu` (Lot 18) restent éditables
+ * dans tous les cas (coordonnées / pièces pratiques, sans impact sur le
+ * dossier déjà transmis — la CMU n'est PAS un fait d'identité vérifié sur
+ * pièce comme `cni`, elle n'entre dans aucun contrôle d'éligibilité). Signal
  * choisi : `date_soumission`, pas `statut_interne` — c'est déjà exactement ce
  * que lit le frontend (`Profil.jsx`, `dejaSoumis`), pas une liste de statuts à
  * maintenir en double.
@@ -61,6 +63,7 @@ class MettreAJourProfilRequest extends FormRequest
             'sexe' => $verrouille ? ['prohibited'] : ['sometimes', 'required', Rule::in(['F', 'H'])],
             'date_naissance' => $verrouille ? ['prohibited'] : ['sometimes', 'required', 'date', 'before:today'],
             'cni' => $verrouille ? ['prohibited'] : ['sometimes', 'required', 'string', 'max:50'],
+            'numero_cmu' => ['sometimes', 'required', 'string', 'max:50'],
             'telephone' => ['sometimes', 'required', 'string', 'max:20'],
             'ville_residence' => ['sometimes', 'required', 'string', 'max:100'],
 

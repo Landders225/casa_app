@@ -22,7 +22,8 @@ const FILIERES = [
 
 const PROFIL = {
   email: 'aya@example.ci', prenom: 'Aya', nom: 'Traoré', sexe: 'F',
-  date_naissance: '2001-05-14', cni: 'CI001', telephone: '0700', ville_residence: 'Abidjan',
+  date_naissance: '2001-05-14', cni: 'CI001', numero_cmu: 'CMU001',
+  telephone: '0700', ville_residence: 'Abidjan',
 }
 
 function candidatureResource(over = {}) {
@@ -54,7 +55,7 @@ function candidatureComplete(over = {}) {
       di01_disponible_lun_ven: 'oui', di02_contraintes: 'aucune', di03_engagement_complet: 'oui',
       acces_plateau: 'oui', acces_deux_plateaux_vallons: 'oui',
     },
-    pieces_dossier: ['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo']
+    pieces_dossier: ['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo', 'cmu']
       .map((t) => ({ id: `p-${t}`, type_document_code: t })),
     ...over,
   })

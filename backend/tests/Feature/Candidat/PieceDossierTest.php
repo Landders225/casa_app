@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Candidat;
 
+use App\Domain\Piece\ContraintesFichier;
 use App\Models\PieceJustificative;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -76,16 +77,16 @@ class PieceDossierTest extends TestCase
         Storage::disk('documents')->assertExists($piece->chemin_stockage);
     }
 
-    public function test_les_6_types_du_referentiel_sont_acceptes(): void
+    public function test_tous_les_types_du_referentiel_sont_acceptes(): void
     {
-        foreach (['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo'] as $type) {
+        foreach (ContraintesFichier::TYPES_DOSSIER as $type) {
             $this->actingAs($this->user)->post(
                 "/api/candidatures/{$this->candidatureId}/pieces/{$type}",
                 ['fichier' => $this->fichierPdf("{$type}.pdf")],
             )->assertCreated();
         }
 
-        $this->assertSame(6, PieceJustificative::where('candidature_id', $this->candidatureId)->count());
+        $this->assertSame(count(ContraintesFichier::TYPES_DOSSIER), PieceJustificative::where('candidature_id', $this->candidatureId)->count());
     }
 
     public function test_type_hors_referentiel_donne_404(): void

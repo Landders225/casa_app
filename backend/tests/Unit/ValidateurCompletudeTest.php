@@ -101,4 +101,39 @@ class ValidateurCompletudeTest extends TestCase
         $this->assertArrayHasKey('pieces_dossier', $erreurs);
         $this->assertStringContainsString('diplome', $erreurs['pieces_dossier'][0]);
     }
+
+    // --- Lot 18 — CMU (numéro + justificatif) ---
+
+    public function test_numero_cmu_manquant_bloque_la_completude(): void
+    {
+        $candidature = $this->candidature();
+        $candidature->candidat->forceFill(['numero_cmu' => null])->save();
+
+        $c = $this->rendreCandidatureComplete($candidature);
+
+        $erreurs = $this->validateur->verifier($c->fresh()->load('candidat', 'reponseFormulaire', 'experiences', 'piecesDossier'));
+        $this->assertArrayHasKey('identite.numero_cmu', $erreurs);
+    }
+
+    public function test_justificatif_cmu_manquant_bloque_la_completude(): void
+    {
+        $c = $this->rendreCandidatureComplete($this->candidature());
+        $c->piecesDossier()->where('type_document_code', 'cmu')->delete();
+
+        $erreurs = $this->validateur->verifier($c->fresh()->load('candidat', 'reponseFormulaire', 'experiences', 'piecesDossier'));
+        $this->assertArrayHasKey('pieces_dossier', $erreurs);
+        $this->assertStringContainsString('cmu', $erreurs['pieces_dossier'][0]);
+    }
+
+    public function test_numero_cmu_et_justificatif_presents_ne_bloquent_rien(): void
+    {
+        $candidature = $this->candidature();
+        $candidature->candidat->forceFill(['numero_cmu' => 'CMU000111222'])->save();
+
+        $c = $this->rendreCandidatureComplete($candidature);
+
+        $this->assertSame([], $this->validateur->verifier(
+            $c->fresh()->load('candidat', 'reponseFormulaire', 'experiences', 'piecesDossier'),
+        ));
+    }
 }

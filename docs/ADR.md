@@ -51,6 +51,8 @@ Lot 0. Chaque entrée : contexte → décision → conséquence. Numérotées, j
 **Décision.** `reponse_formulaire` (1-1 candidature) porte **tous** les champs bruts du formulaire (SC.\*, SE.\*, DI.\*, langues, informatique). `note_sous_critere_entretien` porte les 12 sous-notes d'entretien individuellement (cf. D-4c-4), séparément du score agrégé stocké sur `entretien.score_total`. Ces deux tables sont🔴 mais restent la source que `ServiceScoring` relit pour tout recalcul (correction exceptionnelle notamment).
 **Conséquence.** Une correction exceptionnelle peut modifier un champ précis (ex. `di02_contraintes`) et ne recalculer que ce qui en découle, avec une trace exacte "ancienne valeur → nouvelle valeur" au niveau du champ, pas seulement du score agrégé.
 
+**Mise à jour (Lot 18 — CMU).** Confirme la frontière de cette ADR plutôt que de la déplacer : `reponse_formulaire` reste STRICTEMENT le reflet de `scoring.js` (SC/SE/DI/langues/informatique/motivation) — un champ déclaratif qui n'entre dans AUCUN calcul (numéro de Couverture Maladie Universelle, comme `cni`/`telephone`/`ville_residence` avant lui) n'y a pas sa place, même si la demande d'origine suggérait cet emplacement par analogie rapide. Il vit sur `candidat`. Preuve exécutable de l'absence de tout effet sur le calcul : `Tests\Unit\Security\CmuHorsScoringTest` (grep du code source de `ServiceScoring`/`ServiceEligibilite`/`ServiceEligibiliteInitiale`/`ServiceClassement`).
+
 ## ADR-06 — Élimination : logique serveur versionnée, pas de moteur de règles générique
 
 **Contexte.** Le barème doit être en base (règle 6), mais la logique d'élimination (bornes d'âge, groupe OR sur les 2 sites, seuil de français...) est un algorithme, pas une simple donnée.

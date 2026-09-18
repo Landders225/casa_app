@@ -26,6 +26,7 @@ class CandidatResource extends JsonResource
             'sexe' => $this->sexe,
             'date_naissance' => $this->date_naissance?->toDateString(),
             'cni' => $this->cni,
+            'numero_cmu' => $this->numero_cmu,
             'telephone' => $this->telephone,
             'ville_residence' => $this->ville_residence,
             'residence_ci' => (bool) $this->residence_ci,

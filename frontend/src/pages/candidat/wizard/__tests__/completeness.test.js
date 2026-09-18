@@ -53,10 +53,14 @@ describe('stepErrors', () => {
     expect(e).toHaveProperty('experiences.0.justificatif')
   })
 
-  it('documents : 6 pièces obligatoires', () => {
+  it('documents : 7 pièces obligatoires (Lot 18 : cmu ajoutée)', () => {
     expect(stepErrors('documents', { ...base, pieces: {} })).toHaveProperty('pieces_dossier')
-    const toutes = { cni: 1, residence: 1, diplome: 1, cv: 1, lettre: 1, photo: 1 }
+    const toutes = { cni: 1, residence: 1, diplome: 1, cv: 1, lettre: 1, photo: 1, cmu: 1 }
     expect(stepErrors('documents', { ...base, pieces: toutes })).toEqual({})
+    // manque uniquement cmu -> toujours signalé
+    const sansCmu = { ...toutes }
+    delete sansCmu.cmu
+    expect(stepErrors('documents', { ...base, pieces: sansCmu })).toHaveProperty('pieces_dossier')
   })
 
   it('filiere : cqp_confirme requis', () => {
@@ -64,8 +68,8 @@ describe('stepErrors', () => {
     expect(stepErrors('filiere', { ...base, candidature: { cqp_confirme: true } })).toEqual({})
   })
 
-  it('identite : prenom/nom/date/cni sur le profil', () => {
-    expect(Object.keys(stepErrors('identite', base))).toEqual(['prenom', 'nom', 'date_naissance', 'cni'])
+  it('identite : prenom/nom/date/cni/numero_cmu sur le profil (Lot 18 : numero_cmu ajouté)', () => {
+    expect(Object.keys(stepErrors('identite', base))).toEqual(['prenom', 'nom', 'date_naissance', 'cni', 'numero_cmu'])
   })
 })
 
@@ -90,6 +94,7 @@ describe('submitErrorStep — mapping clé serveur → étape', () => {
 describe('submitErrorLabel', () => {
   it('libellés lisibles', () => {
     expect(submitErrorLabel('identite.cni')).toBe('Numéro CNI / récépissé')
+    expect(submitErrorLabel('identite.numero_cmu')).toBe('Numéro CMU')
     expect(submitErrorLabel('experiences.1.justificatif')).toBe('Expérience 2 — justificatif')
     expect(submitErrorLabel('pieces_dossier')).toBe('Pièces justificatives')
   })

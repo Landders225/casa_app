@@ -18,7 +18,7 @@ class ProfilCandidatTest extends TestCase
     use CreeContexteCandidature;
     use RefreshDatabase;
 
-    public function test_get_profil_renvoie_les_8_champs_verts_et_rien_d_autre(): void
+    public function test_get_profil_renvoie_les_9_champs_verts_et_rien_d_autre(): void
     {
         $user = $this->creerCandidat('cand@example.ci', [
             'prenom' => 'Koffi', 'nom' => 'Yao', 'sexe' => 'H',
@@ -34,6 +34,7 @@ class ProfilCandidatTest extends TestCase
             'sexe' => 'H',
             'date_naissance' => '2000-03-15',
             'cni' => $user->candidat->cni,
+            'numero_cmu' => $user->candidat->numero_cmu,
             'telephone' => '0700000000',
             'ville_residence' => 'Bouaké',
             'residence_ci' => true,
@@ -208,6 +209,19 @@ class ProfilCandidatTest extends TestCase
 
         $this->assertDatabaseHas('candidat', [
             'utilisateur_id' => $user->id, 'telephone' => '0102030405', 'ville_residence' => 'San-Pédro',
+        ]);
+    }
+
+    public function test_numero_cmu_toujours_modifiable_si_dossier_soumis(): void
+    {
+        $user = $this->creerCandidatDossierSoumis();
+
+        $this->actingAs($user)->patchJson('/api/candidat/profil', ['numero_cmu' => 'CMU999888777'])
+            ->assertOk()
+            ->assertJsonPath('data.numero_cmu', 'CMU999888777');
+
+        $this->assertDatabaseHas('candidat', [
+            'utilisateur_id' => $user->id, 'numero_cmu' => 'CMU999888777',
         ]);
     }
 

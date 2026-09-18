@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Candidat;
 
+use App\Domain\Piece\ContraintesFichier;
 use App\Models\Candidat;
 use App\Models\Candidature;
 use App\Models\Filiere;
@@ -61,6 +62,7 @@ trait CreeContexteCandidature
             'sexe' => 'F',
             'date_naissance' => '2004-01-01',
             'cni' => 'CI'.fake()->numerify('#########'),
+            'numero_cmu' => 'CMU'.fake()->numerify('#########'),
             'telephone' => '0700000000',
             'ville_residence' => 'Abidjan - Cocody',
             'residence_ci' => true,
@@ -151,7 +153,10 @@ trait CreeContexteCandidature
         $candidature->reponseFormulaire->fill(array_merge($this->reponsesEligibles(), $reponses))->save();
         $candidature->forceFill(['cqp_confirme' => true])->save();
 
-        foreach (['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo'] as $type) {
+        // Lot 18 : plus de littéral dupliqué ici — une seule source
+        // (`ContraintesFichier::TYPES_DOSSIER`), déjà celle que lisent la
+        // route d'upload et `ValidateurCompletude`.
+        foreach (ContraintesFichier::TYPES_DOSSIER as $type) {
             PieceJustificative::create([
                 'candidature_id' => $candidature->id,
                 'type_document_code' => $type,
