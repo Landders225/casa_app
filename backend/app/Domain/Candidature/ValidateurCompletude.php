@@ -107,7 +107,10 @@ final class ValidateurCompletude
             }
         }
 
-        // --- Pièces du dossier : les 7 types (ContraintesFichier::TYPES_DOSSIER) ---
+        // --- Pièces du dossier : les 5 types obligatoires (ContraintesFichier::
+        // TYPES_DOSSIER, Lot D) — `TYPES_RETIRES` (residence/lettre) n'est
+        // JAMAIS lu ici : une pièce retirée déjà déposée ne bloque ni ne
+        // dispense rien, elle est simplement hors du diff ci-dessous.
         $presents = $candidature->piecesDossier->pluck('type_document_code')->all();
         $manquants = array_values(array_diff(ContraintesFichier::TYPES_DOSSIER, $presents));
         if ($manquants !== []) {

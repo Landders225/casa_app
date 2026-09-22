@@ -136,4 +136,43 @@ class ValidateurCompletudeTest extends TestCase
             $c->fresh()->load('candidat', 'reponseFormulaire', 'experiences', 'piecesDossier'),
         ));
     }
+
+    // --- Lot D — retrait de residence/lettre de l'obligation ---
+
+    public function test_dossier_complet_sans_residence_ni_lettre_ne_renvoie_aucune_erreur(): void
+    {
+        // `rendreCandidatureComplete` dépose exactement `TYPES_DOSSIER` (5,
+        // Lot D) — aucune pièce `residence`/`lettre` ici, volontairement.
+        $c = $this->rendreCandidatureComplete($this->candidature());
+        $this->assertDatabaseMissing('piece_justificative', ['type_document_code' => 'residence']);
+        $this->assertDatabaseMissing('piece_justificative', ['type_document_code' => 'lettre']);
+
+        $this->assertSame([], $this->validateur->verifier(
+            $c->fresh()->load('candidat', 'reponseFormulaire', 'experiences', 'piecesDossier'),
+        ));
+    }
+
+    /**
+     * Un dossier qui a DÉJÀ une pièce retirée (déposée avant le Lot D, ou
+     * via l'API malgré tout — la route reste permissive) reste complet : la
+     * présence d'une pièce hors `TYPES_DOSSIER` n'ajoute ni ne retire rien
+     * au diff de `verifier()`.
+     */
+    public function test_piece_retiree_deja_presente_ne_perturbe_pas_la_completude(): void
+    {
+        $c = $this->rendreCandidatureComplete($this->candidature());
+        $c->piecesDossier()->create([
+            'type_document_code' => 'residence',
+            'rattachement' => 'dossier',
+            'nom_original' => 'residence.pdf',
+            'chemin_stockage' => $c->id.'/residence-legacy.pdf',
+            'taille_octets' => 500,
+            'type_mime' => 'application/pdf',
+            'depose_le' => now(),
+        ]);
+
+        $this->assertSame([], $this->validateur->verifier(
+            $c->fresh()->load('candidat', 'reponseFormulaire', 'experiences', 'piecesDossier'),
+        ));
+    }
 }

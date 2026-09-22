@@ -76,7 +76,7 @@ describe('Documents — écran candidat (Lot 14)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/n'ont pas pu être charg/i)
   })
 
-  it('soumis -> liste les 7 pièces (déposé/manquant), compteur correct (Lot 18 : cmu ajoutée)', async () => {
+  it('soumis -> liste les 5 pièces obligatoires (déposé/manquant), compteur correct (Lot D : residence/lettre retirées)', async () => {
     mockCandidature(() => Promise.resolve({
       data: payload({
         pieces_dossier: [
@@ -87,10 +87,14 @@ describe('Documents — écran candidat (Lot 14)', () => {
     }))
     renderScreen()
 
-    expect(await screen.findByText('2/7 déposées')).toBeInTheDocument()
+    expect(await screen.findByText('2/5 déposées')).toBeInTheDocument()
     expect(screen.getByText('Carte Nationale d’Identité')).toBeInTheDocument()
     expect(screen.getByText('Couverture Maladie Universelle (CMU)')).toBeInTheDocument()
-    expect(screen.getAllByText('Manquant')).toHaveLength(5) // résidence, diplôme, lettre, photo, cmu
+    expect(screen.getAllByText('Manquant')).toHaveLength(3) // diplôme, photo, cmu
+    // residence/lettre ne sont plus proposées du tout (ni requises, ni « manquantes »).
+    expect(screen.queryByText('Certificat de résidence')).not.toBeInTheDocument()
+    expect(screen.queryByText('Lettre de motivation')).not.toBeInTheDocument()
+    expect(screen.queryByText('Pièces conservées')).not.toBeInTheDocument()
 
     // Téléchargement : l'URL vient EXACTEMENT de la réponse serveur, jamais reconstruite.
     const lienCni = screen.getByRole('link', { name: /cni\.pdf/i })
@@ -98,6 +102,31 @@ describe('Documents — écran candidat (Lot 14)', () => {
     expect(lienCni).toHaveAttribute('target', '_blank')
     const lienCv = screen.getByRole('link', { name: /cv\.pdf/i })
     expect(lienCv).toHaveAttribute('href', '/api/pieces/p-cv/download')
+  })
+
+  it('Lot D — un dossier qui a DÉJÀ residence/lettre les affiche en lecture seule sous « Pièces conservées », sans les compter dans les 5 obligatoires', async () => {
+    mockCandidature(() => Promise.resolve({
+      data: payload({
+        pieces_dossier: [
+          piece({ id: 'p-cni', type_document_code: 'cni', nom_original: 'cni.pdf' }),
+          piece({ id: 'p-diplome', type_document_code: 'diplome', nom_original: 'diplome.pdf' }),
+          piece({ id: 'p-cv', type_document_code: 'cv', nom_original: 'cv.pdf' }),
+          piece({ id: 'p-photo', type_document_code: 'photo', nom_original: 'photo.pdf' }),
+          piece({ id: 'p-cmu', type_document_code: 'cmu', nom_original: 'cmu.pdf' }),
+          piece({ id: 'p-residence', type_document_code: 'residence', nom_original: 'residence.pdf', url: '/api/pieces/p-residence/download' }),
+          piece({ id: 'p-lettre', type_document_code: 'lettre', nom_original: 'lettre.pdf' }),
+        ],
+      }),
+    }))
+    renderScreen()
+
+    expect(await screen.findByText('5/5 déposées')).toBeInTheDocument() // pas 7/5
+    expect(screen.getByText('Pièces conservées')).toBeInTheDocument()
+    expect(screen.getByText('Certificat de résidence')).toBeInTheDocument()
+    expect(screen.getByText('Lettre de motivation')).toBeInTheDocument()
+
+    const lienResidence = screen.getByRole('link', { name: /residence\.pdf/i })
+    expect(lienResidence).toHaveAttribute('href', '/api/pieces/p-residence/download')
   })
 
   it('aucun bouton dépôt/suppression RENDU après soumission (pas juste désactivé)', async () => {

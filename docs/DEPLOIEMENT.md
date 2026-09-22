@@ -291,7 +291,7 @@ Vérifier :
 ```bash
 dcp exec backend php artisan tinker --execute \
   "echo DB::table('filiere')->count().' filières, '.DB::table('grille')->count().' grille, '.DB::table('type_document')->count().' types de doc, '.DB::table('campagne')->count().' campagne, '.DB::table('utilisateur')->count().' comptes';"
-# attendu : 5 filières, 1 grille, 6 types de doc, 1 campagne, 0 compte
+# attendu : 5 filières, 1 grille, 7 types de doc, 1 campagne, 0 compte
 ```
 
 Les migrations créent aussi les tables `jobs` / `failed_jobs` (file d'attente
@@ -1162,7 +1162,7 @@ certificat auto-signé (`gen-selfsigned.sh`), fichiers `.env.production` dédié
 - `dcp up -d --build` → 4 services `healthy`, entrypoint visible dans les logs
   (`[entrypoint] Reconstruction des caches Laravel…`).
 - `dcp exec backend php artisan migrate --force` → migrations appliquées.
-- `dcp exec backend php artisan casa:seed-referentiel` → 5 filières + grille + 6
+- `dcp exec backend php artisan casa:seed-referentiel` → 5 filières + grille + 7
   types de doc + 1 campagne, **0 compte** ; 2ᵉ passage → « référentiel déjà
   présent », rien touché.
 - `dcp exec backend php artisan casa:create-admin` → compte créé, ligne d'audit,
@@ -1322,7 +1322,7 @@ dca exec backend php artisan casa:seed-referentiel
 ```bash
 dca exec backend php artisan tinker --execute \
   "echo DB::table('filiere')->count().' filières, '.DB::table('grille')->count().' grille, '.DB::table('type_document')->count().' types de doc, '.DB::table('campagne')->count().' campagne, '.DB::table('utilisateur')->count().' comptes';"
-# attendu : 5 filières, 1 grille, 6 types de doc, 1 campagne, 0 compte
+# attendu : 5 filières, 1 grille, 7 types de doc, 1 campagne, 0 compte
 dca ps worker   # attendu : maintenant (healthy) — la table jobs existe
 ```
 

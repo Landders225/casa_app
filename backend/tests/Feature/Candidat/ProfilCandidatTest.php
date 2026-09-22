@@ -212,6 +212,24 @@ class ProfilCandidatTest extends TestCase
         ]);
     }
 
+    /**
+     * Bug trouvé en E2E réel (`profil-mot-de-passe.spec.js`) : `Profil.jsx`
+     * renvoie TOUJOURS `numero_cmu` (comme `telephone`/`ville_residence`),
+     * y compris pour un candidat qui n'est jamais passé par le wizard
+     * (Lot 18) et n'en a donc pas encore — `required` bloquait alors la
+     * sauvegarde d'un simple changement de téléphone.
+     */
+    public function test_modifier_le_telephone_sans_numero_cmu_deja_renseigne_reussit(): void
+    {
+        $user = $this->creerCandidat('cand@example.ci', ['numero_cmu' => null]);
+
+        $this->actingAs($user)->patchJson('/api/candidat/profil', [
+            'telephone' => '0708091011', 'numero_cmu' => null,
+        ])->assertOk()
+            ->assertJsonPath('data.telephone', '0708091011')
+            ->assertJsonPath('data.numero_cmu', null);
+    }
+
     public function test_numero_cmu_toujours_modifiable_si_dossier_soumis(): void
     {
         $user = $this->creerCandidatDossierSoumis();

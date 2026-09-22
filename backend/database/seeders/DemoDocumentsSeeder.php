@@ -18,9 +18,13 @@ use Illuminate\Support\Str;
  *
  *   php artisan db:seed --class=DemoDocumentsSeeder
  *
- * Candidature SOUMISE avec les 6 pièces du dossier + 1 expérience justifiée —
- * de VRAIS fichiers écrits sur le disque privé `documents` (pas de simulation :
- * l'E2E doit pouvoir réellement télécharger et vérifier le contenu reçu).
+ * Candidature SOUMISE avec les 7 lignes du référentiel déposées (5
+ * obligatoires + `residence`/`lettre`, retirées de l'obligation au Lot D
+ * mais délibérément gardées ICI : ce dossier démo sert aussi à démontrer
+ * l'affichage « Pièces conservées » d'un dossier qui les a déjà) + 1
+ * expérience justifiée — de VRAIS fichiers écrits sur le disque privé
+ * `documents` (pas de simulation : l'E2E doit pouvoir réellement télécharger
+ * et vérifier le contenu reçu).
  */
 class DemoDocumentsSeeder extends Seeder
 {
@@ -54,7 +58,9 @@ class DemoDocumentsSeeder extends Seeder
 
         $disque = Storage::disk('documents');
         $candidature->piecesDossier()->delete();
-        foreach (['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo'] as $type) {
+        // Les 7 lignes du référentiel (Lot D) : 5 obligatoires + residence/lettre
+        // (retirées de l'obligation mais démontrent « Pièces conservées »).
+        foreach (['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo', 'cmu'] as $type) {
             $chemin = $candidature->id.'/'.Str::uuid().'.pdf';
             $disque->put($chemin, "%PDF-1.4\nContenu de démonstration — {$type}.\n%%EOF");
             PieceJustificative::create([
@@ -88,6 +94,6 @@ class DemoDocumentsSeeder extends Seeder
         ]);
         $experience->forceFill(['piece_justificative_id' => $pieceExp->id])->save();
 
-        $this->command?->info("Candidature {$candidature->numero_dossier} soumise, 6 pièces + 1 justificatif d'expérience, prête pour /candidat/documents.");
+        $this->command?->info("Candidature {$candidature->numero_dossier} soumise, 7 pièces (5 obligatoires + 2 conservées) + 1 justificatif d'expérience, prête pour /candidat/documents.");
     }
 }

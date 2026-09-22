@@ -53,14 +53,22 @@ describe('stepErrors', () => {
     expect(e).toHaveProperty('experiences.0.justificatif')
   })
 
-  it('documents : 7 pièces obligatoires (Lot 18 : cmu ajoutée)', () => {
+  it('documents : 5 pièces obligatoires (Lot D : residence/lettre retirées)', () => {
     expect(stepErrors('documents', { ...base, pieces: {} })).toHaveProperty('pieces_dossier')
-    const toutes = { cni: 1, residence: 1, diplome: 1, cv: 1, lettre: 1, photo: 1, cmu: 1 }
+    const toutes = { cni: 1, diplome: 1, cv: 1, photo: 1, cmu: 1 }
     expect(stepErrors('documents', { ...base, pieces: toutes })).toEqual({})
     // manque uniquement cmu -> toujours signalé
     const sansCmu = { ...toutes }
     delete sansCmu.cmu
     expect(stepErrors('documents', { ...base, pieces: sansCmu })).toHaveProperty('pieces_dossier')
+  })
+
+  it('documents : residence/lettre déjà déposées (dossier antérieur au Lot D) ne sont plus exigées et ne bloquent rien', () => {
+    const requisesSeulement = { cni: 1, diplome: 1, cv: 1, photo: 1, cmu: 1 }
+    expect(stepErrors('documents', { ...base, pieces: requisesSeulement })).toEqual({})
+    // Présentes EN PLUS : toujours complet, aucune erreur nouvelle.
+    const avecRetirees = { ...requisesSeulement, residence: 1, lettre: 1 }
+    expect(stepErrors('documents', { ...base, pieces: avecRetirees })).toEqual({})
   })
 
   it('filiere : cqp_confirme requis', () => {

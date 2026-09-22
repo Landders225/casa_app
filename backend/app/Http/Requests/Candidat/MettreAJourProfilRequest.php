@@ -63,7 +63,16 @@ class MettreAJourProfilRequest extends FormRequest
             'sexe' => $verrouille ? ['prohibited'] : ['sometimes', 'required', Rule::in(['F', 'H'])],
             'date_naissance' => $verrouille ? ['prohibited'] : ['sometimes', 'required', 'date', 'before:today'],
             'cni' => $verrouille ? ['prohibited'] : ['sometimes', 'required', 'string', 'max:50'],
-            'numero_cmu' => ['sometimes', 'required', 'string', 'max:50'],
+            // `nullable`, PAS `required` (bug trouvé en E2E réel) : contrairement à
+            // `cni`/`telephone`/`ville_residence` (tous requis dès `/api/register`,
+            // Lot 7), `numero_cmu` n'existe QUE depuis le wizard (Lot 18) — un
+            // candidat inscrit avant d'avoir atteint cette étape a légitimement
+            // `numero_cmu = null`. `Profil.jsx` renvoie TOUJOURS ce champ (même
+            // non modifié, comme telephone/ville) : `required` le rejetait alors
+            // que le candidat ne touchait qu'à son téléphone, bloquant TOUT
+            // enregistrement du profil. L'obligation réelle de la CMU reste portée
+            // par `ValidateurCompletude`, à la soumission — pas ici.
+            'numero_cmu' => ['sometimes', 'nullable', 'string', 'max:50'],
             'telephone' => ['sometimes', 'required', 'string', 'max:20'],
             'ville_residence' => ['sometimes', 'required', 'string', 'max:100'],
 

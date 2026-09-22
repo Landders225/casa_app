@@ -55,7 +55,9 @@ function candidatureComplete(over = {}) {
       di01_disponible_lun_ven: 'oui', di02_contraintes: 'aucune', di03_engagement_complet: 'oui',
       acces_plateau: 'oui', acces_deux_plateaux_vallons: 'oui',
     },
-    pieces_dossier: ['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo', 'cmu']
+    // Lot D : seules les 5 pièces OBLIGATOIRES suffisent désormais à rendre
+    // le dossier « complet » (residence/lettre retirées).
+    pieces_dossier: ['cni', 'diplome', 'cv', 'photo', 'cmu']
       .map((t) => ({ id: `p-${t}`, type_document_code: t })),
     ...over,
   })

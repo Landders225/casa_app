@@ -34,8 +34,8 @@ UTILISATEUR (1,1) ──possède── (0,1) MEMBRE_EQUIPE
 | répond | CANDIDATURE (1,1) | REPONSE_FORMULAIRE (1,1) | 1-1 stricte : une candidature a exactement un jeu de réponses. |
 | déclare | CANDIDATURE (1,1) | EXPERIENCE_PROFESSIONNELLE (0,N) | |
 | justifie (expérience) | EXPERIENCE_PROFESSIONNELLE (1,1) | PIECE_JUSTIFICATIVE (1,1) | Justificatif **obligatoire** (règle "1 expérience = 1 justificatif") — cardinalité (1,1) côté expérience. |
-| dépose (pièce dossier) | CANDIDATURE (1,1) | PIECE_JUSTIFICATIVE (0,N) | Pièces du dossier (CNI, résidence, diplôme, CV, lettre, photo), distinctes du justificatif d'expérience. |
-| type | TYPE_DOCUMENT (1,1) | PIECE_JUSTIFICATIVE (0,N) | Référentiel des 6 types de pièces du dossier. |
+| dépose (pièce dossier) | CANDIDATURE (1,1) | PIECE_JUSTIFICATIVE (0,N) | Pièces du dossier (CNI, résidence, diplôme, CV, lettre, photo, CMU), distinctes du justificatif d'expérience. |
+| type | TYPE_DOCUMENT (1,1) | PIECE_JUSTIFICATIVE (0,N) | Référentiel de 7 types de pièces du dossier — 5 OBLIGATOIRES (CNI, diplôme, CV, photo, CMU ; `ContraintesFichier::TYPES_DOSSIER`, Lot D) + 2 retirées de l'obligation mais conservées pour tout dossier qui les aurait déjà (résidence, lettre ; `TYPES_RETIRES`). |
 | classe | CANDIDATURE (1,1) | CLASSEMENT_FILIERE_PREFERENCE (0,N) | Association N-N CANDIDATURE↔FILIERE porteuse du `rang` de préférence (1 à 5). |
 | préférée | FILIERE (1,1) | CLASSEMENT_FILIERE_PREFERENCE (0,N) | |
 | fait l'objet de | CANDIDATURE (1,1) | VERIFICATION_DOSSIER (0,1) | 1-1 optionnelle : n'existe qu'une fois le dossier pris en instruction. |

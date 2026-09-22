@@ -63,18 +63,28 @@ export const EXPERIENCE_DUREES = { moins_6: 'Moins de 6 mois', '6_12': '6 à 12 
 export const NIVEAUX = ['Débutant', 'Élémentaire', 'Intermédiaire', 'Avancé']
 
 /**
- * Les 7 pièces du dossier (référentiel `type_document`) — copie DÉLIBÉRÉMENT
- * dupliquée de `pages/candidat/wizard/formStructure.js` (étanchéité
- * candidat/évaluateur, `noBridge.test.js` — pas une dette à corriger).
+ * Les 5 pièces OBLIGATOIRES du dossier (référentiel `type_document`, Lot D :
+ * `residence`/`lettre` retirées) — copie DÉLIBÉRÉMENT dupliquée de
+ * `pages/candidat/wizard/formStructure.js` (étanchéité candidat/évaluateur,
+ * `noBridge.test.js` — pas une dette à corriger).
  */
 export const PIECES_DOSSIER = [
   { code: 'cni', label: 'Carte Nationale d’Identité' },
-  { code: 'residence', label: 'Certificat de résidence' },
-  { code: 'diplome', label: 'Diplôme ou bulletin de notes' },
+  { code: 'diplome', label: 'Diplôme ou bulletin de notes ou toute autre preuve de scolarité' },
   { code: 'cv', label: 'Curriculum Vitae (CV)' },
-  { code: 'lettre', label: 'Lettre de motivation' },
   { code: 'photo', label: 'Photo d’identité' },
   { code: 'cmu', label: 'Couverture Maladie Universelle (CMU)' },
+]
+
+/**
+ * Types RETIRÉS de l'obligation (Lot D) — affichage en lecture seule
+ * UNIQUEMENT si le dossier en a réellement une déjà déposée (section
+ * « Pièces conservées », `FicheCandidat.jsx`). Copie déclarée à part pour la
+ * même raison que `PIECES_DOSSIER` ci-dessus.
+ */
+export const PIECES_DOSSIER_RETIREES = [
+  { code: 'residence', label: 'Certificat de résidence' },
+  { code: 'lettre', label: 'Lettre de motivation' },
 ]
 
 /** SC.04 — vérifié par l'évaluateur, jamais déclaré par le candidat (ADR-07). */

@@ -72,8 +72,8 @@ test.describe('Documents — écran candidat (Lot 14)', () => {
     await page.getByLabel('Ville de résidence').fill('Abidjan - Cocody')
     await page.getByLabel('Téléphone').fill('0709081013')
     await page.getByLabel('Adresse e-mail').fill(email)
-    await page.getByLabel('Mot de passe', { exact: true }).fill('MotDePasse2026')
-    await page.getByLabel('Confirmer le mot de passe').fill('MotDePasse2026')
+    await page.getByLabel('Mot de passe', { exact: true }).fill('Casa-E2eTest-9147!qx')
+    await page.getByLabel('Confirmer le mot de passe').fill('Casa-E2eTest-9147!qx')
     await page.getByLabel(/Je déclare résider en Côte d'Ivoire/).check()
     await page.getByLabel(/J'accepte les conditions/).check()
     await page.getByRole('button', { name: /Créer mon compte/i }).click()
@@ -85,6 +85,8 @@ test.describe('Documents — écran candidat (Lot 14)', () => {
     await page.getByRole('link', { name: 'Commencer' }).click()
     await expect(page).toHaveURL(/\/candidat\/candidature$/)
     await expect(page.getByRole('heading', { name: /Vos informations personnelles/i })).toBeVisible({ timeout: 30_000 })
+    // Lot 18 : numéro CMU obligatoire, jamais pré-rempli depuis l'inscription.
+    await page.getByLabel('Numéro CMU').fill('CMU-E2E-DOCS')
     await page.getByRole('button', { name: 'Suivant' }).click()
     await expect(page.getByText('Étape 2 / 10')).toBeVisible({ timeout: 60_000 })
     await page.getByRole('button', { name: /Agent de cuisine/ }).click()
@@ -101,13 +103,19 @@ test.describe('Documents — écran candidat (Lot 14)', () => {
     await expect(page.getByText(/déposées/i)).not.toBeVisible()
   })
 
-  test('soumis -> liste les 6 pièces + 1 justificatif d\'expérience, téléchargement réel', async ({ page }) => {
+  test('soumis -> liste les 5 pièces obligatoires + 2 conservées + 1 justificatif d\'expérience, téléchargement réel', async ({ page }) => {
     await login(page, 'documents@casa-demo.ci')
     await gotoDocuments(page)
 
     await expect(page.getByRole('heading', { level: 2, name: 'Documents' })).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText('Votre dossier a été soumis')).toBeVisible()
-    await expect(page.getByText('6/6 déposées')).toBeVisible()
+    await expect(page.getByText('5/5 déposées')).toBeVisible()
+    // Lot D — residence/lettre (déposées par DemoDocumentsSeeder, comme un
+    // dossier antérieur à ce lot) : plus obligatoires, mais toujours
+    // affichées en lecture seule dans leur propre section.
+    await expect(page.getByText('Pièces conservées')).toBeVisible()
+    await expect(page.getByRole('link', { name: /residence\.pdf/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /lettre\.pdf/i })).toBeVisible()
     await expect(page.getByText('Hôtellerie · 6 à 12 mois')).toBeVisible()
     await shots(page, 'soumis')
 

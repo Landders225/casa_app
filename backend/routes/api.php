@@ -249,11 +249,15 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
                 // l'upload (PHP ne parse le multipart que sur POST) ; UPSERT.
                 // `throttle:casa-uploads` : 40 dépôts / min (Lot 10, T1) — finfo +
                 // écriture disque à chaque requête.
+                // `TYPES_ACCEPTES` (Lot D), pas `TYPES_DOSSIER` : un candidat qui a
+                // déjà déposé une pièce RETIRÉE de l'obligation (residence/lettre)
+                // doit pouvoir encore la remplacer ou la retirer — seul le wizard
+                // cesse de proposer le dépôt initial, la route reste permissive.
                 Route::post('/pieces/{type}', [PieceDossierController::class, 'deposer'])
                     ->middleware('throttle:casa-uploads')
-                    ->whereIn('type', ContraintesFichier::TYPES_DOSSIER);
+                    ->whereIn('type', ContraintesFichier::TYPES_ACCEPTES);
                 Route::delete('/pieces/{type}', [PieceDossierController::class, 'destroy'])
-                    ->whereIn('type', ContraintesFichier::TYPES_DOSSIER);
+                    ->whereIn('type', ContraintesFichier::TYPES_ACCEPTES);
 
                 Route::post('/experiences/{experience}/justificatif', [JustificatifExperienceController::class, 'deposer'])
                     ->middleware('throttle:casa-uploads');

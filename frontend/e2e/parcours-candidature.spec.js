@@ -17,13 +17,13 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PNG = resolve(HERE, 'fixtures/piece.png')
 const PDF = resolve(HERE, 'fixtures/piece.pdf')
 
+// Lot D : residence/lettre retirées de l'obligation (plus proposées au dépôt).
 const PIECES = [
   'Carte Nationale d’Identité',
-  'Certificat de résidence',
-  'Diplôme ou bulletin de notes',
+  'Diplôme ou bulletin de notes ou toute autre preuve de scolarité',
   'Curriculum Vitae (CV)',
-  'Lettre de motivation',
   'Photo d’identité',
+  'Couverture Maladie Universelle (CMU)',
 ]
 
 async function inscription(page) {
@@ -37,8 +37,8 @@ async function inscription(page) {
   await page.getByLabel('Ville de résidence').fill('Abidjan - Cocody')
   await page.getByLabel('Téléphone').fill('0709081011')
   await page.getByLabel('Adresse e-mail').fill(email)
-  await page.getByLabel('Mot de passe', { exact: true }).fill('MotDePasse2026')
-  await page.getByLabel('Confirmer le mot de passe').fill('MotDePasse2026')
+  await page.getByLabel('Mot de passe', { exact: true }).fill('Casa-E2eTest-9147!qx')
+  await page.getByLabel('Confirmer le mot de passe').fill('Casa-E2eTest-9147!qx')
   await page.getByLabel(/Je déclare résider en Côte d'Ivoire/).check()
   await page.getByLabel(/J'accepte les conditions/).check()
   await page.getByRole('button', { name: /Créer mon compte/i }).click()
@@ -70,6 +70,9 @@ test('inscription → wizard complet → upload → classement → soumission �
   // --- Étape 1 : identité (pré-remplie depuis l'inscription) ---
   await expect(page.getByRole('heading', { name: /Vos informations personnelles/i })).toBeVisible()
   await expect(page.getByLabel('Adresse e-mail')).toBeDisabled()
+  // Lot 18 : numéro CMU obligatoire, jamais pré-rempli depuis l'inscription
+  // (saisi seulement ici, dans le wizard).
+  await page.getByLabel('Numéro CMU').fill('CMU-E2E-4242')
   await page.getByRole('button', { name: 'Suivant' }).click()
 
   // --- Étape 2 : filière + confirmation (crée la candidature) ---
@@ -140,7 +143,7 @@ test('inscription → wizard complet → upload → classement → soumission �
   await pickRadio(page, /vous rendre aux 2 Plateaux Vallons/i, 'Oui')
   await page.getByRole('button', { name: 'Suivant' }).click()
 
-  // --- Étape 9 : 6 pièces (upload réel) ---
+  // --- Étape 9 : 5 pièces obligatoires (upload réel, Lot D) ---
   await expectStep(page, 9)
   for (let i = 0; i < PIECES.length; i++) {
     await page.locator('input[type=file]').nth(i).setInputFiles(PNG)
@@ -178,6 +181,7 @@ test('brouillon fiable : les réponses survivent à un rechargement', async ({ p
   await inscription(page)
 
   await page.getByRole('link', { name: 'Commencer' }).click()
+  await page.getByLabel('Numéro CMU').fill('CMU-E2E-4343')
   await page.getByRole('button', { name: 'Suivant' }).click() // identité
 
   await expectStep(page, 2)

@@ -4,7 +4,7 @@ import { Alert } from '../../components/ui/Alert.jsx'
 import { FullPageSpinner } from '../../components/ui/Spinner.jsx'
 import { paths } from '../../routing/routes.js'
 import { useDocuments } from './useDocuments.js'
-import { EXPERIENCE_DOMAINES, EXPERIENCE_DUREES, PIECES_DOSSIER } from './wizard/formStructure.js'
+import { EXPERIENCE_DOMAINES, EXPERIENCE_DUREES, PIECES_DOSSIER, PIECES_DOSSIER_RETIREES } from './wizard/formStructure.js'
 
 /**
  * Écran « Documents » (Lot 14) — re-consultation / re-téléchargement des
@@ -124,6 +124,11 @@ export function Documents() {
   if (s.statutPublic === 'brouillon') return <EcranAtterrissage jamaisSoumis={false} />
 
   const piecesParCode = Object.fromEntries(s.piecesDossier.map((p) => [p.type_document_code, p]))
+  // Compteur limité aux pièces OBLIGATOIRES : une pièce retirée (Lot D) déjà
+  // déposée ne doit ni gonfler ni fausser ce ratio, elle vit dans sa propre
+  // section ci-dessous.
+  const deposeesRequises = PIECES_DOSSIER.filter((type) => piecesParCode[type.code]).length
+  const piecesRetireesPresentes = PIECES_DOSSIER_RETIREES.filter((type) => piecesParCode[type.code])
 
   return (
     <AppShell title="Documents">
@@ -143,7 +148,7 @@ export function Documents() {
       <div className="card" style={{ maxWidth: 720, marginBottom: 'var(--space-6)' }}>
         <div className="card-header">
           <h3>Pièces du dossier</h3>
-          <span className="badge badge-neutral">{s.piecesDossier.length}/{PIECES_DOSSIER.length} déposées</span>
+          <span className="badge badge-neutral">{deposeesRequises}/{PIECES_DOSSIER.length} déposées</span>
         </div>
         {PIECES_DOSSIER.map((type) => {
           const piece = piecesParCode[type.code]
@@ -152,6 +157,20 @@ export function Documents() {
             : <LigneManquante key={type.code} label={type.label} />
         })}
       </div>
+
+      {piecesRetireesPresentes.length > 0 ? (
+        <div className="card" style={{ maxWidth: 720, marginBottom: 'var(--space-6)' }}>
+          <div className="card-header">
+            <h3>Pièces conservées</h3>
+          </div>
+          <p className="caption" style={{ marginBottom: 'var(--space-3)' }}>
+            Ces pièces ne sont plus obligatoires, mais restent accessibles ici.
+          </p>
+          {piecesRetireesPresentes.map((type) => (
+            <LigneDeposee key={type.code} label={type.label} piece={piecesParCode[type.code]} />
+          ))}
+        </div>
+      ) : null}
 
       {s.experiences.length > 0 ? (
         <div className="card" style={{ maxWidth: 720 }}>

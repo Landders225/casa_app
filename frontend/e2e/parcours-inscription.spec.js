@@ -32,8 +32,8 @@ test('accueil → inscription → dashboard candidat', async ({ page }) => {
   await page.getByLabel('Ville de résidence').fill('Abidjan - Cocody')
   await page.getByLabel('Téléphone').fill('0709081011')
   await page.getByLabel('Adresse e-mail').fill(email)
-  await page.getByLabel('Mot de passe', { exact: true }).fill('MotDePasse2026')
-  await page.getByLabel('Confirmer le mot de passe').fill('MotDePasse2026')
+  await page.getByLabel('Mot de passe', { exact: true }).fill('Casa-E2eTest-9147!qx')
+  await page.getByLabel('Confirmer le mot de passe').fill('Casa-E2eTest-9147!qx')
   await page.getByLabel(/Je déclare résider en Côte d'Ivoire/).check()
   await page.getByLabel(/J'accepte les conditions/).check()
 

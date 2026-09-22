@@ -89,6 +89,32 @@ class ConsultationDossierTest extends TestCase
             ->assertJsonPath('data.candidat.numero_cmu', null);
     }
 
+    /**
+     * Lot D — une pièce RETIRÉE de l'obligation (`residence`) mais déjà
+     * déposée sur un dossier reste exposée telle quelle dans `pieces_dossier`
+     * : la Resource évaluateur est générique (aucun filtre par type), donc
+     * rien à modifier côté backend pour que la fiche l'affiche — c'est le
+     * frontend (section « Pièces conservées ») qui décide de la mettre à part.
+     */
+    public function test_fiche_expose_une_piece_retiree_deja_deposee(): void
+    {
+        $c = $this->candidatureAffectee($this->candidat, $this->evaluateur);
+        $c->piecesDossier()->create([
+            'type_document_code' => 'residence',
+            'rattachement' => 'dossier',
+            'nom_original' => 'residence.pdf',
+            'chemin_stockage' => $c->id.'/residence-legacy.pdf',
+            'taille_octets' => 500,
+            'type_mime' => 'application/pdf',
+            'depose_le' => now(),
+        ]);
+
+        $reponse = $this->actingAs($this->evaluateur)->getJson("/api/evaluateur/candidatures/{$c->id}")
+            ->assertOk();
+        $codes = collect($reponse->json('data.pieces_dossier'))->pluck('type_document_code');
+        $this->assertContains('residence', $codes);
+    }
+
     public function test_filtre_par_statut_interne(): void
     {
         $this->candidatureAffectee($this->candidat, $this->evaluateur);

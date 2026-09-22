@@ -28,12 +28,33 @@ final class ContraintesFichier
     ];
 
     /**
-     * Les 7 types de pièces du dossier (référentiel `type_document`) — `cmu`
-     * ajouté au Lot 18. SOURCE UNIQUE consommée par la contrainte de route
-     * `whereIn` (upload/suppression, `routes/api.php`) et par
-     * `ValidateurCompletude` (diff des pièces manquantes) : y ajouter un type
-     * suffit à le rendre obligatoire de bout en bout, rien d'autre à modifier
-     * côté contrôleur.
+     * Les 5 types de pièces OBLIGATOIRES du dossier (référentiel
+     * `type_document`) — `residence`/`lettre` retirés au Lot D (plus jamais
+     * exigés NI proposés au dépôt), `cmu` ajouté au Lot 18. SOURCE UNIQUE
+     * consommée par `ValidateurCompletude` (diff des pièces manquantes) et
+     * par le wizard (`PIECES_DOSSIER`, frontend) : y ajouter/retirer un type
+     * suffit à changer l'obligation de bout en bout, rien d'autre à modifier
+     * côté `ValidateurCompletude`.
      */
-    public const TYPES_DOSSIER = ['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo', 'cmu'];
+    public const TYPES_DOSSIER = ['cni', 'diplome', 'cv', 'photo', 'cmu'];
+
+    /**
+     * Types RETIRÉS de l'obligation (Lot D) mais dont le référentiel
+     * `type_document` garde la ligne (intégrité FK avec tout
+     * `piece_justificative` déjà déposé — on ne détruit jamais un dépôt
+     * candidat). Sert UNIQUEMENT à composer `TYPES_ACCEPTES` ci-dessous ; ne
+     * jamais lire cette constante seule pour une obligation ou un affichage
+     * de dépôt (le wizard ne doit plus les proposer).
+     */
+    public const TYPES_RETIRES = ['residence', 'lettre'];
+
+    /**
+     * Types acceptés par la ROUTE d'upload/suppression (`whereIn`,
+     * `routes/api.php`) — délibérément plus large que `TYPES_DOSSIER` :
+     * un candidat qui a DÉJÀ déposé `residence`/`lettre` avant le Lot D doit
+     * pouvoir encore la remplacer ou la retirer via l'endpoint existant,
+     * même si plus personne ne peut en déposer une de zéro (le wizard ne
+     * propose plus le bloc). Jamais utilisée pour la complétude.
+     */
+    public const TYPES_ACCEPTES = [...self::TYPES_DOSSIER, ...self::TYPES_RETIRES];
 }

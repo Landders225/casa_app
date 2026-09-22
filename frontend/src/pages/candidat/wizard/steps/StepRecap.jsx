@@ -117,7 +117,11 @@ export function StepRecap({ form, profil, onJump, submitErrors, onSubmit, submit
       </Section>
 
       <Section title="Documents" stepKey="documents" onJump={onJump}>
-        <Row k="Pièces déposées" v={`${Object.keys(pieces).length} / ${PIECES_DOSSIER.length}`} />
+        {/* Ne compte que les pièces OBLIGATOIRES : un brouillon antérieur au
+            Lot D qui aurait déjà une pièce retirée ne doit pas afficher un
+            ratio du type "6 / 5" (ni la faire compter comme "requise et
+            manquante" — elle n'apparaît simplement pas dans ce total). */}
+        <Row k="Pièces déposées" v={`${PIECES_DOSSIER.filter((p) => pieces[p.code]).length} / ${PIECES_DOSSIER.length}`} />
       </Section>
 
       <div style={{ margin: 'var(--space-6) 0' }}>

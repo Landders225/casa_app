@@ -36,14 +36,16 @@ for (const w of WIDTHS) {
     await page.getByLabel('Ville de résidence').fill('Abidjan')
     await page.getByLabel('Téléphone').fill('0709081011')
     await page.getByLabel('Adresse e-mail').fill(email)
-    await page.getByLabel('Mot de passe', { exact: true }).fill('MotDePasse2026')
-    await page.getByLabel('Confirmer le mot de passe').fill('MotDePasse2026')
+    await page.getByLabel('Mot de passe', { exact: true }).fill('Casa-E2eTest-9147!qx')
+    await page.getByLabel('Confirmer le mot de passe').fill('Casa-E2eTest-9147!qx')
     await page.getByLabel(/Je déclare résider en Côte d'Ivoire/).check()
     await page.getByLabel(/J'accepte les conditions/).check()
     await page.getByRole('button', { name: /Créer mon compte/i }).click()
     await page.waitForURL(/\/candidat$/, { timeout: 40_000 })
 
     await page.getByRole('link', { name: 'Commencer' }).click()
+    // Lot 18 : numéro CMU obligatoire, jamais pré-rempli depuis l'inscription.
+    await page.getByLabel('Numéro CMU').fill(`CMU-CAP-${w}`)
     await page.getByRole('button', { name: 'Suivant' }).click() // étape 1
 
     // Étape 2 : filière + confirmation.

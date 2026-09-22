@@ -154,8 +154,10 @@ trait CreeContexteCandidature
         $candidature->forceFill(['cqp_confirme' => true])->save();
 
         // Lot 18 : plus de littéral dupliqué ici — une seule source
-        // (`ContraintesFichier::TYPES_DOSSIER`), déjà celle que lisent la
-        // route d'upload et `ValidateurCompletude`.
+        // (`ContraintesFichier::TYPES_DOSSIER`), déjà celle que lit
+        // `ValidateurCompletude`. Depuis le Lot D, TYPES_DOSSIER = les 5
+        // pièces OBLIGATOIRES (residence/lettre retirées) — cette fixture
+        // dépose donc exactement, et seulement, ce qui est requis.
         foreach (ContraintesFichier::TYPES_DOSSIER as $type) {
             PieceJustificative::create([
                 'candidature_id' => $candidature->id,

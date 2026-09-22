@@ -103,6 +103,35 @@ describe('FicheCandidat — la zone 🔴 est affichée LÉGITIMEMENT (inversion 
     expect(within(row).getByText('—')).toBeInTheDocument()
   })
 
+  it('Lot D — un dossier qui a DÉJÀ residence/lettre les affiche sous « Pièces conservées », sans les exiger', async () => {
+    apiClient.get.mockResolvedValueOnce({ data: dossier({
+      pieces_dossier: [
+        { id: 'p-residence', type_document_code: 'residence', nom_original: 'residence.pdf', url: '/api/pieces/p-residence/download', taille_octets: 100 },
+        { id: 'p-lettre', type_document_code: 'lettre', nom_original: 'lettre.pdf', url: '/api/pieces/p-lettre/download', taille_octets: 100 },
+      ],
+    }) })
+    renderFiche()
+    await screen.findByRole('heading', { name: 'Awa Konan' })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Documents' }))
+
+    expect(screen.getByText('Pièces conservées (plus obligatoires)')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /residence\.pdf/i })).toHaveAttribute('href', '/api/pieces/p-residence/download')
+    expect(screen.getByRole('link', { name: /lettre\.pdf/i })).toHaveAttribute('href', '/api/pieces/p-lettre/download')
+  })
+
+  it('Lot D — aucune pièce retirée déposée : pas de section « Pièces conservées »', async () => {
+    apiClient.get.mockResolvedValueOnce({ data: dossier() }) // pieces_dossier: []
+    renderFiche()
+    await screen.findByRole('heading', { name: 'Awa Konan' })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Documents' }))
+
+    expect(screen.queryByText('Pièces conservées (plus obligatoires)')).not.toBeInTheDocument()
+  })
+
   it('éligible + aucun critère -> bannière succès, jamais de calcul client', async () => {
     apiClient.get.mockResolvedValueOnce({ data: dossier() })
     renderFiche()

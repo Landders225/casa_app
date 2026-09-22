@@ -224,17 +224,34 @@ export const EXPERIENCE_DUREES = [
   { value: 'plus_12', label: 'Plus de 12 mois' },
 ]
 
-/** Étape 9 — Pièces du dossier (référentiel `type_document`, 7 obligatoires). */
+/**
+ * Étape 9 — Pièces du dossier OBLIGATOIRES (référentiel `type_document`, 5
+ * depuis le Lot D — `residence`/`lettre` retirées, plus jamais proposées au
+ * dépôt ici). Si un dossier en cours de remplissage en a déjà une (avant ce
+ * lot), elle reste simplement invisible pendant l'édition — pas de bloc, pas
+ * de message : cf. `PIECES_DOSSIER_RETIREES` pour l'affichage en lecture
+ * seule après soumission (Documents.jsx), la seule vue concernée.
+ */
 export const PIECES_DOSSIER = [
   { code: 'cni', label: 'Carte Nationale d’Identité' },
-  { code: 'residence', label: 'Certificat de résidence' },
-  { code: 'diplome', label: 'Diplôme ou bulletin de notes' },
+  { code: 'diplome', label: 'Diplôme ou bulletin de notes ou toute autre preuve de scolarité' },
   { code: 'cv', label: 'Curriculum Vitae (CV)' },
-  { code: 'lettre', label: 'Lettre de motivation' },
   { code: 'photo', label: 'Photo d’identité' },
   // Lot 18 — hors maquette (demande projet). Même patron que "Curriculum
   // Vitae (CV)" ci-dessus : nom complet d'abord, sigle entre parenthèses.
   { code: 'cmu', label: 'Couverture Maladie Universelle (CMU)' },
+]
+
+/**
+ * Types RETIRÉS de l'obligation (Lot D) — `residence`/`lettre`. Jamais
+ * utilisée pour le wizard (dépôt) : SEULEMENT pour afficher, en lecture
+ * seule après soumission, une pièce qu'un dossier aurait déjà déposée avant
+ * ce lot (`Documents.jsx`, section « Pièces conservées » — n'apparaît que si
+ * la pièce existe réellement sur CE dossier).
+ */
+export const PIECES_DOSSIER_RETIREES = [
+  { code: 'residence', label: 'Certificat de résidence' },
+  { code: 'lettre', label: 'Lettre de motivation' },
 ]
 
 /** Formats acceptés par l'upload (backend `ContraintesFichier`). */

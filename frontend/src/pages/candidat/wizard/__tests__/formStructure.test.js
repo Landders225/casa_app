@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as structure from '../formStructure.js'
-import { DISPONIBILITE, PIECES_DOSSIER, SCOLAIRE, SOCIO_ECO, STEPS } from '../formStructure.js'
+import { DISPONIBILITE, PIECES_DOSSIER, PIECES_DOSSIER_RETIREES, SCOLAIRE, SOCIO_ECO, STEPS } from '../formStructure.js'
 
 /**
  * CONFIDENTIALITÉ (ADR-02) — formStructure.js est LE fichier le plus à risque de
@@ -59,8 +59,16 @@ describe('formStructure — contrat backend', () => {
     expect(DISPONIBILITE.di05.field).toBe('acces_deux_plateaux_vallons')
   })
 
-  it('les 7 pièces du dossier (Lot 18 : cmu ajoutée)', () => {
-    expect(PIECES_DOSSIER.map((p) => p.code)).toEqual(['cni', 'residence', 'diplome', 'cv', 'lettre', 'photo', 'cmu'])
+  it('les 5 pièces obligatoires du dossier (Lot D : residence/lettre retirées)', () => {
+    expect(PIECES_DOSSIER.map((p) => p.code)).toEqual(['cni', 'diplome', 'cv', 'photo', 'cmu'])
+  })
+
+  it('les 2 pièces retirées restent connues, à part (affichage lecture seule uniquement)', () => {
+    expect(PIECES_DOSSIER_RETIREES.map((p) => p.code)).toEqual(['residence', 'lettre'])
+    // Jamais dans la liste obligatoire.
+    for (const p of PIECES_DOSSIER_RETIREES) {
+      expect(PIECES_DOSSIER.map((x) => x.code)).not.toContain(p.code)
+    }
   })
 
   it('ne propose jamais SC.04 / note en étoiles / nationalité', () => {

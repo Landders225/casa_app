@@ -18,6 +18,7 @@ import {
   EXPERIENCE_DUREES,
   NIVEAUX,
   PIECES_DOSSIER,
+  PIECES_DOSSIER_RETIREES,
   SC02_CLASSE,
   SE01_VIT_AVEC,
   SE03_EMPLOI,
@@ -340,6 +341,19 @@ export function FicheCandidat() {
               {PIECES_DOSSIER.map((t) => (
                 <PieceLink key={t.code} label={t.label} piece={piecesParType[t.code]} />
               ))}
+              {/* Lot D — pièces retirées de l'obligation : affichées SEULEMENT
+                  si ce dossier en a réellement une déjà déposée (jamais une
+                  ligne « manquante » pour elles, ce ne sont plus des obligations). */}
+              {PIECES_DOSSIER_RETIREES.filter((t) => piecesParType[t.code]).length > 0 ? (
+                <>
+                  <p className="caption" style={{ margin: 'var(--space-4) 0 var(--space-2)' }}>
+                    Pièces conservées (plus obligatoires)
+                  </p>
+                  {PIECES_DOSSIER_RETIREES.filter((t) => piecesParType[t.code]).map((t) => (
+                    <PieceLink key={t.code} label={t.label} piece={piecesParType[t.code]} />
+                  ))}
+                </>
+              ) : null}
             </div>
           ) : null}
 

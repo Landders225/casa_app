@@ -79,14 +79,18 @@ class PieceDossierTest extends TestCase
 
     public function test_tous_les_types_du_referentiel_sont_acceptes(): void
     {
-        foreach (ContraintesFichier::TYPES_DOSSIER as $type) {
+        // `TYPES_ACCEPTES` (Lot D), pas `TYPES_DOSSIER` : la surface de la
+        // ROUTE reste les 7 lignes du référentiel, même si seules 5 sont
+        // désormais obligatoires — `test_type_retire_toujours_deposable_et_supprimable`
+        // ci-dessous prouve pourquoi.
+        foreach (ContraintesFichier::TYPES_ACCEPTES as $type) {
             $this->actingAs($this->user)->post(
                 "/api/candidatures/{$this->candidatureId}/pieces/{$type}",
                 ['fichier' => $this->fichierPdf("{$type}.pdf")],
             )->assertCreated();
         }
 
-        $this->assertSame(count(ContraintesFichier::TYPES_DOSSIER), PieceJustificative::where('candidature_id', $this->candidatureId)->count());
+        $this->assertSame(count(ContraintesFichier::TYPES_ACCEPTES), PieceJustificative::where('candidature_id', $this->candidatureId)->count());
     }
 
     public function test_type_hors_referentiel_donne_404(): void
@@ -95,6 +99,32 @@ class PieceDossierTest extends TestCase
             "/api/candidatures/{$this->candidatureId}/pieces/achevement",
             ['fichier' => $this->fichierPdf()],
         )->assertStatus(404);
+    }
+
+    /**
+     * Lot D — le cœur de la preuve de non-destruction : un type RETIRÉ de
+     * l'obligation (`residence`) reste déposable ET remplaçable ET
+     * supprimable via l'endpoint existant — la route lit `TYPES_ACCEPTES`,
+     * pas `TYPES_DOSSIER`. Seul le wizard cesse de proposer le bloc ; le
+     * candidat qui avait déjà cette pièce (ou qui la dépose malgré tout via
+     * l'API) garde la main dessus.
+     */
+    public function test_type_retire_toujours_deposable_remplacable_et_supprimable(): void
+    {
+        $this->actingAs($this->user)->post(
+            "/api/candidatures/{$this->candidatureId}/pieces/residence",
+            ['fichier' => $this->fichierPdf('residence-v1.pdf')],
+        )->assertCreated();
+
+        $this->actingAs($this->user)->post(
+            "/api/candidatures/{$this->candidatureId}/pieces/residence",
+            ['fichier' => $this->fichierPdf('residence-v2.pdf')],
+        )->assertOk()->assertJsonPath('data.nom_original', 'residence-v2.pdf');
+        $this->assertSame(1, PieceJustificative::where('type_document_code', 'residence')->count());
+
+        $this->actingAs($this->user)->deleteJson("/api/candidatures/{$this->candidatureId}/pieces/residence")
+            ->assertNoContent();
+        $this->assertDatabaseMissing('piece_justificative', ['type_document_code' => 'residence']);
     }
 
     public function test_suppression_d_une_piece(): void

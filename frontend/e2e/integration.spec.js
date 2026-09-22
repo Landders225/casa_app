@@ -43,19 +43,19 @@ const PNG = resolve(HERE, 'fixtures/piece.png')
 const PWD = 'Demo2026!' // comptes de démonstration (seedés, contournent la validation)
 // Le candidat frais s'inscrit pour de vrai : mot de passe conforme (min:10 +
 // casse + chiffres — `Demo2026!` à 9 caractères serait refusé à l'inscription).
-const FRESH_PWD = 'MotDePasse2026'
+const FRESH_PWD = 'Casa-E2eTest-9147!qx'
 
 /** Tout terme qui trahirait le score / le rang / la cause interne côté candidat. */
 const TERMES_INTERNES =
   /score|\brang\b|bar[èe]me|[ée]ligib|[ée]valuat|\bnote\b|\/(35|65|100)|\bpoints?\b|pond[ée]r|non[_ -]?eligible|statut_interne|motif_interne/i
 
+// Lot D : residence/lettre retirées de l'obligation (plus proposées au dépôt).
 const PIECES = [
   'Carte Nationale d’Identité',
-  'Certificat de résidence',
-  'Diplôme ou bulletin de notes',
+  'Diplôme ou bulletin de notes ou toute autre preuve de scolarité',
   'Curriculum Vitae (CV)',
-  'Lettre de motivation',
   'Photo d’identité',
+  'Couverture Maladie Universelle (CMU)',
 ]
 
 async function login(page, email, urlRe, pwd = PWD) {
@@ -129,8 +129,10 @@ async function parcoursWizardNominal(page) {
   await page.getByRole('link', { name: 'Commencer' }).click()
   await expect(page).toHaveURL(/\/candidat\/candidature$/)
 
-  // 1 — identité (pré-remplie)
+  // 1 — identité (pré-remplie) — numéro CMU (Lot 18) jamais pré-rempli
+  // depuis l'inscription, saisi seulement ici.
   await expect(page.getByRole('heading', { name: /Vos informations personnelles/i })).toBeVisible()
+  await page.getByLabel('Numéro CMU').fill('CMU-INT-9001')
   await page.getByRole('button', { name: 'Suivant' }).click()
 
   // 2 — filière + confirmation
@@ -205,7 +207,7 @@ async function parcoursWizardNominal(page) {
   await pickRadio(page, /vous rendre aux 2 Plateaux Vallons/i, 'Oui')
   await page.getByRole('button', { name: 'Suivant' }).click()
 
-  // 9 — 6 pièces (upload réel)
+  // 9 — 5 pièces obligatoires (upload réel, Lot D)
   await expectStep(page, 9)
   for (let i = 0; i < PIECES.length; i++) {
     // eslint-disable-next-line no-await-in-loop
