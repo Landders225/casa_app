@@ -49,6 +49,17 @@
   border-style: dashed;
   border-color: var(--casa-primary-500);
 }
+/* Filière déjà confirmée (Lot C) : figée, pas de poignée/flèches — distincte
+   visuellement (fond teinté, pas de curseur "grab") sans dépendre de la
+   couleur seule (icône cadenas + badge texte). */
+.rank-item.is-locked {
+  cursor: default;
+  background: var(--casa-primary-50);
+  border-color: var(--casa-primary-100);
+}
+.rank-item.is-locked .badge {
+  margin-left: auto;
+}
 .rank-item .rank-num {
   width: 26px;
   height: 26px;

@@ -37,11 +37,34 @@ function experiencesFromResource(res) {
   }))
 }
 
-function classementFromResource(res, filieres) {
+/**
+ * Lot C — la filière CONFIRMÉE (`res.filiere`, `cqp_confirme`) est TOUJOURS
+ * replacée en position 1 à l'affichage, quel que soit l'ordre d'où elle
+ * vient : repli alphabétique (dossier neuf, aucun classement enregistré) OU
+ * classement déjà sauvegardé où elle ne serait pas en tête (dossier repris,
+ * classé avant ce lot). Les 4 autres gardent leur ordre relatif tel quel.
+ *
+ * Ajustement de PRÉSENTATION uniquement : ça ne déclenche AUCUN appel réseau
+ * (`saveClassement` reste gated par `classementDirtyRef`, inchangé) — le
+ * classement n'est envoyé au serveur que si le candidat réordonne lui-même
+ * les filières classables.
+ */
+function avecFiliereConfirmeeEnTete(items, confirmedId) {
+  if (!confirmedId) return items
+  const idx = items.findIndex((item) => item.id === confirmedId)
+  if (idx <= 0) return items // absente, ou déjà en tête : rien à faire
+  const confirmed = items[idx]
+  return [confirmed, ...items.slice(0, idx), ...items.slice(idx + 1)]
+}
+
+export function classementFromResource(res, filieres) {
   const rows = [...(res?.classement || [])].sort((a, b) => a.rang - b.rang)
-  if (rows.length === 5) return rows.map((r) => ({ id: r.filiere.id, nom: r.filiere.nom }))
-  // Repli : ordre alphabétique des filières connues.
-  return [...filieres].sort((a, b) => a.nom.localeCompare(b.nom)).map((f) => ({ id: f.id, nom: f.nom }))
+  const base = rows.length === 5
+    ? rows.map((r) => ({ id: r.filiere.id, nom: r.filiere.nom }))
+    // Repli : ordre alphabétique des filières connues.
+    : [...filieres].sort((a, b) => a.nom.localeCompare(b.nom)).map((f) => ({ id: f.id, nom: f.nom }))
+
+  return avecFiliereConfirmeeEnTete(base, res?.filiere?.id)
 }
 
 function piecesFromResource(res) {
