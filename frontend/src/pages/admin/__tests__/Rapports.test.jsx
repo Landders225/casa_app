@@ -57,6 +57,8 @@ describe('Rapports & statistiques (Lot 11c)', () => {
     expect(screen.getByRole('img', { name: /Répartition femmes \/ hommes.*Femmes : 15/ })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /Distribution des scores.*60–80 : 5/ })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /Répartition par ville.*Autres villes : 6/ })).toBeInTheDocument()
+    // Lot E : chiffre d'information féminines/total, dérivé de repartition_sexe existant.
+    expect(screen.getByText(/15 candidatures féminines sur 24 au total\./)).toBeInTheDocument()
   })
 
   it('une répartition masquée (null) affiche « effectif insuffisant », pas un graphe', async () => {
@@ -69,6 +71,8 @@ describe('Rapports & statistiques (Lot 11c)', () => {
     expect(screen.queryByRole('img', { name: /Répartition femmes/ })).not.toBeInTheDocument()
     // taux masqué → n/d
     expect(screen.getAllByText('n/d').length).toBeGreaterThanOrEqual(1)
+    // Lot E : le chiffre féminines/total suit le même masquage k=5 que le reste de repartition_sexe.
+    expect(screen.queryByText(/candidatures féminines sur/)).not.toBeInTheDocument()
   })
 
   it('changer de campagne relance la requête avec ?campagne=', async () => {

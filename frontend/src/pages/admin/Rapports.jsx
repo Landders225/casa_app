@@ -120,13 +120,18 @@ export function Rapports() {
 
             <ChartCard titre="Répartition femmes / hommes">
               {data.repartition_sexe ? (
-                <DonutChart
-                  titre="Répartition femmes / hommes"
-                  slices={[
-                    { label: 'Femmes', value: data.repartition_sexe.F, tone: 'b' },
-                    { label: 'Hommes', value: data.repartition_sexe.H, tone: 'a' },
-                  ]}
-                />
+                <>
+                  <p className="caption" style={{ marginBottom: 'var(--space-3)' }}>
+                    {data.repartition_sexe.F} candidature{data.repartition_sexe.F > 1 ? 's' : ''} féminine{data.repartition_sexe.F > 1 ? 's' : ''} sur {data.perimetre.candidatures} au total.
+                  </p>
+                  <DonutChart
+                    titre="Répartition femmes / hommes"
+                    slices={[
+                      { label: 'Femmes', value: data.repartition_sexe.F, tone: 'b' },
+                      { label: 'Hommes', value: data.repartition_sexe.H, tone: 'a' },
+                    ]}
+                  />
+                </>
               ) : (
                 <MasqueEffectif seuil={seuil} />
               )}
