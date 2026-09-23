@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { paths } from '../../routing/routes.js'
 
 const LANDING_LINKS = [
-  { href: '#programme', label: 'Le programme' },
+  { href: '#programme', label: 'Le projet' },
   { href: '#filieres', label: 'Les formations' },
   { href: '#comment', label: 'Comment candidater' },
   { href: '#faq', label: 'FAQ' },

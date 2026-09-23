@@ -70,4 +70,42 @@ describe('HomePage (accueil public)', () => {
     renderHome()
     expect(await screen.findByRole('alert')).toHaveTextContent(/filières n'a pas pu être chargée/i)
   })
+
+  describe('Lot A — renommage « Projet CASA » → « Initiative CASA » + AICS + logos partenaires', () => {
+    it('le titre principal (eyebrow hero) porte la forme complète', async () => {
+      renderHome()
+      await screen.findByText('Agent de cuisine')
+      expect(screen.getByText(/Initiative CASA \/ Projet de formation et\s+Insertion – Hôtellerie et Tourisme/)).toBeInTheDocument()
+    })
+
+    it('nav et bouton renommés : « Le projet » / « Découvrir le projet »', async () => {
+      renderHome()
+      await screen.findByText('Agent de cuisine')
+      expect(screen.getAllByRole('link', { name: 'Le projet' }).length).toBeGreaterThanOrEqual(1)
+      expect(screen.getByRole('link', { name: 'Découvrir le projet' })).toBeInTheDocument()
+    })
+
+    it('section « Projet Initiative CASA » affiche la mention « Financé par l’AICS »', async () => {
+      renderHome()
+      await screen.findByText('Agent de cuisine')
+      expect(screen.getByText('Projet Initiative CASA')).toBeInTheDocument()
+      expect(screen.getByText('Financé par l\'AICS')).toBeInTheDocument()
+    })
+
+    it('footer renommé (Initiative CASA) et logos partenaires intégrés (image réelle, pas de placeholder cassé)', async () => {
+      renderHome()
+      await screen.findByText('Agent de cuisine')
+      expect(screen.getByText(/Initiative CASA — Arbre de Vie 2026/)).toBeInTheDocument()
+      expect(screen.getByText('© 2026 Initiative CASA — Arbre de Vie.')).toBeInTheDocument()
+
+      const logo = screen.getByRole('img', { name: /Logos des partenaires/ })
+      expect(logo).toHaveAttribute('src', '/partner_logo.png')
+    })
+
+    it('« Projet CASA » n\'apparaît plus nulle part sur la page d\'accueil', async () => {
+      const { container } = renderHome()
+      await screen.findByText('Agent de cuisine')
+      expect(container.innerHTML).not.toContain('Projet CASA')
+    })
+  })
 })

@@ -59,6 +59,25 @@
 .site-footer a:hover { color: #fff; }
 .footer-bottom { border-top: 1px solid rgba(255,255,255,0.12); padding-top: var(--space-6); display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); font-size: var(--fs-caption); color: var(--casa-secondary-300); }
 
+/* Bandeau logos partenaires (Lot A) — image UNIQUE (partner_logo.png, ratio
+   très large ~12,4:1, fond blanc opaque sans transparence). Sort de la
+   colonne étroite du footer-grid (grid-column: 1/-1) pour disposer de toute
+   la largeur du container : c'est la seule façon de garder le texte des
+   logos lisible sans dépasser le viewport ni forcer de scroll horizontal. */
+.footer-partners-col { grid-column: 1 / -1; }
+.footer-partners-logo-wrap {
+  display: inline-block;
+  max-width: 100%;
+  background: #fff;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+}
+.footer-partners-logo { display: block; height: 64px; width: auto; max-width: 100%; object-fit: contain; }
+@media (max-width: 560px) {
+  .footer-partners-logo-wrap { display: block; }
+  .footer-partners-logo { height: auto; width: 100%; }
+}
+
 /* ---------------------------------------------------------------------------
    Back-office layout (sidebar + topbar)
 --------------------------------------------------------------------------- */

@@ -146,7 +146,8 @@ export function HomePage() {
             <div className="hero-grid">
               <div data-reveal>
                 <span className="eyebrow">
-                  <i className="fa-solid fa-star" aria-hidden="true" /> Projet CASA — CCI-CI · FADV · AICS
+                  <i className="fa-solid fa-star" aria-hidden="true" /> Initiative CASA / Projet de formation et
+                  Insertion – Hôtellerie et Tourisme
                 </span>
                 <h1 className="display" style={{ marginTop: 'var(--space-4)' }}>
                   Votre avenir <br />commence ici.
@@ -160,7 +161,7 @@ export function HomePage() {
                   <Link to={paths.inscription} className="btn btn-primary btn-lg">
                     Candidater maintenant <i className="fa-solid fa-arrow-right" aria-hidden="true" />
                   </Link>
-                  <a href="#programme" className="btn btn-outline btn-lg">Découvrir le programme</a>
+                  <a href="#programme" className="btn btn-outline btn-lg">Découvrir le projet</a>
                 </div>
                 <div className="hero-stats">
                   {[
@@ -231,7 +232,7 @@ export function HomePage() {
             <div className="grid grid-2" style={{ alignItems: 'center', gap: 'var(--space-16)' }}>
               <div data-reveal="left">
                 <span className="eyebrow">
-                  <i className="fa-solid fa-book-open" aria-hidden="true" /> Le programme CASA
+                  <i className="fa-solid fa-book-open" aria-hidden="true" /> Projet Initiative CASA
                 </span>
                 <h2 style={{ marginTop: 'var(--space-4)' }}>Coopération au Service de l'Apprentissage</h2>
                 <p style={{ marginTop: 'var(--space-4)' }}>
@@ -240,6 +241,9 @@ export function HomePage() {
                   Arbre de Vie Côte d'Ivoire (FADV)</strong>, et cofinancé par l'<strong className="text-primary-brand">Agence
                   Italienne pour la Coopération au Développement (AICS)</strong>, le dispositif CASA forme et insère
                   des jeunes de 18 à 30 ans dans les métiers de l'hôtellerie et de la restauration.
+                </p>
+                <p className="caption fw-semibold" style={{ marginTop: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <i className="fa-solid fa-hand-holding-heart" aria-hidden="true" /> Financé par l'AICS
                 </p>
                 <ul style={{ marginTop: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   {[
