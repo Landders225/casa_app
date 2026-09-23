@@ -104,6 +104,13 @@ describe('LoginPage', () => {
     expect(screen.getByRole('link', { name: /mot de passe oublié/i })).toHaveAttribute('href', '/mot-de-passe/oublie')
   })
 
+  it('propose un lien vers l’inscription pour qui n’a pas de compte (Lot B)', () => {
+    useAuth.mockReturnValue({ login: vi.fn() })
+    renderLogin()
+    expect(screen.getByText(/vous n'avez pas de compte/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /créez-en un ici/i })).toHaveAttribute('href', '/inscription')
+  })
+
   it('un retour depuis la réinitialisation affiche un message de succès', () => {
     useAuth.mockReturnValue({ login: vi.fn() })
     render(

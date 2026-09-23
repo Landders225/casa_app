@@ -149,6 +149,10 @@ export function LoginPage() {
               Se connecter <i className="fa-solid fa-arrow-right" aria-hidden="true" />
             </button>
           </form>
+
+          <p className="caption" style={{ marginTop: 'var(--space-5)', textAlign: 'center' }}>
+            Vous n'avez pas de compte ? <Link to={paths.inscription}>Créez-en un ici</Link>
+          </p>
         </div>
       </div>
     </div>

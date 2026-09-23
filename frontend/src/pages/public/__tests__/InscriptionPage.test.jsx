@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -147,5 +147,12 @@ describe('InscriptionPage', () => {
     const user = setup()
     await user.type(screen.getByLabelText('Date de naissance'), '2015-01-01')
     expect(screen.getByText(/18-30 ans/)).toBeInTheDocument()
+  })
+
+  it('l\'en-tête garde son bouton « Se connecter » (Lot B — retiré uniquement sur la page d\'accueil)', () => {
+    useAuth.mockReturnValue({ register: vi.fn() })
+    const { container } = renderInscription()
+    const header = within(container.querySelector('.site-header'))
+    expect(header.getByRole('link', { name: 'Se connecter' })).toHaveAttribute('href', '/connexion')
   })
 })

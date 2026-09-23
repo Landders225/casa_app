@@ -28,8 +28,12 @@ function Brand() {
  * En-tête public — reprend `.site-header` de la maquette.
  * `landing` : nav à ancres + menu mobile plein écran (`.mobile-nav`).
  * Sinon : brand + « Se connecter » (écrans publics secondaires, ex. inscription).
+ * `showConnexion` (Lot B, défaut `true`) : masque le bouton « Se connecter »
+ * — désactivé uniquement depuis la page d'accueil (décision direction : un
+ * seul appel à l'action au premier contact), les autres pages qui partagent
+ * ce composant (ex. inscription) le gardent.
  */
-export function PublicHeader({ landing = false }) {
+export function PublicHeader({ landing = false, showConnexion = true }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -56,9 +60,11 @@ export function PublicHeader({ landing = false }) {
             </nav>
           ) : null}
           <div className="header-actions">
-            <Link to={paths.login} className="btn btn-outline btn-sm">
-              Se connecter
-            </Link>
+            {showConnexion ? (
+              <Link to={paths.login} className="btn btn-outline btn-sm">
+                Se connecter
+              </Link>
+            ) : null}
             <Link to={paths.inscription} className="btn btn-primary btn-sm">
               Candidater <i className="fa-solid fa-arrow-right" aria-hidden="true" />
             </Link>
@@ -100,9 +106,11 @@ export function PublicHeader({ landing = false }) {
               {l.label}
             </a>
           ))}
-          <Link to={paths.login} onClick={() => setMenuOpen(false)}>
-            Se connecter
-          </Link>
+          {showConnexion ? (
+            <Link to={paths.login} onClick={() => setMenuOpen(false)}>
+              Se connecter
+            </Link>
+          ) : null}
           <Link
             to={paths.inscription}
             className="btn btn-primary btn-block"

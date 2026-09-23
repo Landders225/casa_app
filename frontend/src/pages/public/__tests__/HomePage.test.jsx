@@ -108,4 +108,27 @@ describe('HomePage (accueil public)', () => {
       expect(container.innerHTML).not.toContain('Projet CASA')
     })
   })
+
+  describe('Lot B — un seul appel à l’action dans l’en-tête (« Candidater »)', () => {
+    it('le bouton « Se connecter » de l’en-tête a disparu, « Candidater » reste et mène à l’inscription', async () => {
+      const { container } = renderHome()
+      await screen.findByText('Agent de cuisine')
+      const header = within(container.querySelector('.site-header'))
+      expect(header.queryByRole('link', { name: 'Se connecter' })).not.toBeInTheDocument()
+      expect(header.getByRole('link', { name: /^candidater/i })).toHaveAttribute('href', '/inscription')
+    })
+
+    it('le bouton « J’ai déjà un compte » de la bande CTA finale reste intact (chemin de reconnexion volontaire)', async () => {
+      renderHome()
+      await screen.findByText('Agent de cuisine')
+      expect(screen.getByRole('link', { name: /j.ai déjà un compte/i })).toHaveAttribute('href', '/connexion')
+    })
+
+    it('/connexion reste atteignable via le footer même sans le bouton d’en-tête (pas de route orpheline)', async () => {
+      const { container } = renderHome()
+      await screen.findByText('Agent de cuisine')
+      const footer = within(container.querySelector('.site-footer'))
+      expect(footer.getByRole('link', { name: 'Se connecter' })).toHaveAttribute('href', '/connexion')
+    })
+  })
 })
