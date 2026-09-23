@@ -17,8 +17,11 @@ test('accueil → inscription → dashboard candidat', async ({ page }) => {
     expect(bodyText, `« ${interdit} » ne doit pas apparaître sur l'accueil`).not.toContain(interdit)
   }
 
-  // 2. Aller à l'inscription (CTA du hero — libellé sans ambiguïté)
+  // 2. Aller à l'inscription (CTA du hero — libellé sans ambiguïté). Depuis le
+  // Lot B (correctif 2), ce clic ouvre d'abord la modale de choix.
   await page.getByRole('link', { name: 'Candidater maintenant' }).click()
+  await page.getByRole('dialog', { name: /avez-vous déjà un compte/i }).waitFor()
+  await page.getByRole('button', { name: 'Créer mon compte' }).click()
   await expect(page).toHaveURL(/\/inscription$/)
   await expect(page.getByRole('heading', { name: /Créer votre compte candidat/i })).toBeVisible()
 

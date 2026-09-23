@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { paths } from '../../routing/routes.js'
-import { ChoixCompteModal } from './ChoixCompteModal.jsx'
 
 const LANDING_LINKS = [
   { href: '#programme', label: 'Le projet' },
@@ -28,15 +27,15 @@ function Brand() {
 /**
  * En-tête public — reprend `.site-header` de la maquette.
  * `landing` : nav à ancres + menu mobile plein écran (`.mobile-nav`).
- * `interceptCandidater` (Lot B correctif) : le clic sur « Candidater » (desktop
- * ET menu mobile) ouvre `ChoixCompteModal` au lieu de naviguer directement —
- * activé uniquement depuis la page d'accueil (premier contact, candidat qui a
- * peut-être déjà un compte), les autres pages qui partagent ce composant
- * (ex. inscription) gardent la navigation directe.
+ * `onCandidaterClick` (Lot B correctif) : si fourni, le clic sur « Candidater »
+ * (desktop ET menu mobile) appelle ce callback au lieu de naviguer directement
+ * — la page d'accueil l'utilise pour ouvrir `ChoixCompteModal` (elle possède
+ * l'unique instance de la modale, partagée avec ses propres boutons
+ * « Candidater » ailleurs sur la page). Les autres pages qui partagent ce
+ * composant (ex. inscription) ne passent rien : navigation directe inchangée.
  */
-export function PublicHeader({ landing = false, interceptCandidater = false }) {
+export function PublicHeader({ landing = false, onCandidaterClick }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [choixOuvert, setChoixOuvert] = useState(false)
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : ''
@@ -45,11 +44,12 @@ export function PublicHeader({ landing = false, interceptCandidater = false }) {
     }
   }, [menuOpen])
 
-  const ouvrirChoix = (e) => {
-    e.preventDefault()
-    setMenuOpen(false)
-    setChoixOuvert(true)
-  }
+  const onCandidater = onCandidaterClick
+    ? (e) => {
+        setMenuOpen(false)
+        onCandidaterClick(e)
+      }
+    : undefined
 
   return (
     <>
@@ -71,11 +71,7 @@ export function PublicHeader({ landing = false, interceptCandidater = false }) {
             <Link to={paths.login} className="btn btn-outline btn-sm">
               Se connecter
             </Link>
-            <Link
-              to={paths.inscription}
-              className="btn btn-primary btn-sm"
-              onClick={interceptCandidater ? ouvrirChoix : undefined}
-            >
+            <Link to={paths.inscription} className="btn btn-primary btn-sm" onClick={onCandidater}>
               Candidater <i className="fa-solid fa-arrow-right" aria-hidden="true" />
             </Link>
             {landing ? (
@@ -123,14 +119,12 @@ export function PublicHeader({ landing = false, interceptCandidater = false }) {
             to={paths.inscription}
             className="btn btn-primary btn-block"
             style={{ marginTop: 'var(--space-4)', justifyContent: 'center' }}
-            onClick={interceptCandidater ? ouvrirChoix : () => setMenuOpen(false)}
+            onClick={onCandidater ?? (() => setMenuOpen(false))}
           >
             Candidater
           </Link>
         </div>
       ) : null}
-
-      {choixOuvert ? <ChoixCompteModal onClose={() => setChoixOuvert(false)} /> : null}
     </>
   )
 }

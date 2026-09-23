@@ -228,4 +228,54 @@ describe('HomePage (accueil public)', () => {
       expect(await screen.findByRole('heading', { name: /accéder à mon espace/i })).toBeInTheDocument()
     })
   })
+
+  describe('Lot B (correctif 2) — TOUS les boutons « Candidater »/« Déposer ma candidature » de l’accueil ouvrent la modale', () => {
+    it('le hero « Candidater maintenant » ouvre la modale au lieu de naviguer directement', async () => {
+      renderHome()
+      await screen.findByText('Agent de cuisine')
+      const user = userEvent.setup()
+
+      await user.click(screen.getByRole('link', { name: /^candidater maintenant/i }))
+
+      expect(screen.getByRole('dialog', { name: /avez-vous déjà un compte casa/i })).toBeInTheDocument()
+      expect(screen.getByText('Agent de cuisine')).toBeInTheDocument() // pas de navigation
+    })
+
+    it('la bande CTA finale « Déposer ma candidature » ouvre la modale au lieu de naviguer directement', async () => {
+      renderHome()
+      await screen.findByText('Agent de cuisine')
+      const user = userEvent.setup()
+
+      await user.click(screen.getByRole('link', { name: 'Déposer ma candidature' }))
+
+      expect(screen.getByRole('dialog', { name: /avez-vous déjà un compte casa/i })).toBeInTheDocument()
+      expect(screen.getByText('Agent de cuisine')).toBeInTheDocument()
+    })
+
+    it('le « Candidater » de la section éligibilité (actif une fois la case cochée) ouvre la modale', async () => {
+      renderHome()
+      await screen.findByText('Agent de cuisine')
+      const user = userEvent.setup()
+
+      const cocher = screen.getByLabelText(/J'ai pris connaissance des conditions/i)
+      await user.click(cocher)
+      const carte = within(cocher.closest('.card'))
+      // Devenu un vrai lien (plus le <button disabled>) une fois la case cochée.
+      await user.click(carte.getByRole('link', { name: /^candidater/i }))
+
+      expect(screen.getByRole('dialog', { name: /avez-vous déjà un compte casa/i })).toBeInTheDocument()
+      expect(screen.getByText('Agent de cuisine')).toBeInTheDocument()
+    })
+
+    it('depuis n’importe lequel de ces boutons, « Créer mon compte » mène bien à l’inscription', async () => {
+      renderHome()
+      await screen.findByText('Agent de cuisine')
+      const user = userEvent.setup()
+
+      await user.click(screen.getByRole('link', { name: 'Déposer ma candidature' }))
+      await user.click(screen.getByRole('button', { name: 'Créer mon compte' }))
+
+      expect(await screen.findByRole('heading', { name: /créer votre compte candidat/i })).toBeInTheDocument()
+    })
+  })
 })

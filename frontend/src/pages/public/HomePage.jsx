@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ChoixCompteModal } from '../../components/public/ChoixCompteModal.jsx'
 import { PublicFooter } from '../../components/public/PublicFooter.jsx'
 import { PublicHeader } from '../../components/public/PublicHeader.jsx'
 import { FiliereCard } from '../../components/public/FiliereCard.jsx'
@@ -133,10 +134,20 @@ export function HomePage() {
   const revealRef = useScrollReveal()
   const filieres = useFilieres()
   const [ack, setAck] = useState(false)
+  const [choixOuvert, setChoixOuvert] = useState(false)
+
+  // Tout bouton "Candidater" de l'accueil (en-tête, hero, éligibilité, bande
+  // CTA finale) ouvre ce même choix explicite plutôt que de foncer vers
+  // l'inscription — seul "J'ai déjà un compte" (bande CTA) navigue directement,
+  // il répond déjà à ce besoin sans détour (Lot B correctif 2).
+  const ouvrirChoixCompte = (e) => {
+    e.preventDefault()
+    setChoixOuvert(true)
+  }
 
   return (
     <>
-      <PublicHeader landing interceptCandidater />
+      <PublicHeader landing onCandidaterClick={ouvrirChoixCompte} />
       <main ref={revealRef}>
         {/* HERO */}
         <section className="hero bg-gradient-hero">
@@ -158,7 +169,7 @@ export function HomePage() {
                   initiation à l'italien au Centre d'Étude des Langues de la CCI-CI.
                 </p>
                 <div className="flex gap-3" style={{ marginTop: 'var(--space-8)', flexWrap: 'wrap' }}>
-                  <Link to={paths.inscription} className="btn btn-primary btn-lg">
+                  <Link to={paths.inscription} className="btn btn-primary btn-lg" onClick={ouvrirChoixCompte}>
                     Candidater maintenant <i className="fa-solid fa-arrow-right" aria-hidden="true" />
                   </Link>
                   <a href="#programme" className="btn btn-outline btn-lg">Découvrir le projet</a>
@@ -377,7 +388,7 @@ export function HomePage() {
                 <span className="body-sm">J'ai pris connaissance des conditions ci-dessus.</span>
               </label>
               {ack ? (
-                <Link to={paths.inscription} className="btn btn-primary btn-lg">
+                <Link to={paths.inscription} className="btn btn-primary btn-lg" onClick={ouvrirChoixCompte}>
                   Candidater <i className="fa-solid fa-arrow-right" aria-hidden="true" />
                 </Link>
               ) : (
@@ -443,7 +454,7 @@ export function HomePage() {
                 Rejoignez la prochaine cohorte CASA et lancez votre carrière dans l'hôtellerie-restauration.
               </p>
               <div className="flex gap-3" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
-                <Link to={paths.inscription} className="btn btn-accent btn-lg">Déposer ma candidature</Link>
+                <Link to={paths.inscription} className="btn btn-accent btn-lg" onClick={ouvrirChoixCompte}>Déposer ma candidature</Link>
                 <Link to={paths.login} className="btn btn-lg" style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}>
                   J'ai déjà un compte
                 </Link>
@@ -453,6 +464,7 @@ export function HomePage() {
         </section>
       </main>
       <PublicFooter />
+      {choixOuvert ? <ChoixCompteModal onClose={() => setChoixOuvert(false)} /> : null}
     </>
   )
 }
