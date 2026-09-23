@@ -9,6 +9,14 @@ use Illuminate\Support\Str;
 /**
  * Les 5 filières CQP + leurs compétences clés, conformes à
  * App_maquette/assets/js/mock-data.js (CASA_CQP).
+ *
+ * `upsert` sur `filiere` keyed par `code` (unique en base) — même patron que
+ * `TypeDocumentSeeder` (Lot 18) : `--force` (`casa:seed-referentiel`) rejoue
+ * ce seeder sans dupliquer les 5 lignes ni écraser leur `id` (préservé sur
+ * conflit, cf. `docs/POINTS-OUVERTS.md`, incohérence seeders trouvée à la
+ * revue pré-prod). `filiere_competence` n'a pas de clé métier propre : purgée
+ * puis reconstruite à l'identique pour chaque filière, plutôt qu'un upsert
+ * artificiel sur un ordre de compétence.
  */
 class FiliereSeeder extends Seeder
 {
@@ -55,9 +63,8 @@ class FiliereSeeder extends Seeder
         $now = now();
 
         foreach ($filieres as $f) {
-            $id = (string) Str::uuid();
-            DB::table('filiere')->insert([
-                'id' => $id,
+            DB::table('filiere')->upsert([
+                'id' => (string) Str::uuid(),
                 'code' => $f['code'],
                 'nom' => $f['nom'],
                 'description' => $f['description'],
@@ -65,12 +72,15 @@ class FiliereSeeder extends Seeder
                 'actif' => true,
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]);
+            ], uniqueBy: ['code'], update: ['nom', 'description', 'icone', 'updated_at']);
 
+            $filiereId = DB::table('filiere')->where('code', $f['code'])->value('id');
+
+            DB::table('filiere_competence')->where('filiere_id', $filiereId)->delete();
             foreach ($f['competences'] as $ordre => $libelle) {
                 DB::table('filiere_competence')->insert([
                     'id' => (string) Str::uuid(),
-                    'filiere_id' => $id,
+                    'filiere_id' => $filiereId,
                     'libelle' => $libelle,
                     'ordre' => $ordre,
                 ]);

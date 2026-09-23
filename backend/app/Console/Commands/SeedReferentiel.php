@@ -34,7 +34,9 @@ class SeedReferentiel extends Command
 
         if ($dejaAmorce && ! $this->option('force')) {
             $this->warn('Le référentiel semble déjà présent (table `grille` ou `filiere` non vide).');
-            $this->line('Utilisez --force pour ré-exécuter les seeders (ils sont idempotents : firstOrCreate).');
+            $this->line('Utilisez --force pour ré-exécuter : TypeDocument/Filiere/Campagne sont idempotents (upsert sur');
+            $this->line('leur clé métier). GrilleBareme, lui, ne l\'est PAS (insert brut) : rejouer --force sur un');
+            $this->line('référentiel déjà présent échouera dessus (contrainte `one_active_grille`), cf. docs/POINTS-OUVERTS.md.');
 
             return self::SUCCESS;
         }
