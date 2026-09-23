@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '../../../lib/apiClient.js'
 import { HomePage } from '../HomePage.jsx'
@@ -14,8 +15,12 @@ const FILIERES = [
 
 function renderHome() {
   return render(
-    <MemoryRouter>
-      <HomePage />
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/inscription" element={<h1>Créer votre compte candidat</h1>} />
+        <Route path="/connexion" element={<h1>Accéder à mon espace</h1>} />
+      </Routes>
     </MemoryRouter>,
   )
 }
@@ -109,26 +114,118 @@ describe('HomePage (accueil public)', () => {
     })
   })
 
-  describe('Lot B — un seul appel à l’action dans l’en-tête (« Candidater »)', () => {
-    it('le bouton « Se connecter » de l’en-tête a disparu, « Candidater » reste et mène à l’inscription', async () => {
+  describe('Lot B (correctif) — « Se connecter » restauré + modale de choix au clic sur « Candidater »', () => {
+    // Le libellé « Candidater » n'est pas unique sur la page (aussi dans le
+    // hero « Candidater maintenant »), d'où ce scope explicite à l'en-tête.
+    const clickHeaderCandidater = async (container, user) => {
+      const header = within(container.querySelector('.site-header'))
+      await user.click(header.getByRole('link', { name: /^candidater/i }))
+    }
+
+    it('l’en-tête garde « Se connecter » ET « Candidater »', async () => {
       const { container } = renderHome()
       await screen.findByText('Agent de cuisine')
       const header = within(container.querySelector('.site-header'))
-      expect(header.queryByRole('link', { name: 'Se connecter' })).not.toBeInTheDocument()
-      expect(header.getByRole('link', { name: /^candidater/i })).toHaveAttribute('href', '/inscription')
+      expect(header.getByRole('link', { name: 'Se connecter' })).toHaveAttribute('href', '/connexion')
+      expect(header.getByRole('link', { name: /^candidater/i })).toBeInTheDocument()
     })
 
-    it('le bouton « J’ai déjà un compte » de la bande CTA finale reste intact (chemin de reconnexion volontaire)', async () => {
-      renderHome()
-      await screen.findByText('Agent de cuisine')
-      expect(screen.getByRole('link', { name: /j.ai déjà un compte/i })).toHaveAttribute('href', '/connexion')
-    })
-
-    it('/connexion reste atteignable via le footer même sans le bouton d’en-tête (pas de route orpheline)', async () => {
+    it('cliquer sur « Candidater » (en-tête) ouvre la modale de choix au lieu de naviguer directement', async () => {
       const { container } = renderHome()
       await screen.findByText('Agent de cuisine')
-      const footer = within(container.querySelector('.site-footer'))
-      expect(footer.getByRole('link', { name: 'Se connecter' })).toHaveAttribute('href', '/connexion')
+      const user = userEvent.setup()
+      await clickHeaderCandidater(container, user)
+
+      const dialog = screen.getByRole('dialog', { name: /avez-vous déjà un compte casa/i })
+      expect(dialog).toBeInTheDocument()
+      expect(within(dialog).getByText(/connectez-vous pour continuer.*poursuivez vers/i)).toBeInTheDocument()
+      // Toujours sur l'accueil : aucune navigation n'a eu lieu à l'ouverture.
+      expect(screen.getByText('Agent de cuisine')).toBeInTheDocument()
+    })
+
+    it('« Créer mon compte » dans la modale mène à l’inscription', async () => {
+      const { container } = renderHome()
+      await screen.findByText('Agent de cuisine')
+      const user = userEvent.setup()
+      await clickHeaderCandidater(container, user)
+
+      await user.click(screen.getByRole('button', { name: 'Créer mon compte' }))
+      expect(await screen.findByRole('heading', { name: /créer votre compte candidat/i })).toBeInTheDocument()
+    })
+
+    it('« J’ai déjà un compte, me connecter » dans la modale mène à la connexion', async () => {
+      const { container } = renderHome()
+      await screen.findByText('Agent de cuisine')
+      const user = userEvent.setup()
+      await clickHeaderCandidater(container, user)
+
+      await user.click(screen.getByRole('button', { name: "J'ai déjà un compte, me connecter" }))
+      expect(await screen.findByRole('heading', { name: /accéder à mon espace/i })).toBeInTheDocument()
+    })
+
+    it('fermer la modale (X) ne redirige nulle part — reste sur l’accueil', async () => {
+      const { container } = renderHome()
+      await screen.findByText('Agent de cuisine')
+      const user = userEvent.setup()
+      await clickHeaderCandidater(container, user)
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Fermer' }))
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByText('Agent de cuisine')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /créer votre compte candidat/i })).not.toBeInTheDocument()
+    })
+
+    it('fermer la modale (Échap) ne redirige nulle part', async () => {
+      const { container } = renderHome()
+      await screen.findByText('Agent de cuisine')
+      const user = userEvent.setup()
+      await clickHeaderCandidater(container, user)
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      await user.keyboard('{Escape}')
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByText('Agent de cuisine')).toBeInTheDocument()
+    })
+
+    it('fermer la modale (clic extérieur) ne redirige nulle part', async () => {
+      const { container } = renderHome()
+      await screen.findByText('Agent de cuisine')
+      const user = userEvent.setup()
+      await clickHeaderCandidater(container, user)
+      const dialog = screen.getByRole('dialog')
+
+      await user.click(dialog.parentElement) // l'overlay, hors du contenu de la modale
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByText('Agent de cuisine')).toBeInTheDocument()
+    })
+
+    it('le focus est piégé dans la modale (Tab depuis le dernier bouton revient au premier élément focusable)', async () => {
+      const { container } = renderHome()
+      await screen.findByText('Agent de cuisine')
+      const user = userEvent.setup()
+      await clickHeaderCandidater(container, user)
+
+      const dialog = screen.getByRole('dialog')
+      const fermer = within(dialog).getByRole('button', { name: 'Fermer' })
+      const creerCompte = within(dialog).getByRole('button', { name: 'Créer mon compte' })
+
+      creerCompte.focus()
+      expect(document.activeElement).toBe(creerCompte)
+      await user.tab()
+      expect(document.activeElement).toBe(fermer) // reboucle sur le premier élément focusable
+    })
+
+    it('le bouton « J’ai déjà un compte » de la bande CTA finale reste intact et navigue directement, sans modale (chemin de reconnexion volontaire)', async () => {
+      renderHome()
+      await screen.findByText('Agent de cuisine')
+      const user = userEvent.setup()
+
+      await user.click(screen.getByRole('link', { name: /j.ai déjà un compte/i }))
+      expect(await screen.findByRole('heading', { name: /accéder à mon espace/i })).toBeInTheDocument()
     })
   })
 })

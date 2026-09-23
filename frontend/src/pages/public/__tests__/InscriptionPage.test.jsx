@@ -149,10 +149,12 @@ describe('InscriptionPage', () => {
     expect(screen.getByText(/18-30 ans/)).toBeInTheDocument()
   })
 
-  it('l\'en-tête garde son bouton « Se connecter » (Lot B — retiré uniquement sur la page d\'accueil)', () => {
+  it('l\'en-tête a son bouton « Se connecter » ET son « Candidater » qui navigue directement (pas de modale ici, Lot B)', () => {
     useAuth.mockReturnValue({ register: vi.fn() })
     const { container } = renderInscription()
     const header = within(container.querySelector('.site-header'))
     expect(header.getByRole('link', { name: 'Se connecter' })).toHaveAttribute('href', '/connexion')
+    expect(header.getByRole('link', { name: /^candidater/i })).toHaveAttribute('href', '/inscription')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

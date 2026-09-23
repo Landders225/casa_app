@@ -136,7 +136,7 @@ export function HomePage() {
 
   return (
     <>
-      <PublicHeader landing showConnexion={false} />
+      <PublicHeader landing interceptCandidater />
       <main ref={revealRef}>
         {/* HERO */}
         <section className="hero bg-gradient-hero">

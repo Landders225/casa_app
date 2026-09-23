@@ -1,0 +1,12 @@
+/* Le libellé du bouton secondaire ("J'ai déjà un compte, me connecter") est
+   long : sous ~480px, le footer par défaut (`.modal-footer`, flex sans wrap)
+   fait déborder les deux boutons côte à côte. Empilés, primaire en haut
+   (colonne inversée) pour rester l'action la plus visible. */
+@media (max-width: 480px) {
+  .choix-compte-modal .modal-footer {
+    flex-direction: column-reverse;
+  }
+  .choix-compte-modal .modal-footer .btn {
+    width: 100%;
+  }
+}
