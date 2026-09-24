@@ -2,6 +2,7 @@
 # Les fichiers .env.example RESTENT suivis (référence) ; aucun .env réel ne l'est.
 
 # --- Dépendances ---
+/.claude/
 /backend/vendor/
 /frontend/node_modules/
 node_modules/
