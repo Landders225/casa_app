@@ -495,52 +495,65 @@ devtools).
 
 ## 12. Maintenance
 
-### 12.1 Sauvegarde de la base (quotidienne)
+### 12.1 Sauvegarde de la base et des pièces (quotidienne)
 
 ```bash
 sudo mkdir -p /srv/backups && sudo chown "$USER":"$USER" /srv/backups
 ```
 
-Script `/srv/casa/scripts-hote/backup-db.sh` (à créer sur l'hôte, hors dépôt) :
+Script **`scripts-hote/backup-db.sh`**, dans le dépôt (committé — plus besoin de
+le recréer à la main sur chaque serveur) : dump PostgreSQL compressé **ET**
+archive du volume `casa_documents_data` (pièces justificatives) en un seul
+passage, permissions `600`, rétention configurable. Cible les conteneurs par
+leur nom **fixe** (`casa-postgres-1`, volume `casa_documents_data` — identique
+en mode test-local **et** Apache, `name: casa` dans tous les overlays) : ce
+script ne lit aucun `.env` et continue de fonctionner sans modification à
+travers un changement de mode.
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-cd /srv/casa
-STAMP=$(date +%Y%m%d-%H%M%S)
-docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml \
-  exec -T postgres pg_dump -U casa -d casa | gzip > "/srv/backups/casa-$STAMP.sql.gz"
-# Rotation : garder 14 jours
-find /srv/backups -name 'casa-*.sql.gz' -mtime +14 -delete
-```
-
-```bash
-chmod +x /srv/casa/scripts-hote/backup-db.sh
+chmod +x scripts-hote/backup-db.sh    # déjà exécutable dans le dépôt, au cas où
 crontab -e
-# ajouter :
-15 2 * * * /srv/casa/scripts-hote/backup-db.sh >> /srv/backups/backup.log 2>&1
+# ajouter (BACKUP_DIR/RETENTION_DAYS par défaut : /srv/backups, 14 jours) :
+15 2 * * * /opt/casa/scripts-hote/backup-db.sh >> /srv/backups/backup.log 2>&1
 ```
 
-### 12.2 Sauvegarde des pièces justificatives
-
-Elles vivent dans le volume Docker `casa_documents_data` (monté sur
-`storage/app/private`). Sauvegarde :
-
-```bash
-docker run --rm -v casa_documents_data:/data -v /srv/backups:/out alpine \
-  tar czf /out/casa-documents-$(date +%Y%m%d).tar.gz -C /data .
+Sortie attendue (dans `backup.log`) :
+```
+[2026-10-06T02:15:03+00:00] Sauvegarde OK : /srv/backups/casa-db-20261006-021503.sql.gz (…), /srv/backups/casa-documents-20261006-021503.tar.gz (…)
 ```
 
-### 12.3 Restauration
+### 12.2 (fusionné dans §12.1 — le script sauvegarde les deux en un passage)
+
+### 12.3 Restauration — TESTÉE sur une base jetable, jamais la base réelle
+
+**Ne jamais restaurer directement sur `casa` tant que la procédure n'a pas été
+vérifiée sur une base séparée** :
 
 ```bash
-# Base :
-gunzip -c /srv/backups/casa-20260101-021500.sql.gz | \
+# 1. Base de test jetable, à partir d'une vraie sauvegarde :
+dcp exec -T postgres psql -U casa -d casa -c "CREATE DATABASE casa_restore_test;"
+gunzip -c /srv/backups/casa-db-20261006-021503.sql.gz | \
+  dcp exec -T postgres psql -U casa -d casa_restore_test
+
+# 2. Vérifier que ça a repris (au minimum, un comptage non nul sur une table connue) :
+dcp exec -T postgres psql -U casa -d casa_restore_test -tAc "select count(*) from filiere;"
+dcp exec -T postgres psql -U casa -d casa_restore_test -tAc "select count(*) from candidature;"
+
+# 3. Nettoyer la base de test :
+dcp exec -T postgres psql -U casa -d casa -c "DROP DATABASE casa_restore_test;"
+```
+
+**Seulement après ce test réussi**, restauration réelle (incident avéré
+uniquement — écrase la base en place) :
+
+```bash
+# Base — la cible DOIT être arrêtée/isolée des écritures pendant la restauration :
+gunzip -c /srv/backups/casa-db-20261006-021503.sql.gz | \
   dcp exec -T postgres psql -U casa -d casa
 
 # Pièces :
 docker run --rm -v casa_documents_data:/data -v /srv/backups:/in alpine \
-  sh -c 'cd /data && tar xzf /in/casa-documents-20260101.tar.gz'
+  sh -c 'cd /data && tar xzf /in/casa-documents-20261006-021503.tar.gz'
 ```
 
 ### 12.4 Mise à jour de l'application
@@ -616,6 +629,226 @@ DNS automatique en ≤ 10 s, voir § 12.9 — mais on garde le réflexe).
 
 Ne **jamais** éditer un `.env` et attendre que ça prenne : sans recreate, les
 caches figés gardent l'ancienne valeur.
+
+### 12.6bis Bascule EN PLACE : mode test-local → mode Apache (jupiter, sans perte de données)
+
+> **Contexte spécifique à ce serveur.** CentOS Stream 9, `httpd` (pas Apache2/
+> Debian), vhost `/etc/httpd/conf.d/casa.conf` **déjà en place** avec le
+> certificat **wildcard CCI** (pas Let's Encrypt/certbot). Le serveur tourne
+> **aujourd'hui** en mode test-local (§14) derrière ce httpd, avec de vrais
+> candidats inscrits. **Ne pas utiliser `docker/apache/deploy-behind-apache.sh`**
+> — conçu pour un premier déploiement (génère un `.env.production` neuf,
+> relance `migrate`+`seed-referentiel` sans discernement, réécrit le vhost) :
+> inadapté à une bascule en place. Tout ce qui suit est une séquence manuelle,
+> plus étroite.
+>
+> **Interdits, toute cette procédure** : `down -v`, suppression des volumes
+> `casa_postgres_data`/`casa_documents_data`, `migrate:fresh`, `db:seed`
+> complet, régénération de `APP_KEY`/`DB_PASSWORD`/tout autre secret.
+>
+> ⚠️ **Préalable bloquant** : le correctif `docker/nginx/casa.apache.conf`
+> (172.30.1.1, §15.5) doit être déployé **avant** de basculer — sinon la
+> bascule reproduit l'incident du rate-limiting partagé, un maillon plus loin.
+
+#### Alias (à placer dans `~/.bashrc` du compte de déploiement, PAS root)
+
+```bash
+cat >> ~/.bashrc <<'EOF'
+alias dct='docker compose --env-file ~/casa/.env.test-local -f ~/casa/docker-compose.yml -f ~/casa/docker-compose.prod.yml -f ~/casa/docker-compose.test-local.yml'
+alias dca='docker compose --env-file ~/casa/.env.production  -f ~/casa/docker-compose.yml -f ~/casa/docker-compose.prod.yml -f ~/casa/docker-compose.apache.yml'
+EOF
+source ~/.bashrc
+```
+*(Adapter `~/casa` au chemin réel du clone sur jupiter — `cd` dedans et
+vérifier avec `pwd` avant de copier-coller ces alias.)*
+
+#### Étape 0 — Réconciliation des `.env` (AVANT tout écrasement, aucune valeur affichée)
+
+```bash
+cd ~/casa   # le clone sur jupiter
+
+# Noms de variables SEULEMENT (jamais les valeurs) — présentes dans l'un, absentes de l'autre :
+echo "--- Variables dans backend/.env.test-local mais ABSENTES de backend/.env.production ---"
+comm -23 \
+  <(grep -oE '^[A-Z_]+=' backend/.env.test-local | sed 's/=$//' | sort -u) \
+  <(grep -oE '^[A-Z_]+=' backend/.env.production 2>/dev/null | sed 's/=$//' | sort -u)
+
+echo "--- Variables dans backend/.env.production mais ABSENTES de backend/.env.test-local ---"
+comm -13 \
+  <(grep -oE '^[A-Z_]+=' backend/.env.test-local | sed 's/=$//' | sort -u) \
+  <(grep -oE '^[A-Z_]+=' backend/.env.production 2>/dev/null | sed 's/=$//' | sort -u)
+
+echo "--- Variables du modèle .example ABSENTES de backend/.env.production (à combler) ---"
+comm -23 \
+  <(grep -oE '^[A-Z_]+=' backend/.env.production.example | sed 's/=$//' | sort -u) \
+  <(grep -oE '^[A-Z_]+=' backend/.env.production 2>/dev/null | sed 's/=$//' | sort -u)
+```
+
+**Si `backend/.env.production` n'existe pas du tout** (improbable si `worker`
+tourne déjà, §12.6bis intro) : le créer à partir de `backend/.env.test-local`
+(PAS du `.example`, pour garder `APP_KEY`/`DB_PASSWORD` réels) :
+
+```bash
+cp backend/.env.test-local backend/.env.production
+```
+
+**Si `backend/.env.production` existe déjà** (cas attendu — le `worker` le lit
+déjà en permanence, §12.6bis intro) : le **compléter**, ne jamais l'écraser.
+Pour chaque variable listée dans le 1ᵉʳ `comm` ci-dessus (présente côté
+test-local, absente côté production) qui n'est PAS dans la liste « à changer »
+ci-dessous, la copier **telle quelle** de `backend/.env.test-local` vers
+`backend/.env.production` :
+
+```bash
+nano backend/.env.production   # éditeur au choix
+```
+
+**À PRÉSERVER EXACTEMENT** (ne jamais régénérer) :
+`APP_KEY` (avec le préfixe `base64:`), `DB_PASSWORD` (== `POSTGRES_PASSWORD`
+de `.env.production` racine), tout `MAIL_*`, `RATE_LIMIT_*` s'ils sont déjà
+présents.
+
+**À CHANGER** (seules variables qui DOIVENT différer de `.env.test-local`) :
+
+| Variable | Valeur test-local (actuelle) | Valeur à poser en mode Apache |
+|---|---|---|
+| `APP_URL` | `http://<IP>:8090` | `https://casa.cci.ci` |
+| `SESSION_DOMAIN` | `<IP>` | `casa.cci.ci` |
+| `SANCTUM_STATEFUL_DOMAINS` | `<IP>:8090` | `casa.cci.ci` (sans port) |
+| `SESSION_SECURE_COOKIE` | `false` | `true` |
+| `TRUSTED_PROXIES` | `172.31.243.0/24` | **identique**, `172.31.243.0/24` — ne pas toucher |
+
+```bash
+sed -i 's#^APP_URL=.*#APP_URL=https://casa.cci.ci#' backend/.env.production
+sed -i 's/^SESSION_DOMAIN=.*/SESSION_DOMAIN=casa.cci.ci/' backend/.env.production
+sed -i 's/^SANCTUM_STATEFUL_DOMAINS=.*/SANCTUM_STATEFUL_DOMAINS=casa.cci.ci/' backend/.env.production
+sed -i 's/^SESSION_SECURE_COOKIE=.*/SESSION_SECURE_COOKIE=true/' backend/.env.production
+grep -c '^TRUSTED_PROXIES=172.31.243.0/24$' backend/.env.production   # doit afficher 1
+```
+
+**`.env.production` racine** (à côté de `.env.test-local` racine, même logique) :
+
+```bash
+[ -f .env.production ] || cp .env.test-local .env.production   # garde POSTGRES_PASSWORD
+sed -i 's/^CASA_BIND_ADDR=.*/CASA_BIND_ADDR=127.0.0.1/' .env.production
+grep -c '^CASA_SUBNET=172.31.243.0/24$' .env.production        # doit afficher 1
+grep -c '^CASA_HTTP_PORT=8090$' .env.production                # doit afficher 1 (ou votre port réel)
+```
+
+**Contrôle final avant de continuer** — plus aucune variable manquante côté
+`.example` :
+
+```bash
+dca config -q && echo "compose OK (syntaxe + variables résolues)"
+```
+
+#### Étape 1 — Juste avant la coupure
+
+```bash
+# Sauvegarde fraîche (script §12.1 — fonctionne déjà, mode test-local actif) :
+scripts-hote/backup-db.sh
+
+# Compte de référence AVANT bascule (à recomparer après, §12.6bis Étape 3) :
+dct exec -T postgres psql -U casa -d casa -tAc \
+  "select (select count(*) from candidat), (select count(*) from candidature);"
+```
+Noter ces deux nombres (candidats, candidatures) quelque part — pas dans ce
+chat (pas de donnée candidat ici).
+
+#### Étape 2 — Coupure (séquence autorisée uniquement)
+
+```bash
+dct down                      # SANS -v — les volumes casa_postgres_data / casa_documents_data survivent
+dca up -d --build
+watch -n 3 'dca ps'            # Ctrl-C dès 4-5x (healthy)
+dca exec -T backend php artisan migrate --force
+dca up -d --force-recreate backend worker nginx   # toujours les 3 ensemble (règle §12.6) — IP Docker fraîches
+```
+
+**Ne PAS lancer** `casa:seed-referentiel` (le référentiel est déjà en place,
+données réelles) ni aucune commande `seed`/`fresh`.
+
+**Durée d'indisponibilité attendue** : le `dct down` coupe l'accès dès son
+lancement ; `dca up -d --build` (image déjà construite lors d'un test
+antérieur = quelques secondes, premier build = 1-3 min) + healthchecks (4
+services à stabiliser, §15.3) + `migrate --force` (quelques secondes, peu de
+migrations en attente) → **compter 2 à 5 minutes de coupure totale**, httpd
+renverra une erreur de passerelle (502/503) pendant ce laps, sans rien changer
+à sa propre config (il continue de taper sur `127.0.0.1:8090`, c'est
+simplement injoignable le temps du redémarrage).
+
+#### Étape 3 — Vérifications post-bascule (checklist, toutes à faire)
+
+```bash
+# a. 5 services healthy
+dca ps --format '{{.Name}}\t{{.Status}}'
+
+# b. Seuils de rate-limit effectivement lus (valeurs attendues : 40/600/5/120/600, ou vos RATE_LIMIT_* si définis)
+dca exec -T backend php artisan tinker --execute="
+echo json_encode(config('casa.rate_limits'));
+"
+
+# c. Connexion (remplacer par un VRAI compte existant — ne pas coller le mot de passe dans l'historique partagé)
+#    -> à faire au navigateur : https://casa.cci.ci/connexion, se connecter, vérifier l'arrivée sur le tableau de bord.
+
+# d. 5 inscriptions de test d'affilée (comptes jetables, à nettoyer ensuite si besoin — cf. prudence sur journal_audit append-only)
+#    -> à faire au navigateur, ou en curl comme dans les vérifications de rate-limiting (preuve déjà établie, même méthode).
+
+# e. Anti-spoof DEPUIS L'EXTÉRIEUR du réseau CCI (4G, pas le WiFi/VPN CCI) :
+for i in $(seq 1 700); do
+  curl -s -o /dev/null -w '%{http_code}\n' -H "X-Forwarded-For: 10.$((i%250)).$((i/250)).$((i%7))" \
+    https://casa.cci.ci/api/filieres
+done | sort | uniq -c
+#   Attendu : ~600 x 200 PUIS des 429 (= casa-public, l'en-tête forgé n'a rien changé).
+#   Si largement plus de 600 x 200 : ARRÊT, ne pas considérer la bascule terminée, revenir à l'Étape 2.5 (repli).
+
+# f. Port 8090 : injoignable depuis un AUTRE poste du réseau, joignable en local
+#    Depuis une AUTRE machine du LAN CCI :
+curl -m 3 -s -o /dev/null -w '%{http_code}\n' http://172.30.4.200:8090/up || echo "injoignable (attendu)"
+#    Depuis jupiter lui-même :
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8090/up   # attendu 200
+
+# g. Compte candidats/candidatures APRÈS = IDENTIQUE à l'Étape 1
+dca exec -T postgres psql -U casa -d casa -tAc \
+  "select (select count(*) from candidat), (select count(*) from candidature);"
+```
+
+#### Étape 4 — firewalld : retirer la règle du port 8090 (root, PAS casa)
+
+`casa` n'a pas sudo pour cette partie — à faire par un administrateur :
+
+```bash
+# Avec root ou sudo :
+firewall-cmd --permanent --remove-port=8090/tcp
+firewall-cmd --reload
+firewall-cmd --list-ports   # 8090 ne doit plus apparaître
+```
+*(Si la règle avait été posée comme un `--zone` spécifique plutôt qu'un port
+nu, adapter — vérifier d'abord `firewall-cmd --list-all` pour retrouver la
+forme exacte de la règle existante avant de la retirer.)*
+
+#### Étape 5 — Repli (rollback) en une séquence
+
+Les fichiers test-local (`backend/.env.test-local`, `.env.test-local`,
+`docker/nginx/casa.test.conf`) **restent intacts** — rien n'a été supprimé à
+aucune étape ci-dessus :
+
+```bash
+dca down                       # SANS -v
+dct up -d --build
+watch -n 3 'dct ps'
+dct up -d --force-recreate backend worker nginx
+```
+Aucune migration à rejouer (le schéma est identique des deux côtés — seule la
+config applicative change). La règle firewalld 8090 (Étape 4), si déjà
+retirée, doit être remise par root le temps du repli.
+
+#### Créneau
+
+Prévoir un **créneau calme, hors session de groupe de candidats** (cf. Étape
+2 : 2-5 min de coupure réelle, httpd renvoie une erreur pendant ce temps) —
+idéalement tôt le matin ou en soirée, jamais pendant un créneau d'inscription
+collective annoncé.
 
 ### 12.7 Renouvellement du certificat
 
@@ -1125,9 +1358,23 @@ REMOTE_ADDR = 172.31.243.x (nginx CASA)     → dans le /24 → sauté
 ```
 
 **Prouvé en local** (mode Apache, `docker network inspect` = `172.31.243.0/24`) :
-65 requêtes `/api/health` avec un `X-Forwarded-For` **forgé tournant** →
-`60 × 200` puis `5 × 429` (le limiteur `casa-public` a bien keyé sur la vraie
-IP). Avec `TRUSTED_PROXIES=*` : **65 × 200** — l'usurpation contourne la limite.
+requêtes `/api/health` avec un `X-Forwarded-For` **forgé tournant** → bloquées
+à la limite réelle de `casa-public` (600/min par défaut, `config('casa.
+rate_limits.public_per_minute')` — voir §12.6bis), jamais au-delà : le
+limiteur garde bien pour clé la vraie IP. Avec `TRUSTED_PROXIES=*` : **aucun
+429** — l'usurpation contourne la limite.
+
+> ⚠️ **Équipement de bordure en amont d'Apache (cas jupiter/CCI, 2026-10-05).**
+> Si un équipement réseau (reverse-proxy, WAF, load-balancer…) se trouve DEVANT
+> Apache sur ce serveur, Apache **ajoute** sa propre IP perçue à la chaîne
+> `X-Forwarded-For` (ex. observé : `"IP_visiteur, 172.30.1.1"`) — un **3ᵉ**
+> maillon que `TRUSTED_PROXIES=172.31.243.0/24` seul ne couvre pas : Laravel
+> s'arrêterait sur cet équipement de bordure, pas sur le vrai visiteur, et
+> TOUS les visiteurs partageraient un seul compteur (même défaut que l'épisode
+> original de cette section, un maillon plus loin). `docker/nginx/casa.apache.conf`
+> doit alors faire confiance à ce saut EXACT, en plus de `CASA_SUBNET`, via une
+> 2ᵉ ligne `set_real_ip_from <IP de bordure>/32;` — jamais un `/16` ni plus
+> large. Procédure complète de diagnostic + correctif : §12.6bis.
 
 Vérifier après `up` que le réseau a bien ce sous-réseau :
 
