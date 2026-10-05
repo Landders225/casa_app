@@ -196,6 +196,50 @@ touche jamais la limite) ; `login` reste limité indépendamment.
 Non-régression : la suite E2E d'intégration (parcours complet inscription →
 retenu) reste verte.
 
+**Mise à jour (2026-10-05) — inscriptions/connexions de GROUPE depuis une même
+IP publique.** Après le correctif du rate limiting partagé via la passerelle
+Docker (commit `a7ad3a4`, cf. `docs/DEPLOIEMENT.md` §14.5bis), chaque IP
+publique a enfin son **propre** compteur — révélant que les seuils ci-dessus
+étaient trop serrés pour un **groupe** de candidats inscrits depuis un même
+Wi-Fi. Trois limiteurs ajustés, deux restent inchangés :
+
+| Limiteur | Débit (avant → après) | Clé | Changé ? |
+|---|---|---|---|
+| `register` | 3/min, 20/j → **40/min, 600/j** | IP (2 clauses indépendantes) | ✅ |
+| `login` | 5/min → **5/min (inchangé) + 120/min** | email+IP (anti-bruteforce compte) **+** IP seule (nouveau, anti-robot multi-comptes) | ✅ (ajout, pas de retrait) |
+| `casa-public` | 60/min → **600/min** | IP | ✅ |
+| `casa-api` | 120/min | id utilisateur (repli IP) | ❌ inchangé |
+| `casa-uploads` | 40/min | id utilisateur | ❌ inchangé |
+| `casa-candidatures` | 12/min | id utilisateur | ❌ inchangé |
+| `casa-mot-de-passe` | 6/min | id utilisateur (repli IP) | ❌ inchangé |
+
+**L'anti-bruteforce PAR COMPTE (`login`, clé email+IP, 5/min) n'a PAS bougé** —
+c'est le plafond IP qui protège désormais contre un robot testant de
+nombreux comptes depuis une même IP, sans jamais assouplir la protection
+d'un compte individuel. Aucun limiteur retiré ni désactivé.
+
+**Les 3 seuils ajustés sont désormais configurables par variable
+d'environnement** (`RATE_LIMIT_REGISTER_PER_MINUTE`/`_PER_DAY`,
+`RATE_LIMIT_LOGIN_PER_MINUTE`/`_IP_PER_MINUTE`, `RATE_LIMIT_PUBLIC_PER_MINUTE`
+— `backend/config/casa.php`, défauts documentés dans les `.env.*.example`).
+**Jamais lus via `env()` directement dans `AppServiceProvider`** : `env()`
+hors d'un fichier `config/*.php` retourne `null` après `config:cache`
+(l'entrypoint le relance à chaque boot, ADR-28) — piège identifié et évité
+dès l'écriture, prouvé par un test qui mute `config()` à l'exécution (si le
+code lisait `env()` en dur, muter `config()` n'aurait aucun effet observable)
+**et** par une vérification manuelle en conditions réelles : valeur
+surchargée dans `.env` → `config:cache` → nouvelle modification du `.env`
+SANS re-cache → la valeur lue reste celle mise en cache, pas la nouvelle —
+confirmant que le mécanisme se comporte exactement comme en production.
+
+**Tests qui le prouvent (ajout).** `RateLimitingTest` : 40 inscriptions
+passent dans la même minute, la 41ᵉ est bloquée, la minute suivante repart à
+zéro (fenêtre glissante) ; le plafond journalier bloque au-delà de sa valeur
+(abaissée via `config()` pour le test, pas 600 requêtes réelles) ; 60
+connexions de 60 comptes différents depuis la même IP passent toutes ; le
+plafond IP du login bloque au-delà de sa valeur ; l'anti-bruteforce par
+compte (6ᵉ tentative sur le même e-mail) reste inchangé.
+
 ### Upload de pièces
 
 **Défenses en place** (Lot 3b, ADR-11).

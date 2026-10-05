@@ -166,6 +166,16 @@ Les autres variables (`APP_ENV=production`, `APP_DEBUG=false`,
 `SESSION_SECURE_COOKIE=true`, `LOG_CHANNEL=stderr`, …) sont **déjà fixées** dans
 le modèle — ne pas y toucher.
 
+> **Limiteurs de débit (`RATE_LIMIT_*`)** — facultatifs, commentés dans le
+> modèle avec leurs défauts (déjà calibrés pour des inscriptions/connexions de
+> GROUPE depuis une même IP publique : `register` 40/min+600/j, `login` 5/min
+> par compte + 120/min par IP, `casa-public` 600/min). Les décommenter
+> seulement pour resserrer face à un abus réel constaté — jamais pour
+> durcir `login` par compte en dessous de 5/min (anti-bruteforce). Après toute
+> modification : redémarrer comme au § 12.6 (`backend`, `worker`, `nginx`) —
+> ces valeurs passent par `config:cache`, un simple changement de `.env` sans
+> recreate n'est jamais pris en compte.
+
 > **Contrôle rapide** avant de continuer :
 > ```bash
 > dcp config -q && echo "compose OK"

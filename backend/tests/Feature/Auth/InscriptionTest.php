@@ -248,6 +248,11 @@ class InscriptionTest extends TestCase
 
     public function test_inscription_rate_limited_par_ip(): void
     {
+        // Seuil ajusté pour les inscriptions de groupe (même IP publique) —
+        // voir config/casa.php (RATE_LIMIT_REGISTER_PER_MINUTE, défaut 40) et
+        // la couverture détaillée dans Security/RateLimitingTest.
+        config(['casa.rate_limits.register_per_minute' => 3]);
+
         for ($i = 0; $i < 3; $i++) {
             $this->fromSpa()->postJson('/api/register', $this->payload(['email' => "essai{$i}@example.ci"]))
                 ->assertCreated();

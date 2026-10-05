@@ -54,17 +54,28 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // --- Limitation des tentatives de connexion (5 / min par e-mail + IP) ---
+        // --- Limitation des tentatives de connexion ------------------------------
+        // Anti-bruteforce PAR COMPTE (clé email+IP, `casa.rate_limits.login_per_minute`,
+        // défaut 5) + plafond PAR IP SEULE (`login_ip_per_minute`, défaut 120) :
+        // un groupe qui se connecte depuis la même IP publique (même Wi-Fi) ne
+        // doit pas se heurter au seuil anti-bruteforce pensé pour UN compte, mais
+        // un robot qui tourne sur de nombreux comptes depuis une même IP reste
+        // arrêté. Lues via `config()`, jamais `env()` ici (cf. config/casa.php).
         RateLimiter::for('login', function (Request $request) {
             $cle = Str::lower((string) $request->input('email')).'|'.$request->ip();
 
-            return Limit::perMinute(5)->by($cle);
+            return [
+                Limit::perMinute((int) config('casa.rate_limits.login_per_minute'))->by($cle),
+                Limit::perMinute((int) config('casa.rate_limits.login_ip_per_minute'))->by('login-ip|'.$request->ip()),
+            ];
         });
 
-        // --- Limitation des inscriptions (anti-bot) : 3 / min ET 20 / jour par IP ---
+        // --- Limitation des inscriptions (anti-bot) : par minute ET par jour, par IP ---
+        // Seuils ajustés pour les inscriptions de groupe (même IP publique) —
+        // `config('casa.rate_limits.register_*')`, défauts 40/min et 600/jour.
         RateLimiter::for('register', fn (Request $request) => [
-            Limit::perMinute(3)->by('register|'.$request->ip()),
-            Limit::perDay(20)->by('register-day|'.$request->ip()),
+            Limit::perMinute((int) config('casa.rate_limits.register_per_minute'))->by('register|'.$request->ip()),
+            Limit::perDay((int) config('casa.rate_limits.register_per_day'))->by('register-day|'.$request->ip()),
         ]);
 
         // --- Filet global des routes authentifiées (Lot 10, T1) -----------------
@@ -87,17 +98,19 @@ class AppServiceProvider extends ServiceProvider
             ->by($request->user()?->getAuthIdentifier() ?: $request->ip()));
 
         // --- Mot de passe (Lot 13, ADR-32) : demande de reset, réinitialisation,
-        // changement connecté. 6/min, cohérent avec login (5) / register (3+20/j).
-        // Keyé IP quand non authentifié (demande/réinitialisation de reset) —
+        // changement connecté. 6/min — INCHANGÉ, hors périmètre de l'ajustement
+        // groupe (Lot « rate limiting groupe »). Keyé IP quand non authentifié —
         // JAMAIS par e-mail, pour ne pas ouvrir un oracle d'énumération sur le
         // throttle lui-même. Keyé utilisateur pour le changement connecté.
         RateLimiter::for('casa-mot-de-passe', fn (Request $request) => Limit::perMinute(6)
             ->by($request->user()?->getAuthIdentifier() ?: $request->ip()));
 
-        // --- Routes PUBLIQUES non authentifiées : 60 / min par IP -------------
+        // --- Routes PUBLIQUES non authentifiées : par IP -----------------------
         // `/api/health` et `/api/filieres` sont hors du filet `casa-api` (pas de
         // session) — ce sont les seules portes ouvertes aux non-authentifiés.
-        RateLimiter::for('casa-public', fn (Request $request) => Limit::perMinute(60)->by($request->ip()));
+        // `config('casa.rate_limits.public_per_minute')`, défaut 600 (relevé pour
+        // les groupes qui chargent la page d'accueil depuis une même IP).
+        RateLimiter::for('casa-public', fn (Request $request) => Limit::perMinute((int) config('casa.rate_limits.public_per_minute'))->by($request->ip()));
 
         // --- Autorisations sémantiques (fondation ADR-10) ---
         // Middleware `role:` pour protéger les routes ; ces Gates pour les
