@@ -789,6 +789,80 @@ monde → rate-limiting = un seau unique).
 > → nginx voit la vraie IP du navigateur. (Un `curl` lancé depuis le serveur
 > lui-même verrait la gateway Docker — sans impact.)
 
+### 14.5bis ⚠️ Si un Apache existant se retrouve EN RÉALITÉ devant ce mode
+
+**Déviation constatée sur `casa.cci.ci` (2026-10-05) : ce mode a été laissé en
+service avec un Apache placé en amont, sans faire le switch § 14.7 → § 15.**
+Le chemin propre reste `§ 14.7` (arrêter le mode test, passer au mode Apache
+dédié, § 15) — mais si ce n'est **pas encore fait** et que le site sert déjà
+de vrais candidats dans cet état, `casa.test.conf` a été corrigé pour rester
+sûr dans cette topologie précise :
+
+```
+Visiteur ──HTTPS──▶ 172.30.1.1 (bordure CCI) ──▶ Apache ──▶ nginx CASA (:8090, via Docker)
+```
+
+- Apache arrive sur le port publié de nginx **via la passerelle Docker**
+  (`172.31.243.1`, = `CASA_SUBNET`) — c'est ce que `casa.apache.conf` gère
+  déjà nativement en mode Apache.
+- **`172.30.1.1`** est l'équipement de bordure CCI placé devant Apache. Il
+  n'est **pas visible de CASA en tant que tel** — Apache l'ajoute lui-même à
+  la chaîne `X-Forwarded-For` comme son propre client perçu, produisant la
+  chaîne observée dans les logs nginx : `"IP_visiteur, 172.30.1.1"`.
+
+`casa.test.conf` fait maintenant confiance, via le module `real_ip` de nginx,
+à ces **deux seuls sauts** (`172.31.243.0/24` + `172.30.1.1/32`, jamais plus
+large, jamais `*`) pour dépouiller la chaîne `X-Forwarded-For` et retrouver la
+vraie IP visiteur — un en-tête forgé par un visiteur ne peut rien changer,
+puisqu'aucune IP qu'il contrôle n'appartient à cette liste de confiance.
+
+**Après TOUT changement de cette conf : seul nginx doit être recréé**, rien
+d'autre (pas de `down -v`, pas de régénération des `.env`, pas de perte de
+données) :
+
+```bash
+dct up -d --force-recreate nginx
+```
+
+**Preuves à faire sur le serveur réel** (pas reproductibles depuis un poste de
+dev — réseau CCI requis) :
+
+```bash
+# --- a. Deux visiteurs d'IP différentes -> compteurs séparés -------------
+# Suivre le log pendant que 2 personnes sur des RÉSEAUX DIFFÉRENTS (pas la
+# même box/4G) ouvrent https://casa.cci.ci :
+dct logs -f --no-log-prefix nginx | grep -v '"GET /up'
+#   Attendu : le 1er champ de chaque ligne = l'IP RÉELLE de chaque visiteur,
+#   DIFFÉRENTE entre les deux, et JAMAIS 172.31.243.1.
+
+# --- b. Anti-usurpation DEPUIS L'EXTÉRIEUR du réseau CCI (4G, pas le WiFi/VPN
+#        CCI) — en-tête forgé qui traverse réellement 172.30.1.1 -----------
+for i in $(seq 1 65); do
+  curl -s -o /dev/null -w '%{http_code}\n' -H "X-Forwarded-For: 10.$i.$i.$i" \
+    https://casa.cci.ci/api/filieres
+done | sort | uniq -c
+#   Succès (chiffré) : ~60 × 200 PUIS ~5 × 429 (= la limite casa-public,
+#   60/min, s'applique normalement — l'en-tête forgé n'a RIEN changé).
+#   ÉCHEC si ~65 × 200 (aucun 429) : la bordure CCI laisse passer un en-tête
+#   forgé jusqu'à Laravel -> ARRÊT, ME PRÉVENIR avant toute autre action.
+#   Recouper avec le log (a.) : les 65 lignes de cette rafale doivent toutes
+#   montrer la MÊME IP réelle de sortie 4G, jamais les 10.$i.$i.$i forgées.
+
+# --- c. Inscription / connexion fonctionnent --------------------------
+# Dans un navigateur : https://casa.cci.ci/inscription puis /connexion avec
+# un compte existant — doit aboutir sans boucle 419 ni blocage 429 imprévu.
+
+# --- Repli si (b) échoue : retour à la conf d'avant ce patch, nginx seul --
+git -C /opt/casa log --oneline -1 -- docker/nginx/casa.test.conf   # vérifier que CE patch est bien le dernier commit sur ce fichier
+git -C /opt/casa checkout HEAD~1 -- docker/nginx/casa.test.conf
+dct up -d --force-recreate nginx
+```
+
+⚠️ Si `172.30.1.1` change un jour (reconfiguration réseau côté CCI), ou si le
+switch § 14.7 → § 15 est enfin fait, ce bloc `set_real_ip_from`/`172.30.1.1`
+devient obsolète — le retirer (ou migrer vers `casa.apache.conf`, qui n'a pas
+besoin de cette entrée : Apache y est TOUJOURS le dernier saut face à nginx).
+
 ### 14.6 Vérifications
 
 ```bash
