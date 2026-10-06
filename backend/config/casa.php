@@ -30,4 +30,20 @@ return [
         // Routes publiques non authentifiées (/api/health, /api/filieres), par IP.
         'public_per_minute' => (int) env('RATE_LIMIT_PUBLIC_PER_MINUTE', 600),
     ],
+
+    // Débit MAXIMUM d'envoi des e-mails de notification (canal `mail` des
+    // classes App\Notifications\*), TOUS destinataires confondus — un
+    // limiteur de JOB de file, pas une route HTTP (cf. le middleware
+    // `Illuminate\Queue\Middleware\RateLimited` appliqué via
+    // `App\Notifications\Concerns\EnvoiMailResilient::middleware()`).
+    //
+    // Pourquoi : le serveur Exchange de production rejette (SMTP 421 4.4.2
+    // "Message submission rate... exceeded") un envoi trop rapide — observé
+    // lors d'un `queue:retry all` après incident (141 échecs en 30 s). La
+    // vraie limite CONFIGURÉE côté Exchange n'est pas connue à ce jour (à
+    // obtenir auprès du DSI) : 30/min est un défaut PRUDENT, délibérément
+    // bas, à ajuster via MAIL_MAX_PER_MINUTE une fois la vraie valeur
+    // connue — sans redéploiement de code, juste cette variable + un
+    // `dcp up -d --force-recreate backend worker`.
+    'mail_max_per_minute' => (int) env('MAIL_MAX_PER_MINUTE', 30),
 ];

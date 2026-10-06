@@ -217,10 +217,27 @@ class ResultatsPubliesNotificationTest extends TestCase
 
         Artisan::call('queue:work', ['--stop-when-empty' => true, '--tries' => 1]);
 
-        // Le job corrompu échoue, SEUL, et atterrit en `failed_jobs`.
-        $this->assertDatabaseCount('failed_jobs', 1);
-        // Les 2 AUTRES jobs, eux, ont été traités normalement — la file est vide,
-        // AUCUNE cascade d'échec ne les a bloqués.
-        $this->assertDatabaseCount('jobs', 0);
+        // Depuis le Lot 18 (ADR-35, `EnvoiMailResilient`), `retryUntil()`
+        // (+6h) fait IGNORER `--tries` par TOUTE exception du job — y compris
+        // une commande corrompue, sans rapport avec le SMTP. Le job n'est
+        // donc PLUS un échec immédiat : il est remis en file avec le plancher
+        // de 30s (`EnvoiMailResilient::backoff()` — sans ce plancher, délai
+        // 0 par défaut ici car `--backoff` n'est pas précisé -> boucle de
+        // relance à chaud, OOM reproduit en conditions réelles avant ce
+        // correctif). Il reste néanmoins SEUL et ISOLÉ : toujours présent en
+        // file (pas bloquant), jamais dans `failed_jobs`.
+        $this->assertDatabaseCount('failed_jobs', 0);
+        $corrompu = DB::table('jobs')->first();
+        $this->assertSame(1, $corrompu->attempts);
+        // Pas immédiatement disponible (donc pas de boucle à chaud) — la
+        // valeur exacte du plancher (30s) est déjà couverte par
+        // EnvoiMailResilient::backoff(), testé isolément ailleurs.
+        $this->assertGreaterThan(now()->getTimestamp(), $corrompu->available_at);
+
+        // Les 2 AUTRES jobs, eux, ont été traités normalement DANS LA MÊME
+        // PASSE — aucune cascade d'échec ne les a bloqués (c'est là
+        // l'isolation que ce test vérifie, indépendante du moment où LE job
+        // corrompu finit par être marqué échoué).
+        $this->assertDatabaseCount('jobs', 1);
     }
 }

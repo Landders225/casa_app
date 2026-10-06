@@ -412,14 +412,68 @@ dcp exec backend php artisan queue:failed
 | Le worker tourne | `dcp ps worker` → `Up` / `(healthy)` |
 | Ses logs | `dcp logs -f worker` |
 | File qui s'accumule (worker mort ou débordé) | `dcp exec backend php artisan queue:monitor database:default --max=50` — **sort en erreur** si > 50 jobs en attente ; à câbler en cron/supervision |
-| Jobs définitivement échoués (3 tentatives épuisées) | `dcp exec backend php artisan queue:failed` |
-| Relancer un job échoué | `dcp exec backend php artisan queue:retry <uuid>`  (ou `all`) |
+| Jobs définitivement échoués | `dcp exec backend php artisan queue:failed` |
+| Relancer un job échoué (⚠️ PAS pour l'e-mail, cf. § 9.4) | `dcp exec backend php artisan queue:retry <uuid>` |
 | Purger les échecs déjà traités | `dcp exec backend php artisan queue:flush` |
 
 - `restart: unless-stopped` → Docker relance automatiquement un worker qui crashe.
 - `--max-time=3600` → le worker se recycle chaque heure (fuite mémoire /
   connexion DB périmée) puis Docker le relance.
-- Un job qui épuise ses 3 tentatives **tombe dans `failed_jobs`** — jamais perdu.
+- Un job qui épuise ses tentatives **tombe dans `failed_jobs`** — jamais perdu.
+  Pour une notification e-mail (canal `mail`), ceci ne se produit QUE pour un
+  rejet SMTP définitif (5xx) ou après la fenêtre de 6h de `retryUntil()`
+  (Lot 18, ADR-35, § 9.4) — PAS après les 3 tentatives du worker (`--tries=3`
+  ci-dessus ne s'applique pas à ces jobs, cf. § 9.4).
+
+### 9.4 Résilience SMTP (Lot 18, ADR-35) — débit, 421 temporaire, incident
+
+**Débit.** `MAIL_MAX_PER_MINUTE` (défaut 30/min, cf. § 9 ci-dessus) limite le
+rythme d'envoi RÉEL vers le serveur SMTP, tous destinataires confondus — un
+pic d'inscriptions (ex. 200 simultanées) ne bombarde donc jamais le serveur.
+Le vrai plafond configuré côté Exchange (ou votre fournisseur) n'est
+généralement pas documenté côté CASA : demandez-le au DSI/à l'administrateur
+du serveur de messagerie et ajustez cette variable en conséquence (`dcp up -d
+--force-recreate backend worker`, sans toucher au code).
+
+**421 / 4xx (temporaire).** Un rejet SMTP temporaire (ex. Exchange « 421
+4.4.2 Message submission rate... exceeded ») ne fait JAMAIS tomber une
+notification dans `failed_jobs` : le job est remis en file avec un délai
+croissant (jusqu'à 10 min), pendant une fenêtre de **6 heures** — largement
+suffisant pour qu'un incident SMTP temporaire se résorbe. Rien à faire :
+```bash
+dcp logs -f worker   # pour observer les relances en cours, si besoin
+```
+
+**5xx (définitif).** Une adresse invalide ou un expéditeur refusé tombe
+IMMÉDIATEMENT dans `failed_jobs` (pas d'attente inutile) — comportement
+normal, à traiter au cas par cas (corriger l'adresse, etc.), PAS par un
+renvoi automatique.
+
+**⚠️ Procédure d'incident — renvoyer des échecs accumulés dans `failed_jobs` :**
+
+> **`php artisan queue:retry all` NE DOIT PLUS JAMAIS être utilisée pour des
+> notifications e-mail.** C'est exactement ce qui a causé l'incident de
+> référence de ce lot : un renvoi groupé de 141 échecs d'un coup a de nouveau
+> saturé le serveur Exchange (421 en rafale). Utilisez SYSTÉMATIQUEMENT la
+> commande dédiée ci-dessous.
+
+```bash
+# 1. Évaluer l'ampleur SANS rien renvoyer :
+dcp exec backend php artisan casa:renvoyer-echecs-smtp --dry-run
+
+# 2. Renvoyer, par lots espacés (défauts : lot = MAIL_MAX_PER_MINUTE,
+#    pause = 60s — jamais plus rapide que le limiteur de débit lui-même) :
+dcp exec backend php artisan casa:renvoyer-echecs-smtp
+
+# Lot/pause personnalisés (ex. serveur SMTP confirmé plus permissif) :
+dcp exec backend php artisan casa:renvoyer-echecs-smtp --lot=50 --pause=90
+```
+
+Cette commande ne touche QUE les échecs de notifications du canal `mail`
+(ignore, sans y toucher, tout autre type de ligne `failed_jobs`) ; la liste
+ciblée est lue une seule fois au démarrage, et `queue:retry` supprime chaque
+ligne dès son renvoi — **aucun doublon possible**, y compris en relançant la
+commande après une interruption (elle ne retraite que ce qui reste).
 
 ---
 

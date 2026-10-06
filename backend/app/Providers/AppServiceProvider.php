@@ -112,6 +112,16 @@ class AppServiceProvider extends ServiceProvider
         // les groupes qui chargent la page d'accueil depuis une même IP).
         RateLimiter::for('casa-public', fn (Request $request) => Limit::perMinute((int) config('casa.rate_limits.public_per_minute'))->by($request->ip()));
 
+        // --- Débit d'envoi des e-mails de notification (Lot 18, ADR-35) --------
+        // PAS un throttle HTTP : un limiteur de JOB DE FILE, consommé par le
+        // middleware `Illuminate\Queue\Middleware\RateLimited` attaché
+        // UNIQUEMENT au canal `mail` des notifications (cf.
+        // App\Notifications\Concerns\EnvoiMailResilient::middleware()). Clé
+        // globale (pas de `->by(...)`) : UNE seule contrainte, le débit total
+        // vers le serveur SMTP, pas par destinataire. `config('casa.mail_max_per_minute')`,
+        // défaut 30 — la vraie limite Exchange reste à confirmer par le DSI.
+        RateLimiter::for('envoi-mail-notification', fn () => Limit::perMinute((int) config('casa.mail_max_per_minute')));
+
         // --- Autorisations sémantiques (fondation ADR-10) ---
         // Middleware `role:` pour protéger les routes ; ces Gates pour les
         // autorisations fines dans les contrôleurs des lots suivants.

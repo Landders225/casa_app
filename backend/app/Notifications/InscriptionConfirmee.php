@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\EnvoiMailResilient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -21,6 +22,7 @@ use Illuminate\Notifications\Notification;
  */
 class InscriptionConfirmee extends Notification implements ShouldQueue
 {
+    use EnvoiMailResilient;
     use Queueable;
 
     /**

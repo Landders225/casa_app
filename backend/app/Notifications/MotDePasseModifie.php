@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\EnvoiMailResilient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -18,6 +19,7 @@ use Illuminate\Notifications\Notification;
  */
 class MotDePasseModifie extends Notification implements ShouldQueue
 {
+    use EnvoiMailResilient;
     use Queueable;
 
     public function __construct(private readonly string $modifieLe) {}
