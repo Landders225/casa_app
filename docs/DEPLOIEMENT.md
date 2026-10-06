@@ -427,21 +427,34 @@ dcp exec backend php artisan queue:failed
 
 ### 9.4 Résilience SMTP (Lot 18, ADR-35) — débit, 421 temporaire, incident
 
-**Débit.** `MAIL_MAX_PER_MINUTE` (défaut **5/min**, cf. § 9 ci-dessus) limite
-le rythme d'envoi RÉEL vers le serveur SMTP, tous destinataires confondus,
-**toutes files confondues** (critique + informative, § 9.4bis — un seul
-budget partagé) — un pic d'inscriptions (ex. 200 simultanées) ne bombarde
-donc jamais le serveur. **Contrainte confirmée : le serveur impose une
-limite basse, de l'ordre de 5 à 10 messages/minute, qui ne sera pas
-relevée** — 5/min est le défaut le plus prudent de cette plage ; ajustez
-cette variable si le DSI confirme une valeur précise (`dcp up -d
---force-recreate backend worker`, sans toucher au code).
+**Débit — ESPACÉ, pas une rafale par fenêtre (Lot 18ter, ADR-37).**
+`MAIL_MAX_PER_MINUTE` (défaut **5/min**, cf. § 9 ci-dessus) ne borne pas
+seulement un TOTAL par minute : il fixe un INTERVALLE RÉGULIER
+(`60 / MAIL_MAX_PER_MINUTE` secondes) entre deux envois successifs, tous
+destinataires confondus, **toutes files confondues** (critique +
+informative, § 9.4bis — une seule cadence partagée). Un pic d'inscriptions
+(ex. 200 simultanées) ne produit donc JAMAIS de rafale instantanée vers le
+serveur, même sous le plafond par minute — important pour un serveur
+sensible au débit INSTANTANÉ, pas seulement au total. **Contrainte
+confirmée : le serveur impose une limite basse, de l'ordre de 5 à 10
+messages/minute, qui ne sera pas relevée** — 5/min (intervalle 12s) est le
+défaut le plus prudent de cette plage ; ajustez cette variable si le DSI
+confirme une valeur précise (`dcp up -d --force-recreate backend worker`,
+sans toucher au code). Espacement mesuré sur un vrai serveur qui horodate
+(Mailpit jetable, 10/min soit 6s) : 4 envois reçus à **14:57:18 / 14:57:23
+(+5s) / 14:57:29 (+6s) / 14:57:35 (+6s)** — jamais de rafale.
 
 **421 / 4xx (temporaire).** Un rejet SMTP temporaire (ex. Exchange « 421
 4.4.2 Message submission rate... exceeded ») ne fait JAMAIS tomber une
 notification dans `failed_jobs` : le job est remis en file avec un délai
 croissant (jusqu'à 10 min), pendant une fenêtre de **6 heures** — largement
-suffisant pour qu'un incident SMTP temporaire se résorbe. Rien à faire :
+suffisant pour qu'un incident SMTP temporaire se résorbe. Journalisé en
+**`WARNING`** (pas `ERROR`) — un 421/4xx est ATTENDU, pas une anomalie — et
+**sans trace d'exception** : seuls 3 champs scalaires (classe de
+notification, code SMTP, numéro de tentative), jamais l'adresse du
+destinataire ni le contenu (vérifié en conditions réelles : un 421/550
+simulé n'écrit QUE cette ligne dans `storage/logs/laravel.log`, rien
+d'autre). Rien à faire :
 ```bash
 dcp logs -f worker   # pour observer les relances en cours, si besoin
 ```
@@ -506,9 +519,11 @@ Laravel vide ENTIÈREMENT une file avant de regarder la suivante (jamais de
 round-robin) : un critique en attente passe donc toujours avant un
 informatif, même arrivé après lui. `default` porte le canal `database`
 (notification dans l'application, jamais affecté par tout ceci) et tout
-futur job sans file dédiée. Le limiteur `MAIL_MAX_PER_MINUTE` reste **unique
-et partagé** entre `mail-critique` et `mail-information` — sinon leurs
-débits s'additionneraient et dépasseraient la vraie limite du serveur.
+futur job sans file dédiée. La cadence d'envoi (§ 9.4, `MAIL_MAX_PER_MINUTE`)
+reste **unique et partagée** entre `mail-critique` et `mail-information` —
+sinon leurs débits s'additionneraient et dépasseraient la vraie limite du
+serveur ; le critique y accède prioritairement du simple fait de l'ordre de
+lecture des files par le worker.
 
 Après un changement de ce fichier (rare — déjà en place) :
 ```bash

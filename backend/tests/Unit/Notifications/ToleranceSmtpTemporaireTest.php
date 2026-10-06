@@ -106,13 +106,20 @@ class ToleranceSmtpTemporaireTest extends TestCase
             );
         });
 
-        Log::shouldHaveReceived('info')->once()->withArgs(function ($message, $context) {
+        // WARNING, pas INFO (Lot 18ter) : un 421/4xx est ATTENDU, mais reste
+        // un signal d'exploitation à ne pas noyer en info.
+        Log::shouldHaveReceived('warning')->once()->withArgs(function ($message, $context) {
             $this->assertSame(['notification', 'code_smtp', 'tentative', 'delai_secondes'], array_keys($context));
             $this->assertStringNotContainsString('candidat-secret', $message);
             $this->assertStringNotContainsString('candidat-secret', (string) json_encode($context));
 
             return true;
         });
+        // Jamais de niveau error/critical pour un échec ATTENDU — et jamais
+        // l'exception (donc sa trace) passée à Log:: (seuls les 3 appels
+        // ci-dessus/dessous, avec des scalaires).
+        Log::shouldNotHaveReceived('error');
+        Log::shouldNotHaveReceived('critical');
     }
 
     public function test_le_journal_d_un_echec_definitif_ne_contient_aucune_donnee_personnelle(): void
@@ -134,5 +141,7 @@ class ToleranceSmtpTemporaireTest extends TestCase
 
             return true;
         });
+        Log::shouldNotHaveReceived('error');
+        Log::shouldNotHaveReceived('critical');
     }
 }

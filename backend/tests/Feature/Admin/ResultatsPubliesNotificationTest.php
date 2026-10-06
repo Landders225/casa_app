@@ -197,6 +197,14 @@ class ResultatsPubliesNotificationTest extends TestCase
     public function test_echec_d_un_job_isole_n_empeche_pas_le_traitement_des_autres(): void
     {
         config(['queue.default' => 'database']);
+        // Débit volontairement généreux (Lot 18ter, EtalementEnvoiMail) :
+        // ce test porte sur l'ISOLATION d'un job corrompu, pas sur la
+        // cadence d'envoi — sans ce réglage, l'étalement RÉEL (60/N
+        // secondes entre 2 envois mail) retarderait légitimement le job
+        // mail du 3ᵉ destinataire au-delà de cette seule passe, ce qui
+        // n'est pas ce qu'on veut observer ici (testé séparément, cf.
+        // PrioriteFilesMailTest / EtalementEnvoiMailTest).
+        config(['casa.mail_max_per_minute' => 1000]);
 
         $this->candidatAvecDecision('retenu');
         $this->candidatAvecDecision('non_retenu');

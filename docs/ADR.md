@@ -674,6 +674,24 @@ Découvert en écrivant l'E2E : `Entretien.jsx` ne proposait **aucune UI** pour 
 
 ---
 
+## ADR-37 — Correction : étalement réel des envois + niveau de journal des 421 (Lot 18ter)
+
+**Contexte.** Deux manques signalés après la livraison du Lot 18bis, effectivement absents : (1) `Illuminate\Queue\Middleware\RateLimited` (utilisé jusque-là pour le débit) autorise une RAFALE de N messages INSTANTANÉE en début de fenêtre de 60s, puis bloque jusqu'à son terme — PAS un espacement réel ; un serveur sensible au débit instantané (pas seulement au total/minute) peut rejeter malgré un total respecté. (2) Un rejet 421/4xx temporaire était journalisé en `INFO`, pas en `WARNING` comme demandé — la trace d'exception elle-même n'avait jamais été loggée (vérifié dès le Lot 18), seul le NIVEAU était en cause.
+
+**Décision — remplacement de `RateLimited` par `App\Notifications\Middleware\EtalementEnvoiMail` :** une clé de cache PARTAGÉE (store `database`, Postgres) retient le PROCHAIN CRÉNEAU encore disponible ; le premier job qui passe réserve ce créneau (ou « maintenant ») et avance la clé de `60 / MAIL_MAX_PER_MINUTE` secondes pour le suivant, sous un verrou atomique (`Cache::lock`, supporté nativement par le store `database`). `ToleranceSmtpTemporaire::handle()` passe son log 421/4xx de `Log::info` à `Log::warning` (le cas 5xx était déjà en `warning`).
+
+**Piège trouvé et corrigé EN COURS DE CORRECTION, par la preuve réelle elle-même (pas par relecture de code) :** une première version mémorisait le créneau réservé sur une PROPRIÉTÉ D'INSTANCE du middleware (`$this->creneauReserve`), en supposant qu'elle survivrait à un `release()` puisque le middleware est sérialisé AVEC le job (`Illuminate\Bus\Queueable::$middleware`). **Faux** : `Illuminate\Queue\DatabaseQueue::release()` repousse le PAYLOAD BRUT D'ORIGINE (`$job->payload`, les octets sérialisés au PREMIER dispatch), jamais une ré-sérialisation de l'objet après mutation en mémoire — toute mutation faite pendant un `handle()` est perdue dès le `release()`. Conséquence observée sur Mailpit (mesure horodatée réelle) : chaque relance d'un job RÉSERVAIT UN NOUVEAU créneau au lieu d'attendre le sien, repoussant la cadence de tous les jobs suivants à l'infini — 1 seul message livré sur 4 en 28s réelles, aucun espacement. Corrigé en déplaçant la mémorisation vers une clé de cache EXTERNE, adressée par l'identifiant STABLE de la notification (`notification->id`, UUID posé une seule fois au dispatch initial et donc préservé dans le payload original, contrairement à l'état en mémoire) : une relance RELIT son créneau déjà réservé au lieu d'en créer un autre.
+
+**Preuve réelle, mesurée sur un serveur qui horodate (pas seulement `Carbon::setTestNow`).** Mailpit jetable, 4 notifications, `MAIL_MAX_PER_MINUTE=10` (intervalle attendu 6s) : réception à **14:57:18 / 14:57:23 (+5s) / 14:57:29 (+6s) / 14:57:35 (+6s)** — espacement réel confirmé, aucune rafale. Journalisation : un 421 et un 550 simulés en conditions réelles écrivent CHACUN une seule ligne dans `storage/logs/laravel.log`, au niveau attendu (`WARNING` pour les deux désormais), sans aucune trace d'exception ni donnée personnelle.
+
+**Tests.** `EtalementEnvoiMailTest` (nouveau, 5 tests déterministes via `Carbon::setTestNow` — dont une preuve directe que le piège de la propriété d'instance est fermé : une relance simulée par une NOUVELLE instance de middleware relit le même créneau plutôt que d'en réserver un autre) ; `ToleranceSmtpTemporaireTest` mis à jour (niveau `warning`, plus une assertion négative `shouldNotHaveReceived('error'|'critical')`) ; `EnvoiMailResilientTest` mis à jour (nouvelle classe de middleware) ; `ResultatsPubliesNotificationTest` : le test d'isolation d'un job corrompu reçoit un débit volontairement généreux (hors sujet pour ce test précis — l'étalement réel aurait légitimement laissé un 3ᵉ job mail en attente dans la même passe).
+
+**Documentation.** `docs/DEPLOIEMENT.md` §9.4 (mécanisme d'espacement réel + preuve Mailpit + niveau de log confirmé).
+
+**Divergences maquette.** Aucune (correctif backend/infrastructure pur, aucun écran).
+
+---
+
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)
 
 > **Inventaire vivant à jour : [`docs/POINTS-OUVERTS.md`](POINTS-OUVERTS.md)** (Lot 9c, ADR-28).

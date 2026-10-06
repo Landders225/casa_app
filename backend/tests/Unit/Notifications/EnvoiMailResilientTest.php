@@ -6,11 +6,11 @@ use App\Notifications\CandidatureSoumise;
 use App\Notifications\EntretienPlanifie;
 use App\Notifications\EntretienReplanifie;
 use App\Notifications\InscriptionConfirmee;
+use App\Notifications\Middleware\EtalementEnvoiMail;
 use App\Notifications\Middleware\ToleranceSmtpTemporaire;
 use App\Notifications\MotDePasseModifie;
 use App\Notifications\ReinitialisationMotDePasse;
 use App\Notifications\ResultatsPublies;
-use Illuminate\Queue\Middleware\RateLimited;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -100,7 +100,7 @@ class EnvoiMailResilientTest extends TestCase
         }
     }
 
-    public function test_le_canal_mail_recoit_le_limiteur_de_debit_et_la_tolerance_smtp(): void
+    public function test_le_canal_mail_recoit_l_etalement_et_la_tolerance_smtp(): void
     {
         $notification = new InscriptionConfirmee;
         $notifiable = (object) ['id' => 1];
@@ -108,7 +108,7 @@ class EnvoiMailResilientTest extends TestCase
         $middlewares = $notification->middleware($notifiable, 'mail');
 
         $this->assertCount(2, $middlewares);
-        $this->assertInstanceOf(RateLimited::class, $middlewares[0]);
+        $this->assertInstanceOf(EtalementEnvoiMail::class, $middlewares[0]);
         $this->assertInstanceOf(ToleranceSmtpTemporaire::class, $middlewares[1]);
     }
 

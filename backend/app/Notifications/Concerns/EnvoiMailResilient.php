@@ -2,17 +2,20 @@
 
 namespace App\Notifications\Concerns;
 
+use App\Notifications\Middleware\EtalementEnvoiMail;
 use App\Notifications\Middleware\ToleranceSmtpTemporaire;
-use Illuminate\Queue\Middleware\RateLimited;
 
 /**
- * Résilience de l'envoi SMTP (Lot 18, ADR-35) — à utiliser par les 7 classes
- * `App\Notifications\*` (toutes `ShouldQueue`).
+ * Résilience de l'envoi SMTP (Lot 18, ADR-35 ; étalement réel Lot 18ter,
+ * ADR-37) — à utiliser par les 7 classes `App\Notifications\*` (toutes
+ * `ShouldQueue`).
  *
- * - `middleware()` : débit (`envoi-mail-notification`, cf.
- *   `config('casa.mail_max_per_minute')`) + tolérance aux 421/4xx
- *   (`ToleranceSmtpTemporaire`) — appliqués UNIQUEMENT au canal `mail`.
- *   Laravel dispatche nativement un job PAR CANAL PAR DESTINATAIRE
+ * - `middleware()` : étalement RÉEL du débit (`EtalementEnvoiMail` — un
+ *   envoi toutes les `60 / casa.mail_max_per_minute` secondes, PAS une
+ *   simple autorisation de N par fenêtre de 60s qui laisserait passer une
+ *   rafale instantanée) + tolérance aux 421/4xx (`ToleranceSmtpTemporaire`)
+ *   — appliqués UNIQUEMENT au canal `mail`. Laravel dispatche nativement un
+ *   job PAR CANAL PAR DESTINATAIRE
  *   (`Illuminate\Notifications\NotificationSender::queueNotification`), et
  *   transmet le `$channel` exact à `middleware($notifiable, $channel)` : le
  *   canal `database` n'est donc jamais concerné, sans code de filtrage côté
@@ -52,12 +55,12 @@ use Illuminate\Queue\Middleware\RateLimited;
  *   `mail-critique,mail-information,default` (cf. docker-compose.prod.yml) :
  *   Laravel vide une file avant de regarder la suivante (PAS de round-robin,
  *   vérifié dans `Illuminate\Queue\Worker`), donc un critique en attente
- *   passe toujours avant un informatif. Le LIMITEUR DE DÉBIT reste UNIQUE et
- *   PARTAGÉ entre les deux files (même nom `envoi-mail-notification` dans
- *   `middleware()` ci-dessus, quelle que soit la file) : deux limiteurs
- *   indépendants cumuleraient leurs débits et dépasseraient la vraie limite
- *   du serveur — un seul budget, auquel le critique accède prioritairement
- *   du simple fait de l'ordre de lecture des files par le worker.
+ *   passe toujours avant un informatif. La CADENCE reste UNIQUE et PARTAGÉE
+ *   entre les deux files (une seule clé de cache dans `EtalementEnvoiMail`,
+ *   quelle que soit la file) : deux cadences indépendantes cumuleraient
+ *   leurs débits et dépasseraient la vraie limite du serveur — un seul
+ *   budget, auquel le critique accède prioritairement du simple fait de
+ *   l'ordre de lecture des files par le worker.
  *
  * - `canauxInformatifs()` (Lot 18bis) : à appeler depuis le `via()` des 5
  *   classes INFORMATIVES (jamais par les 2 critiques, dont le `via()` ne la
@@ -78,7 +81,7 @@ trait EnvoiMailResilient
         }
 
         return [
-            new RateLimited('envoi-mail-notification'),
+            new EtalementEnvoiMail,
             new ToleranceSmtpTemporaire,
         ];
     }

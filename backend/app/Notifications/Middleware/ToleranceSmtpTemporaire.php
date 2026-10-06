@@ -17,10 +17,20 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
  * plutôt que de laisser l'exception se propager (évite 2 tentatives inutiles
  * avant l'échec, cf. `--tries` du worker).
  *
- * ⚠️ RGPD / vie privée — les champs journalisés sont une liste BLANCHE
- * stricte (classe de notification, code SMTP, numéro de tentative) : jamais
- * l'adresse du destinataire, le sujet ou le contenu du message (testé,
- * cf. ToleranceSmtpTemporaireTest::test_le_journal_ne_contient_aucune_donnee_personnelle).
+ * Journalisation (Lot 18ter) : les DEUX cas (temporaire ET définitif) sont
+ * loggés en `WARNING` — un 421/4xx est ATTENDU (pas une anomalie
+ * applicative), mais reste un signal d'exploitation à ne pas noyer en
+ * `info`. Jamais de niveau `error`/`critical` ici, et jamais l'objet
+ * exception ni sa trace ne sont passés à `Log::` — uniquement 3 champs
+ * scalaires (liste BLANCHE stricte : classe de notification, code SMTP,
+ * numéro de tentative) ; ni l'adresse du destinataire, ni le sujet, ni le
+ * contenu du message (testé, cf.
+ * ToleranceSmtpTemporaireTest::test_le_journal_ne_contient_aucune_donnee_personnelle).
+ * L'exception n'est jamais relancée (`throw`) pour ces 2 codes : elle ne
+ * peut donc pas non plus déclencher un `error` avec trace complète via le
+ * gestionnaire d'exceptions global du worker (vérifié en conditions
+ * réelles — `storage/logs/laravel.log` ne contient QUE la ligne `WARNING`
+ * ci-dessus pour un 421/550 simulé, cf. docs/DEPLOIEMENT.md §9.4bis).
  */
 class ToleranceSmtpTemporaire
 {
@@ -55,7 +65,7 @@ class ToleranceSmtpTemporaire
                 self::DELAI_MAX_SECONDES
             );
 
-            Log::info('Notification e-mail : échec SMTP temporaire, nouvelle tentative programmée.', [
+            Log::warning('Notification e-mail : échec SMTP temporaire (421/4xx attendu), nouvelle tentative programmée.', [
                 ...$contexte,
                 'delai_secondes' => $delai,
             ]);
