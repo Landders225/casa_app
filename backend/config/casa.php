@@ -32,18 +32,31 @@ return [
     ],
 
     // Débit MAXIMUM d'envoi des e-mails de notification (canal `mail` des
-    // classes App\Notifications\*), TOUS destinataires confondus — un
-    // limiteur de JOB de file, pas une route HTTP (cf. le middleware
-    // `Illuminate\Queue\Middleware\RateLimited` appliqué via
-    // `App\Notifications\Concerns\EnvoiMailResilient::middleware()`).
+    // classes App\Notifications\*), TOUS destinataires confondus, TOUTES
+    // FILES confondues (critique + informative, Lot 18bis — un seul
+    // limiteur PARTAGÉ, cf. `EnvoiMailResilient::middleware()`) — un
+    // limiteur de JOB de file, pas une route HTTP.
     //
-    // Pourquoi : le serveur Exchange de production rejette (SMTP 421 4.4.2
+    // Pourquoi : le serveur de messagerie de production rejette (SMTP 421
     // "Message submission rate... exceeded") un envoi trop rapide — observé
-    // lors d'un `queue:retry all` après incident (141 échecs en 30 s). La
-    // vraie limite CONFIGURÉE côté Exchange n'est pas connue à ce jour (à
-    // obtenir auprès du DSI) : 30/min est un défaut PRUDENT, délibérément
-    // bas, à ajuster via MAIL_MAX_PER_MINUTE une fois la vraie valeur
-    // connue — sans redéploiement de code, juste cette variable + un
+    // lors d'un `queue:retry all` après incident (141 échecs en 30 s).
+    // CONTRAINTE CONFIRMÉE (Lot 18bis) : le serveur impose une limite basse,
+    // de l'ordre de 5 à 10 messages/minute, qui NE SERA PAS relevée — 5/min
+    // est le défaut délibérément le plus prudent de cette plage. Ajustable
+    // sans redéploiement de code via MAIL_MAX_PER_MINUTE + un
     // `dcp up -d --force-recreate backend worker`.
-    'mail_max_per_minute' => (int) env('MAIL_MAX_PER_MINUTE', 30),
+    'mail_max_per_minute' => (int) env('MAIL_MAX_PER_MINUTE', 5),
+
+    // Coupe-circuit pour les e-mails de notification INFORMATIFS (Lot 18bis)
+    // — InscriptionConfirmee, CandidatureSoumise, EntretienPlanifie,
+    // EntretienReplanifie, ResultatsPublies. Activé par défaut (= envoi
+    // normal). Mis à `false` (ex. pendant une inscription de masse), le
+    // canal `mail` de ces 5 classes est retiré de leur `via()` — AUCUN job
+    // mail n'est même créé pour elles. Le canal `database` (notification
+    // dans l'application) n'est JAMAIS affecté par ce réglage — ni lui, ni
+    // les e-mails CRITIQUES (ReinitialisationMotDePasse, MotDePasseModifie :
+    // sécuritaires, l'un porte un jeton à durée de vie courte, l'autre n'a
+    // aucun canal `database` de repli) dont le `via()` ne consulte jamais
+    // ce réglage.
+    'mail_notifications_informatives' => (bool) env('MAIL_NOTIFICATIONS_INFORMATIVES', true),
 ];

@@ -32,6 +32,17 @@ class MotDePasseModifie extends Notification implements ShouldQueue
         return ['mail'];
     }
 
+    /**
+     * Critique (Lot 18bis) : détection de prise de compte, aucun canal
+     * `database` de repli — jamais soumis à `MAIL_NOTIFICATIONS_INFORMATIVES`
+     * (`via()` ci-dessus ne consulte pas ce réglage), et file `mail-critique`
+     * (priorité sur les notifications informatives au sein du worker).
+     */
+    protected function fileMail(): string
+    {
+        return 'mail-critique';
+    }
+
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)

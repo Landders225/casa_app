@@ -40,7 +40,7 @@ class EntretienReplanifie extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return $this->canauxInformatifs();
     }
 
     public function toMail(object $notifiable): MailMessage

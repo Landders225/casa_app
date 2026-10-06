@@ -36,6 +36,19 @@ class ReinitialisationMotDePasse extends Notification implements ShouldQueue
         return ['mail'];
     }
 
+    /**
+     * Critique (Lot 18bis) : jeton à durée de vie courte (expire après
+     * `auth.passwords.users.expire`, 60 min par défaut) — un retard de file
+     * peut rendre le lien inutilisable avant même réception. File
+     * `mail-critique` (priorité sur les notifications informatives au sein
+     * du worker), jamais soumis à `MAIL_NOTIFICATIONS_INFORMATIVES`
+     * (`via()` ci-dessus ne consulte pas ce réglage).
+     */
+    protected function fileMail(): string
+    {
+        return 'mail-critique';
+    }
+
     public function toMail(object $notifiable): MailMessage
     {
         $lien = $this->lien($notifiable);

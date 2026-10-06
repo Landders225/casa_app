@@ -60,7 +60,7 @@ services:
     env_file:
       - ./backend/.env.production
 
-  # --- Worker de la file d'attente (Lot 12a, ADR-31) -----------------------
+  # --- Worker de la file d'attente (Lot 12a, ADR-31 ; files Lot 18bis, ADR-36) ---
   # Traite les jobs `database` (e-mails asynchrones — les envois ne bloquent
   # jamais l'action de l'utilisateur). MÊME image que `backend`.
   #
@@ -70,11 +70,20 @@ services:
   #                                  connexion DB périmée) puis relance ;
   #   3. healthcheck `pgrep`      → `dcp ps` montre `worker` (unhealthy) si le
   #                                  process a disparu — visible d'un coup d'œil ;
-  #   4. failed_jobs             → un job qui épuise ses 3 tentatives y tombe
+  #   4. failed_jobs             → un job qui épuise ses tentatives y tombe
   #                                  (jamais perdu) : `queue:failed` / `queue:retry`.
   # --timeout=60 < DB_QUEUE_RETRY_AFTER (90) : un job bloqué est tué sans
   # double-envoi. L'entrypoint (mêmes caches que backend) garantit une config
   # identique ; après un changement SMTP → `dcp up -d --force-recreate worker`.
+  #
+  # --queue=mail-critique,mail-information,default (Lot 18bis, ADR-36) : 3
+  # files traitées DANS CET ORDRE — Laravel vide la 1ʳᵉ avant de regarder la
+  # suivante (PAS de round-robin, cf. Illuminate\Queue\Worker). `mail-critique`
+  # (ReinitialisationMotDePasse, MotDePasseModifie) passe donc TOUJOURS avant
+  # `mail-information` (les 5 autres notifications) ; `default` porte le canal
+  # `database` et tout job futur sans file dédiée. Le limiteur de débit SMTP
+  # (`MAIL_MAX_PER_MINUTE`) reste UNIQUE entre les 2 files mail — cf.
+  # `App\Notifications\Concerns\EnvoiMailResilient`, docs/DEPLOIEMENT.md §9.4bis.
   worker:
     image: casa-backend:local
     restart: unless-stopped
@@ -93,7 +102,7 @@ services:
       - artisan
       - queue:work
       - database
-      - --queue=default
+      - --queue=mail-critique,mail-information,default
       - --tries=3
       - --backoff=10
       - --max-time=3600

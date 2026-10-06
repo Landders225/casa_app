@@ -411,7 +411,7 @@ dcp exec backend php artisan queue:failed
 |---|---|
 | Le worker tourne | `dcp ps worker` → `Up` / `(healthy)` |
 | Ses logs | `dcp logs -f worker` |
-| File qui s'accumule (worker mort ou débordé) | `dcp exec backend php artisan queue:monitor database:default --max=50` — **sort en erreur** si > 50 jobs en attente ; à câbler en cron/supervision |
+| File qui s'accumule (worker mort ou débordé) | `dcp exec backend php artisan queue:monitor database:mail-critique,database:mail-information,database:default --max=50` — **sort en erreur** si > 50 jobs en attente sur l'UNE DES 3 files (liste séparée par des virgules, SANS espace ; Lot 18bis, ADR-36) ; à câbler en cron/supervision |
 | Jobs définitivement échoués | `dcp exec backend php artisan queue:failed` |
 | Relancer un job échoué (⚠️ PAS pour l'e-mail, cf. § 9.4) | `dcp exec backend php artisan queue:retry <uuid>` |
 | Purger les échecs déjà traités | `dcp exec backend php artisan queue:flush` |
@@ -427,12 +427,14 @@ dcp exec backend php artisan queue:failed
 
 ### 9.4 Résilience SMTP (Lot 18, ADR-35) — débit, 421 temporaire, incident
 
-**Débit.** `MAIL_MAX_PER_MINUTE` (défaut 30/min, cf. § 9 ci-dessus) limite le
-rythme d'envoi RÉEL vers le serveur SMTP, tous destinataires confondus — un
-pic d'inscriptions (ex. 200 simultanées) ne bombarde donc jamais le serveur.
-Le vrai plafond configuré côté Exchange (ou votre fournisseur) n'est
-généralement pas documenté côté CASA : demandez-le au DSI/à l'administrateur
-du serveur de messagerie et ajustez cette variable en conséquence (`dcp up -d
+**Débit.** `MAIL_MAX_PER_MINUTE` (défaut **5/min**, cf. § 9 ci-dessus) limite
+le rythme d'envoi RÉEL vers le serveur SMTP, tous destinataires confondus,
+**toutes files confondues** (critique + informative, § 9.4bis — un seul
+budget partagé) — un pic d'inscriptions (ex. 200 simultanées) ne bombarde
+donc jamais le serveur. **Contrainte confirmée : le serveur impose une
+limite basse, de l'ordre de 5 à 10 messages/minute, qui ne sera pas
+relevée** — 5/min est le défaut le plus prudent de cette plage ; ajustez
+cette variable si le DSI confirme une valeur précise (`dcp up -d
 --force-recreate backend worker`, sans toucher au code).
 
 **421 / 4xx (temporaire).** Un rejet SMTP temporaire (ex. Exchange « 421
@@ -465,8 +467,9 @@ dcp exec backend php artisan casa:renvoyer-echecs-smtp --dry-run
 #    pause = 60s — jamais plus rapide que le limiteur de débit lui-même) :
 dcp exec backend php artisan casa:renvoyer-echecs-smtp
 
-# Lot/pause personnalisés (ex. serveur SMTP confirmé plus permissif) :
-dcp exec backend php artisan casa:renvoyer-echecs-smtp --lot=50 --pause=90
+# Lot/pause personnalisés (ex. le DSI confirme une valeur précise dans la
+# plage 5-10, disons 8) :
+dcp exec backend php artisan casa:renvoyer-echecs-smtp --lot=8 --pause=60
 ```
 
 Cette commande ne touche QUE les échecs de notifications du canal `mail`
@@ -474,6 +477,68 @@ Cette commande ne touche QUE les échecs de notifications du canal `mail`
 ciblée est lue une seule fois au démarrage, et `queue:retry` supprime chaque
 ligne dès son renvoi — **aucun doublon possible**, y compris en relançant la
 commande après une interruption (elle ne retraite que ce qui reste).
+
+### 9.4bis Files prioritaires + coupe-circuit informatif (Lot 18bis, ADR-36)
+
+**Contexte.** `MAIL_MAX_PER_MINUTE` étant confirmé bas (5-10/min, § 9.4), un
+pic d'inscriptions peut mettre plusieurs minutes à vider la file des e-mails
+*informatifs* (accusés de réception, etc.). Les e-mails *critiques*
+(réinitialisation de mot de passe — jeton à durée de vie courte ;
+confirmation de changement de mot de passe — détection de prise de compte)
+ne doivent JAMAIS attendre derrière cette file.
+
+**Files prioritaires.** Le canal `mail` des notifications est routé vers
+l'une de 2 files :
+
+| File | Notifications | Priorité |
+|---|---|---|
+| `mail-critique` | `ReinitialisationMotDePasse`, `MotDePasseModifie` | 1ʳᵉ traitée |
+| `mail-information` | `InscriptionConfirmee`, `CandidatureSoumise`, `EntretienPlanifie`, `EntretienReplanifie`, `ResultatsPublies` | 2ᵉ traitée |
+
+Le worker (`docker-compose.prod.yml`, hérité TEL QUEL par le mode test-local
+et le mode Apache — jupiter) tourne avec :
+
+```
+--queue=mail-critique,mail-information,default
+```
+
+Laravel vide ENTIÈREMENT une file avant de regarder la suivante (jamais de
+round-robin) : un critique en attente passe donc toujours avant un
+informatif, même arrivé après lui. `default` porte le canal `database`
+(notification dans l'application, jamais affecté par tout ceci) et tout
+futur job sans file dédiée. Le limiteur `MAIL_MAX_PER_MINUTE` reste **unique
+et partagé** entre `mail-critique` et `mail-information` — sinon leurs
+débits s'additionneraient et dépasseraient la vraie limite du serveur.
+
+Après un changement de ce fichier (rare — déjà en place) :
+```bash
+dcp up -d --force-recreate backend worker
+```
+
+**Vérifier sur jupiter (mode Apache) :**
+```bash
+dca ps worker                                    # Up / healthy
+dca exec backend php artisan queue:monitor database:mail-critique,database:mail-information,database:default --max=50
+```
+
+**Coupe-circuit informatif — `MAIL_NOTIFICATIONS_INFORMATIVES`.** Activé par
+défaut (envoi normal). Pour couper TEMPORAIREMENT les 5 e-mails informatifs
+pendant une inscription de masse (réserver le débit rare aux critiques) :
+
+```bash
+# Dans backend/.env.production :
+MAIL_NOTIFICATIONS_INFORMATIVES=false
+# Puis :
+dcp up -d --force-recreate backend worker
+```
+
+- Le canal `database` (notification dans l'application) **n'est jamais
+  affecté** — le candidat voit toujours l'information dans son espace, même
+  coupé.
+- Les e-mails **critiques ne sont jamais affectés** par ce réglage.
+- Remettre `MAIL_NOTIFICATIONS_INFORMATIVES=true` (ou retirer la ligne,
+  c'est le défaut) + `dcp up -d --force-recreate backend worker` pour
+  rétablir l'envoi normal dès que le pic est passé.
 
 ---
 

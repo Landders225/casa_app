@@ -43,6 +43,28 @@ use Illuminate\Queue\Middleware\RateLimited;
  *   correctif, cf. `ResultatsPubliesNotificationTest`). N'affecte PAS le délai
  *   explicite posé par `ToleranceSmtpTemporaire::handle()` via `$job->release()`,
  *   qui reste prioritaire pour le cas SMTP réellement géré.
+ *
+ * - `viaQueues()` (Lot 18bis) : route le job du canal `mail` vers la file
+ *   `mail-critique` (ReinitialisationMotDePasse, MotDePasseModifie — chacune
+ *   override `fileMail()`) ou `mail-information` (les 5 autres, défaut de
+ *   `fileMail()` ci-dessous) — JAMAIS le canal `database`, qui reste sur sa
+ *   file habituelle (`default`). Le worker traite les files dans l'ordre
+ *   `mail-critique,mail-information,default` (cf. docker-compose.prod.yml) :
+ *   Laravel vide une file avant de regarder la suivante (PAS de round-robin,
+ *   vérifié dans `Illuminate\Queue\Worker`), donc un critique en attente
+ *   passe toujours avant un informatif. Le LIMITEUR DE DÉBIT reste UNIQUE et
+ *   PARTAGÉ entre les deux files (même nom `envoi-mail-notification` dans
+ *   `middleware()` ci-dessus, quelle que soit la file) : deux limiteurs
+ *   indépendants cumuleraient leurs débits et dépasseraient la vraie limite
+ *   du serveur — un seul budget, auquel le critique accède prioritairement
+ *   du simple fait de l'ordre de lecture des files par le worker.
+ *
+ * - `canauxInformatifs()` (Lot 18bis) : à appeler depuis le `via()` des 5
+ *   classes INFORMATIVES (jamais par les 2 critiques, dont le `via()` ne la
+ *   consulte pas) — retire le canal `mail` quand
+ *   `casa.mail_notifications_informatives` est à `false` (ex. coupure
+ *   temporaire pendant une inscription de masse), le canal `database` n'est
+ *   JAMAIS retiré.
  */
 trait EnvoiMailResilient
 {
@@ -69,5 +91,28 @@ trait EnvoiMailResilient
     public function backoff(): int
     {
         return 30;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function viaQueues(): array
+    {
+        return ['mail' => $this->fileMail()];
+    }
+
+    protected function fileMail(): string
+    {
+        return 'mail-information';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function canauxInformatifs(): array
+    {
+        return config('casa.mail_notifications_informatives')
+            ? ['mail', 'database']
+            : ['database'];
     }
 }

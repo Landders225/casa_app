@@ -29,13 +29,22 @@ class RenvoyerEchecsSmtpCommandTest extends TestCase
             'mail.mailers.smtp-simule' => ['transport' => 'smtp-simule'],
             'mail.default' => 'smtp-simule',
             'queue.default' => 'database',
+            // Débit volontairement généreux : ce débit RÉEL (5/min par
+            // défaut, Lot 18bis) n'est pas ce qu'on teste ici — on veut
+            // fabriquer $nombre échecs de façon fiable en une seule passe,
+            // indépendamment de la valeur courante de
+            // casa.mail_max_per_minute (testée séparément, explicitement
+            // abaissée par les tests qui en ont besoin).
+            'casa.mail_max_per_minute' => 1000,
         ]);
 
         User::factory()->count($nombre)->create()->each(
             fn (User $u) => $u->notify(new InscriptionConfirmee)
         );
 
-        Artisan::call('queue:work', ['--stop-when-empty' => true, '--tries' => 3, '--backoff' => 10]);
+        // --queue : InscriptionConfirmee est informative (Lot 18bis, ADR-36)
+        // -> son canal mail est routé vers `mail-information`, pas `default`.
+        Artisan::call('queue:work', ['--stop-when-empty' => true, '--tries' => 3, '--backoff' => 10, '--queue' => 'mail-critique,mail-information,default']);
     }
 
     public function test_dry_run_affiche_le_compte_sans_rien_renvoyer(): void
@@ -93,9 +102,10 @@ class RenvoyerEchecsSmtpCommandTest extends TestCase
 
     public function test_les_defauts_de_lot_et_pause_respectent_mail_max_per_minute(): void
     {
-        // Débit par défaut (30/min) pendant la PRODUCTION des échecs : les 9
-        // tentatives doivent toutes atteindre le transport (donc échouer),
-        // aucune ne doit être retardée par le limiteur à ce stade.
+        // Débit généreux (posé par produireEchecsMail(), pas le vrai défaut
+        // 5/min) pendant la PRODUCTION des échecs : les 9 tentatives doivent
+        // toutes atteindre le transport (donc échouer), aucune ne doit être
+        // retardée par le limiteur à ce stade.
         $this->produireEchecsMail(9);
         $this->assertDatabaseCount('failed_jobs', 9);
 

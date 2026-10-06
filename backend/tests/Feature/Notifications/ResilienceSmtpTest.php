@@ -48,6 +48,23 @@ class ResilienceSmtpTest extends TestCase
         ]);
     }
 
+    /**
+     * InscriptionConfirmee est informative (Lot 18bis, ADR-36) : son canal
+     * `mail` est routé vers `mail-information`, pas `default` — sans lister
+     * les 3 files ici, `queue:work` (défaut : `default` seul) ne la
+     * traiterait jamais.
+     */
+    private function travaillerFile(array $options = []): void
+    {
+        Artisan::call('queue:work', [
+            '--stop-when-empty' => true,
+            '--tries' => 3,
+            '--backoff' => 10,
+            '--queue' => 'mail-critique,mail-information,default',
+            ...$options,
+        ]);
+    }
+
     public function test_rejet_421_est_retente_puis_reussit_sans_jamais_echouer(): void
     {
         $this->activerTransportSimule([421, 0]);
@@ -58,7 +75,7 @@ class ResilienceSmtpTest extends TestCase
         $this->assertDatabaseCount('jobs', 2); // mail + database (Lot 12c)
         $this->assertDatabaseCount('failed_jobs', 0);
 
-        Artisan::call('queue:work', ['--stop-when-empty' => true, '--tries' => 3, '--backoff' => 10]);
+        $this->travaillerFile();
 
         // Le canal database a réussi tout de suite ; le job mail a été REJETÉ
         // (421) -> remis en file avec délai (release()), donc toujours
@@ -70,7 +87,7 @@ class ResilienceSmtpTest extends TestCase
         // Avance le temps au-delà du délai de release() (30s) — on ne teste
         // pas ICI le délai réel, déjà couvert par ToleranceSmtpTemporaireTest.
         Carbon::setTestNow(now()->addSeconds(31));
-        Artisan::call('queue:work', ['--stop-when-empty' => true, '--tries' => 3, '--backoff' => 10]);
+        $this->travaillerFile();
 
         $this->assertDatabaseCount('jobs', 0);
         $this->assertDatabaseCount('failed_jobs', 0);
@@ -86,7 +103,7 @@ class ResilienceSmtpTest extends TestCase
         $utilisateur->notify(new InscriptionConfirmee);
         $this->assertDatabaseCount('jobs', 2);
 
-        Artisan::call('queue:work', ['--stop-when-empty' => true, '--tries' => 3, '--backoff' => 10]);
+        $this->travaillerFile();
 
         $this->assertDatabaseCount('failed_jobs', 1);
         $this->assertDatabaseCount('jobs', 0);
@@ -116,7 +133,7 @@ class ResilienceSmtpTest extends TestCase
 
         $tours = 0;
         while (DB::table('jobs')->count() > 0 && $tours < 50) {
-            Artisan::call('queue:work', ['--stop-when-empty' => true, '--tries' => 3, '--backoff' => 10]);
+            $this->travaillerFile();
 
             if (DB::table('jobs')->count() > 0) {
                 // Laisse passer la fenêtre du limiteur de débit ET les

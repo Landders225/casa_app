@@ -655,6 +655,25 @@ Découvert en écrivant l'E2E : `Entretien.jsx` ne proposait **aucune UI** pour 
 
 ---
 
+## ADR-36 — Files prioritaires + coupe-circuit informatif pour l'e-mail (Lot 18bis)
+
+**Contexte.** Contrainte confirmée après le Lot 18 : le serveur de messagerie impose une limite BASSE (5 à 10 messages/minute) qui ne sera pas relevée (le défaut `MAIL_MAX_PER_MINUTE` passe de 30 à **5**). À ce débit, vider la file après un pic d'inscriptions peut prendre plusieurs minutes — un e-mail *critique* (jeton de réinitialisation à durée de vie courte, alerte de prise de compte) ne doit jamais attendre derrière les e-mails *informatifs* (accusés de réception, etc.).
+
+**Décision — deux mécanismes, tous deux bâtis sur des points d'extension Laravel déjà natifs (aucun code de file personnalisé) :**
+- **Files prioritaires** : `viaQueues()` (déjà supporté par `NotificationSender::queueNotification`, lu avec le `$channel` exact, vérifié dans le vendor) route le canal `mail` vers `mail-critique` (`ReinitialisationMotDePasse`, `MotDePasseModifie`) ou `mail-information` (les 5 autres) — ajouté au trait partagé `EnvoiMailResilient` via une méthode `fileMail()` overridable. Le worker passe de `--queue=default` à `--queue=mail-critique,mail-information,default` (`docker-compose.prod.yml`, hérité tel quel par les modes test-local et Apache) : Laravel vide une file avant de regarder la suivante (**pas de round-robin**, vérifié dans `Illuminate\Queue\Worker`) — un critique passe donc toujours avant un informatif, même dispatché après lui (prouvé : `PrioriteFilesMailTest`, un critique arrivé en DERNIER avec un débit limité à 1/min est le seul envoyé). Le limiteur de débit (`RateLimited`, Lot 18) reste **unique et partagé** entre les deux files mail — deux limiteurs indépendants cumuleraient leurs débits et dépasseraient la vraie limite du serveur ; le critique accède prioritairement au budget rare du simple fait de l'ordre de lecture des files par le worker, sans logique de priorité à écrire.
+- **Coupe-circuit informatif** : `MAIL_NOTIFICATIONS_INFORMATIVES` (`config('casa.mail_notifications_informatives')`, activé par défaut) retire le canal `mail` du `via()` des 5 notifications informatives quand désactivé — AUCUN job mail n'est même créé pour elles. Le canal `database` n'est jamais retiré (notification dans l'application inchangée). Les 2 notifications critiques n'utilisent pas ce réglage du tout (leur `via()` reste un littéral `['mail']`) : structurellement insensibles au bascule, pas seulement par convention.
+- **Classification `MotDePasseModifie` = critique (pas informative)**, décision explicite : aucun canal `database` de repli (contrairement aux 5 informatives) et rôle sécuritaire de détection de prise de compte — la couper intégralement (mail ET trace) pendant une rafale aurait été un vrai risque, pas qu'une gêne.
+
+**Étalement des échecs.** Mécanisme déjà livré au Lot 18 (`casa:renvoyer-echecs-smtp`), inchangé — seul son défaut `--lot` suit la baisse de `MAIL_MAX_PER_MINUTE` (30 → 5) automatiquement (lu depuis `config('casa.mail_max_per_minute')`, pas une valeur dupliquée).
+
+**Tests.** `EnvoiMailResilientTest` étendu (classification des 7 classes, `via()`/`viaQueues()` avec et sans le coupe-circuit) ; `PrioriteFilesMailTest` (preuve d'ordre, pas seulement de traitement éventuel) ; `BasculeNotificationsInformativesTest` (dispatch réel -> table `jobs`, au-delà du `via()` isolé). Tous les appels `queue:work` des tests Lot 18 existants mis à jour avec `--queue=mail-critique,mail-information,default` (sans ce flag, `queue:work` ne traite QUE `default` par défaut — un oubli aurait laissé les jobs mail indéfiniment en file dans ces tests).
+
+**Documentation.** `docs/DEPLOIEMENT.md` §9.4 (débit 30→5, plage confirmée) et nouveau §9.4bis (files prioritaires, coupe-circuit, vérification sur jupiter/Apache) ; `.env.example`/`.env.production.example`/`.env.test-local.example`.
+
+**Divergences maquette.** Aucune (lot backend/infrastructure pur, aucun écran).
+
+---
+
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)
 
 > **Inventaire vivant à jour : [`docs/POINTS-OUVERTS.md`](POINTS-OUVERTS.md)** (Lot 9c, ADR-28).

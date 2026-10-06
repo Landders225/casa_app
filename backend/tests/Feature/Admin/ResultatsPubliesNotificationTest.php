@@ -215,7 +215,12 @@ class ResultatsPubliesNotificationTest extends TestCase
         $payload['data']['command'] = 'CORROMPU:'.$payload['data']['command'];
         DB::table('jobs')->where('id', $premier->id)->update(['payload' => json_encode($payload)]);
 
-        Artisan::call('queue:work', ['--stop-when-empty' => true, '--tries' => 1]);
+        // --queue : depuis le Lot 18bis (ADR-36), le canal `mail` des
+        // notifications informatives (ResultatsPublies ici) est routé vers
+        // `mail-information`, pas `default` — sans le préciser, `queue:work`
+        // ne traiterait QUE `default` (le canal `database`) et laisserait le
+        // job mail indéfiniment en file, non représentatif du worker réel.
+        Artisan::call('queue:work', ['--stop-when-empty' => true, '--tries' => 1, '--queue' => 'mail-critique,mail-information,default']);
 
         // Depuis le Lot 18 (ADR-35, `EnvoiMailResilient`), `retryUntil()`
         // (+6h) fait IGNORER `--tries` par TOUTE exception du job — y compris
