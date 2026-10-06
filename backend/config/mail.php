@@ -1,5 +1,15 @@
 <?php
 
+use App\Mail\PeerFingerprint;
+
+// Épinglage de certificat SMTP (serveur à certificat AUTO-SIGNÉ, ex.
+// mail.cci.ci) — calculé ici, PAS inline dans le tableau, pour n'évaluer
+// env() qu'UNE fois et réutiliser le résultat pour les 2 clés ci-dessous.
+// Normalisation dans App\Mail\PeerFingerprint (testée isolément, cf.
+// PeerFingerprintTest) — accepte MAIL_PEER_FINGERPRINT avec ou sans ":",
+// majuscule ou minuscule.
+$mailPeerFingerprint = PeerFingerprint::normalize((string) env('MAIL_PEER_FINGERPRINT', ''));
+
 return [
 
     /*
@@ -47,6 +57,28 @@ return [
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+            // Épinglage de certificat — clé `peer_fingerprint` reconnue
+            // NATIVEMENT par Symfony\Mailer\Transport\Smtp\EsmtpTransportFactory
+            // (lue sur le tableau d'options du DSN, cf.
+            // MailManager::createSmtpTransport qui passe ce tableau tel quel) :
+            // aucun code custom nécessaire, ces 2 clés de config suffisent.
+            // `null` (MAIL_PEER_FINGERPRINT vide/absente) = comportement
+            // standard INCHANGÉ (vérification de chaîne normale, comme
+            // aujourd'hui).
+            'peer_fingerprint' => $mailPeerFingerprint,
+            // `verify_peer`/`verify_peer_name` désactivés UNIQUEMENT quand un
+            // peer_fingerprint est réellement configuré. Nécessaire pour un
+            // certificat AUTO-SIGNÉ (ex. mail.cci.ci) : aucune CA ne peut le
+            // valider, la vérification de chaîne échouerait TOUJOURS, même
+            // avec la bonne empreinte (testé en conditions réelles —
+            // EsmtpTransportFactory applique les deux contrôles
+            // indépendamment, cf. docs/DEPLOIEMENT.md). Ce n'est PAS un
+            // affaiblissement : épingler l'empreinte EXACTE du certificat est
+            // une garantie au moins aussi forte qu'une CA (un attaquant avec
+            // un certificat valide pour un AUTRE hostname/CA serait quand
+            // même rejeté, l'empreinte ne correspondrait pas). Sans variable
+            // renseignée : clé absente, vérification standard inchangée.
+            ...($mailPeerFingerprint === null ? [] : ['verify_peer' => false]),
         ],
 
         'ses' => [

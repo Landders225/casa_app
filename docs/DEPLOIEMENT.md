@@ -342,6 +342,45 @@ Puis recréer les conteneurs qui lisent cette config (l'entrypoint refait
 dcp up -d --force-recreate backend worker nginx
 ```
 
+### 9.1bis Certificat auto-signé (ex. mail.cci.ci) — épinglage d'empreinte
+
+Si votre serveur SMTP présente un **certificat auto-signé** (aucune CA ne peut
+le valider), la vérification de chaîne standard échoue toujours : `certificate
+verify failed`. **Ne pas désactiver la vérification globalement.** CASA sait
+épingler l'empreinte SHA-256 exacte de ce certificat précis — seul un
+certificat ayant cette empreinte est accepté, tout autre est refusé.
+
+Obtenir l'empreinte du certificat réellement servi :
+
+```bash
+openssl s_client -connect mail.cci.ci:587 -starttls smtp </dev/null 2>/dev/null \
+  | openssl x509 -fingerprint -sha256 -noout
+# SHA256 Fingerprint=E6:6F:EE:C9:0F:FB:97:4E:71:A0:01:DB:8A:21:85:3A:DB:FE:7D:F1:39:ED:F3:42:B2:3B:61:B0:95:67:A6:82
+```
+
+Renseigner `backend/.env.production` (avec ou sans « : », majuscules ou
+minuscules — les deux écritures sont équivalentes) :
+
+```dotenv
+MAIL_PEER_FINGERPRINT=E6:6F:EE:C9:0F:FB:97:4E:71:A0:01:DB:8A:21:85:3A:DB:FE:7D:F1:39:ED:F3:42:B2:3B:61:B0:95:67:A6:82
+```
+
+Puis `dcp up -d --force-recreate backend worker` (même commande que § 9.1).
+
+**Vide (défaut) = comportement inchangé** : vérification de chaîne standard,
+comme pour un serveur SMTP au certificat normalement signé. **Renseignée** :
+CASA épingle cette empreinte exacte **et désactive la vérification de chaîne
+CA pour ce mailer uniquement** — obligatoire pour un certificat auto-signé
+(aucune CA ne le validera jamais, empreinte correcte ou pas). Ce n'est **pas**
+un affaiblissement : épingler l'empreinte exacte d'un certificat est une
+garantie au moins aussi forte qu'une CA pour un endpoint connu et unique — un
+attaquant présentant un certificat valide pour un *autre* hôte/CA serait quand
+même rejeté, l'empreinte ne correspondrait pas.
+
+⚠️ Si le certificat du serveur est **renouvelé**, son empreinte change :
+l'envoi échouera (« peer_fingerprint match failure ») jusqu'à la mise à jour de
+`MAIL_PEER_FINGERPRINT` avec la nouvelle empreinte + redémarrage.
+
 ### 9.2 Valider la configuration
 
 ```bash
