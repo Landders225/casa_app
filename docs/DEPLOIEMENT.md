@@ -695,39 +695,158 @@ Sortie attendue (dans `backup.log`) :
 [2026-10-06T02:15:03+00:00] Sauvegarde OK : /srv/backups/casa-db-20261006-021503.sql.gz (…), /srv/backups/casa-documents-20261006-021503.tar.gz (…)
 ```
 
+⚠️ **Réalité sur jupiter (06/10/2026)** : le cron actif n'utilise PAS ce
+script committé, mais un script **PROVISOIRE, HORS DÉPÔT** :
+
+```bash
+15 2 * * * /home/casa/backup-casa-provisoire.sh >> /srv/backups/backup.log 2>&1
+```
+
+`/home/casa/backup-casa-provisoire.sh` (pas versionné) fait :
+- `pg_dump` de la base `casa`, compressé (`gzip`) ;
+- une archive (`tar`) du volume `casa_documents_data`, via un conteneur
+  `alpine` jetable — root DANS le conteneur (pour lire le volume quelles que
+  soient ses permissions), puis `chown` du fichier produit vers l'UID de
+  l'hôte (le compte de déploiement en reste propriétaire, pas root) ;
+- sortie dans `/srv/backups`, permissions `600` ;
+- rétention **7 jours** (`find ... -mtime +7 -delete`) ;
+- une ligne `Sauvegarde OK` dans `backup.log` en cas de succès.
+
+**Point ouvert** : ces sauvegardes restent SUR LE MÊME SERVEUR
+(`/srv/backups`, même disque que la base) — une copie hors site (autre
+machine, stockage objet...) n'est pas encore définie. Un sinistre touchant
+le disque de jupiter emporterait aussi les sauvegardes. À planifier.
+
+**Écart à résorber** (pas traité dans ce lot) : le script committé
+`scripts-hote/backup-db.sh` et le script provisoire réellement actif sur
+jupiter ne sont PAS le même fichier — à terme, consolider sur un seul
+(committé, testé, déployé).
+
+#### Copie chiffrée de `backend/.env.production` (manuelle, hors dépôt)
+
+Ce fichier porte `APP_KEY`/`DB_PASSWORD`/les secrets SMTP — **aucune
+sauvegarde actuelle ne le couvre** (ni le script committé, ni le script
+provisoire ci-dessus, qui ne touchent que la base et les pièces). Sans lui,
+un sinistre du disque de jupiter rend la restauration de la base inutile :
+les cookies de session et toute donnée chiffrée par `APP_KEY` deviennent
+illisibles même avec la base intacte.
+
+**Procédure manuelle, à refaire après CHAQUE modification du fichier** —
+pas automatisée tant que la destination hors serveur n'est pas choisie
+(même point ouvert que ci-dessus) :
+
+```bash
+# Chiffrement symétrique — la phrase de passe est demandée de façon
+# INTERACTIVE : ne jamais la passer en argument (elle resterait dans
+# l'historique shell).
+gpg -c --cipher-algo AES256 -o /srv/backups/env-production-<horodatage>.gpg backend/.env.production
+```
+
+- La phrase de passe est conservée AILLEURS que sur jupiter (gestionnaire de
+  mots de passe de l'équipe, par exemple) — jamais dans ce dépôt, jamais
+  dans `/srv/backups`.
+- Le fichier `.gpg` produit n'est PAS ajouté à l'archive quotidienne en
+  clair — à transférer manuellement hors du serveur dès que possible (même
+  contrainte que les sauvegardes base/pièces, point ouvert ci-dessus).
+- Restauration : `gpg -d /srv/backups/env-production-<horodatage>.gpg > backend/.env.production` (demande la phrase de passe).
+
 ### 12.2 (fusionné dans §12.1 — le script sauvegarde les deux en un passage)
 
-### 12.3 Restauration — TESTÉE sur une base jetable, jamais la base réelle
+### 12.3 Restauration
 
 **Ne jamais restaurer directement sur `casa` tant que la procédure n'a pas été
-vérifiée sur une base séparée** :
+vérifiée sur une base séparée.** Remplacer `<horodatage>` par l'horodatage
+réel du fichier de sauvegarde visé (`casa-db-<horodatage>.sql.gz` /
+`casa-documents-<horodatage>.tar.gz`, produits par le script décrit en § 12.1).
+
+Toutes les opérations PostgreSQL ci-dessous utilisent `docker exec
+casa-postgres-1 psql ...` directement (nom de conteneur fixe, cf. § 12.1) —
+PAS l'alias `dca`, pour ne pas dépendre d'un `.env` particulier pendant une
+restauration. `dca` reste utilisé pour `stop`/`up`/`ps` (arrêt et relance
+des services applicatifs).
+
+#### a) Base de données, sur une base jetable — **TESTÉ sur jupiter le 06/10/2026** (40 tables, comptes `candidat`/`candidature` cohérents)
 
 ```bash
-# 1. Base de test jetable, à partir d'une vraie sauvegarde :
-dcp exec -T postgres psql -U casa -d casa -c "CREATE DATABASE casa_restore_test;"
-gunzip -c /srv/backups/casa-db-20261006-021503.sql.gz | \
-  dcp exec -T postgres psql -U casa -d casa_restore_test
+# 1. Base jetable :
+docker exec casa-postgres-1 psql -U casa -d postgres -c "CREATE DATABASE casa_restore_test;"
 
-# 2. Vérifier que ça a repris (au minimum, un comptage non nul sur une table connue) :
-dcp exec -T postgres psql -U casa -d casa_restore_test -tAc "select count(*) from filiere;"
-dcp exec -T postgres psql -U casa -d casa_restore_test -tAc "select count(*) from candidature;"
+# 2. Charger le dump (-v ON_ERROR_STOP=1 arrête au premier problème, -q = silencieux sauf erreur) :
+gunzip -c /srv/backups/casa-db-<horodatage>.sql.gz | \
+  docker exec -i casa-postgres-1 psql -U casa -d casa_restore_test -v ON_ERROR_STOP=1 -q
 
-# 3. Nettoyer la base de test :
-dcp exec -T postgres psql -U casa -d casa -c "DROP DATABASE casa_restore_test;"
+# 3. Vérifier la reprise — nombre de tables (40 attendu) + comptes sur candidat/candidature :
+docker exec casa-postgres-1 psql -U casa -d casa_restore_test -tAc \
+  "select count(*) from information_schema.tables where table_schema='public';"
+docker exec casa-postgres-1 psql -U casa -d casa_restore_test -tAc "select count(*) from candidat;"
+docker exec casa-postgres-1 psql -U casa -d casa_restore_test -tAc "select count(*) from candidature;"
+
+# 4. Nettoyer :
+docker exec casa-postgres-1 psql -U casa -d postgres -c "DROP DATABASE casa_restore_test;"
 ```
 
-**Seulement après ce test réussi**, restauration réelle (incident avéré
-uniquement — écrase la base en place) :
+#### b) Pièces justificatives — **TESTÉ sur jupiter le 07/10/2026** (lecture de l'archive + extraction dans un volume JETABLE — pas le volume réel)
 
 ```bash
-# Base — la cible DOIT être arrêtée/isolée des écritures pendant la restauration :
-gunzip -c /srv/backups/casa-db-20261006-021503.sql.gz | \
-  dcp exec -T postgres psql -U casa -d casa
-
-# Pièces :
-docker run --rm -v casa_documents_data:/data -v /srv/backups:/in alpine \
-  sh -c 'cd /data && tar xzf /in/casa-documents-20261006-021503.tar.gz'
+# Vérifier l'intégrité de l'archive SANS l'extraire — testé :
+tar tzf /srv/backups/casa-documents-<horodatage>.tar.gz | wc -l
 ```
+
+```bash
+# Restaurer dans un volume — commande VALIDÉE le 07/10/2026 sur un volume
+# JETABLE (archive du 07/10 02:15) : 442 fichiers restaurés = les 442
+# fichiers déjà présents dans le volume réel au moment de l'archive (34
+# fichiers déposés APRÈS 02:15 ne pouvaient pas y figurer — écart ATTENDU,
+# pas une perte). Propriétaire 82:82 et droits `drwx------` CONSERVÉS par
+# l'archive elle-même (tar, exécuté root dans le conteneur, restitue les
+# métadonnées d'origine) — le `chown` explicite ci-dessous est un filet de
+# sécurité, pas une correction nécessaire. Restauration dans le volume
+# RÉEL (écrase l'existant) : non encore exercée, cf. (c).
+docker run --rm \
+  -v casa_documents_data:/data \
+  -v /srv/backups:/in \
+  alpine sh -c 'cd /data && tar xzf /in/casa-documents-<horodatage>.tar.gz && chown -R 82:82 /data'
+```
+
+#### c) Restauration réelle — sinistre avéré uniquement, **procédure non encore exercée en réel**, ordre impératif
+
+```bash
+# 0. Backend et worker déjà arrêtés (dca stop backend worker).
+
+# 1. Dump de sécurité de l'état ACTUEL avant d'écraser quoi que ce soit :
+docker exec casa-postgres-1 pg_dump -U casa -d casa | gzip > /srv/backups/casa-db-avant-restauration-<horodatage>.sql.gz
+
+# 2. Supprimer la base existante — un dump pg_dump simple (sans --clean/--create)
+#    ne se charge PAS dans une base qui existe déjà (erreurs "already exists",
+#    ON_ERROR_STOP interrompt le chargement) : il faut repartir d'une base vide.
+#    WITH (FORCE) coupe les connexions restantes (PostgreSQL 13+) :
+docker exec casa-postgres-1 psql -U casa -d postgres -c "DROP DATABASE casa WITH (FORCE);"
+
+# 3. Recréer une base vide — exécuté en tant qu'utilisateur casa, donc
+#    propriétaire automatiquement (pas de OWNER à préciser) :
+docker exec casa-postgres-1 psql -U casa -d postgres -c "CREATE DATABASE casa;"
+
+# 4. Charger le dump de restauration :
+gunzip -c /srv/backups/casa-db-<horodatage>.sql.gz | \
+  docker exec -i casa-postgres-1 psql -U casa -d casa -v ON_ERROR_STOP=1 -q
+
+# 5. Restaurer les pièces — même procédure qu'en (b), dans le volume réel.
+
+# 6. Restaurer backend/.env.production (APP_KEY RÉEL — jamais régénéré,
+#    sinon les cookies de session/les données chiffrées existants deviennent
+#    illisibles) depuis sa copie chiffrée (cf. § 12.1, "Copie chiffrée de
+#    backend/.env.production").
+
+# 7. Relancer ENSEMBLE (jamais backend seul : nginx doit reprendre le nouveau backend) :
+dca up -d --force-recreate backend worker nginx
+```
+
+#### d) Vérifications après coup
+
+- `dca ps` : services `Up`, `healthy` là où un healthcheck est défini.
+- Comptes `candidat`/`candidature` identiques à avant l'incident.
+- Connexion réelle (admin ou candidat de test).
+- Ouverture d'une pièce justificative connue (confirme le volume ET les permissions).
 
 ### 12.4 Mise à jour de l'application
 
@@ -827,18 +946,20 @@ caches figés gardent l'ancienne valeur.
 
 ```bash
 cat >> ~/.bashrc <<'EOF'
-alias dct='docker compose --env-file ~/casa/.env.test-local -f ~/casa/docker-compose.yml -f ~/casa/docker-compose.prod.yml -f ~/casa/docker-compose.test-local.yml'
-alias dca='docker compose --env-file ~/casa/.env.production  -f ~/casa/docker-compose.yml -f ~/casa/docker-compose.prod.yml -f ~/casa/docker-compose.apache.yml'
+alias dct='docker compose --env-file /opt/casa/.env.test-local -f /opt/casa/docker-compose.yml -f /opt/casa/docker-compose.prod.yml -f /opt/casa/docker-compose.test-local.yml'
+alias dca='docker compose --env-file /opt/casa/.env.production  -f /opt/casa/docker-compose.yml -f /opt/casa/docker-compose.prod.yml -f /opt/casa/docker-compose.apache.yml'
 EOF
 source ~/.bashrc
 ```
-*(Adapter `~/casa` au chemin réel du clone sur jupiter — `cd` dedans et
-vérifier avec `pwd` avant de copier-coller ces alias.)*
+*(Chemin réel du clone sur jupiter : `/opt/casa`. Ajoutés à `~/.bashrc` par
+le bloc ci-dessus, ces alias sont donc PERMANENTS dès la prochaine
+connexion ; `source ~/.bashrc` les active immédiatement dans la session en
+cours sans attendre une reconnexion.)*
 
 #### Étape 0 — Réconciliation des `.env` (AVANT tout écrasement, aucune valeur affichée)
 
 ```bash
-cd ~/casa   # le clone sur jupiter
+cd /opt/casa   # le clone sur jupiter
 
 # Noms de variables SEULEMENT (jamais les valeurs) — présentes dans l'un, absentes de l'autre :
 echo "--- Variables dans backend/.env.test-local mais ABSENTES de backend/.env.production ---"
