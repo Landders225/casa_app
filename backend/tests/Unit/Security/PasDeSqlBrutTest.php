@@ -18,6 +18,15 @@ use RecursiveIteratorIterator;
  * Ce test échoue si une régression future réintroduit une requête brute sous
  * `app/`. Si un tel besoin apparaît un jour (agrégat complexe), il faudra le
  * whitelister ICI explicitement, avec la preuve que l'entrée est bindée.
+ *
+ * EXCEPTION whitelistée (Lot export-analyse) :
+ * `App\Domain\Export\ServiceExportAnalyse::lireEnLectureSeule()` appelle
+ * `DB::statement('SET TRANSACTION READ ONLY')` — une commande de niveau
+ * TRANSACTION, pas une requête, sans AUCUN équivalent Eloquent/Query Builder.
+ * Preuve que rien n'est bindable ni injectable : la chaîne passée est un
+ * littéral fixe à 100%, sans aucune concaténation ni variable — contrairement
+ * à un `whereRaw`/`selectRaw`, cette commande n'accepte même pas de
+ * paramètre côté PostgreSQL.
  */
 class PasDeSqlBrutTest extends TestCase
 {
@@ -39,6 +48,11 @@ class PasDeSqlBrutTest extends TestCase
         'DB::delete(',
     ];
 
+    /** fichier (relatif à app/) => motifs explicitement whitelistés, avec preuve ci-dessus. */
+    private const EXCEPTIONS = [
+        'Domain/Export/ServiceExportAnalyse.php' => ["DB::statement('SET TRANSACTION READ ONLY')"],
+    ];
+
     public function test_aucune_requete_sql_brute_sous_app(): void
     {
         $racine = dirname(__DIR__, 3).'/app';
@@ -49,10 +63,20 @@ class PasDeSqlBrutTest extends TestCase
             if ($fichier->getExtension() !== 'php') {
                 continue;
             }
+            $relatif = str_replace($racine.'/', '', $fichier->getPathname());
             $code = $this->sansCommentaires(file_get_contents($fichier->getPathname()));
             foreach (self::MOTIFS_INTERDITS as $motif) {
-                if (str_contains($code, $motif)) {
-                    $coupables[] = str_replace($racine.'/', '', $fichier->getPathname()).' → '.$motif;
+                if (! str_contains($code, $motif)) {
+                    continue;
+                }
+                // Ne retire QUE la chaîne exacte whitelistée (preuve ci-dessus) —
+                // toute AUTRE occurrence du même motif dans ce fichier reste détectée.
+                $codeSansExceptions = $code;
+                foreach (self::EXCEPTIONS[$relatif] ?? [] as $exception) {
+                    $codeSansExceptions = str_replace($exception, '', $codeSansExceptions);
+                }
+                if (str_contains($codeSansExceptions, $motif)) {
+                    $coupables[] = $relatif.' → '.$motif;
                 }
             }
         }

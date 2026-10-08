@@ -8,6 +8,11 @@ FROM php:8.3-fpm-alpine
 # gd (+ libpng/libjpeg/freetype) : requis par phpoffice/phpspreadsheet (Lot
 # 15c, export Excel des rapports) — pas utilisé pour des images applicatives,
 # c'est une dépendance dure du writer .xlsx de la lib.
+# icu-dev (+ ext intl) : requis par `App\Domain\Export\NormalisationVille`
+# (Normalizer::FORM_KC/FORM_D) pour la commande casa:export-analyse — sans
+# cette extension, les variantes Unicode (ex. caractères mathématiques
+# stylisés saisis par un candidat) ne sont plus repliées vers leur forme
+# ASCII de base, donc plus reconnues par la table de correspondance.
 RUN apk add --no-cache \
         postgresql-dev \
         libzip-dev \
@@ -17,8 +22,9 @@ RUN apk add --no-cache \
         libpng-dev \
         libjpeg-turbo-dev \
         freetype-dev \
+        icu-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_pgsql zip gd
+    && docker-php-ext-install pdo pdo_pgsql zip gd intl
 
 # Composer (binaire officiel, pas de réinstallation depuis les sources)
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

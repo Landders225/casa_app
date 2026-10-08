@@ -2155,3 +2155,87 @@ ls -la /srv/backups/
 (remplacer `dcp` par `dca`).
 
 ---
+
+## 17. Export d'analyse administratif (`casa:export-analyse`)
+
+⚠️ **Prérequis de déploiement** : cette commande dépend de l'extension PHP
+`intl` (normalisation Unicode des villes), ajoutée au `Dockerfile` du
+backend (`icu-dev` + `docker-php-ext-install intl`). Comme tout changement
+de `Dockerfile`, elle exige un **rebuild** des images `backend` ET `worker`
+(elles partagent la même image) avant la mise en service — à planifier hors
+session de groupe (cf. § 12.4), **avant** la première exécution de cette
+commande en production :
+```bash
+dca build backend worker
+dca up -d backend worker
+dca exec -T backend php -m | grep intl   # doit afficher "intl"
+```
+Le service `nginx` n'est pas concerné (il ne contient pas de code PHP).
+
+### 17.1 Exécution
+
+La commande tourne **dans le conteneur backend**, jamais sur l'hôte (c'est
+là que vit le code applicatif et la connexion à la base) :
+```bash
+dca exec -T backend php artisan casa:export-analyse --operateur=<email d'un compte administrateur>
+```
+- `--operateur` est **obligatoire** — l'e-mail d'un compte `administrateur`
+  existant (résolu en auteur de l'entrée `journal_audit`, pas de valeur
+  libre acceptée).
+- `--dry-run` simule l'exécution : affiche les colonnes, les effectifs et un
+  contrôle de cohérence (zone/`residence_ci`) — **aucune donnée, aucun
+  fichier**. À utiliser en premier pour vérifier qu'aucune ville ne bloque
+  la livraison.
+- Si une valeur de `ville_residence` reste non classée par la table de
+  correspondance (`App\Domain\Export\NormalisationVille`), la commande
+  **refuse de produire un fichier** (`--dry-run` ou pas) et affiche les
+  valeurs brutes en cause — à traiter avant de relancer (nouvelle variante
+  à ajouter à la table de correspondance, versionnée dans le code).
+
+Le fichier produit est écrit **dans le conteneur**, hors zone publique
+(`storage/app/private/exports-analyse/`), avec les droits `600` — jamais
+accessible par une route HTTP ni par le volume `documents_data`.
+
+### 17.2 Récupération du fichier sur l'hôte
+
+```bash
+# Nom exact affiché par la commande (horodaté) :
+docker compose cp backend:/var/www/html/storage/app/private/exports-analyse/export-analyse-<horodatage>.xlsx .
+chmod 600 export-analyse-<horodatage>.xlsx
+sha256sum export-analyse-<horodatage>.xlsx   # comparer au SHA-256 affiché par la commande ET à journal_audit.nouvelle_valeur
+```
+
+Vérification des en-têtes (sans ouvrir tout le fichier) :
+```bash
+unzip -p export-analyse-<horodatage>.xlsx xl/worksheets/sheet1.xml | head -c 2000
+```
+Ou plus simplement, ouvrir le fichier dans un tableur et vérifier la feuille
+**Dictionnaire** (description colonne par colonne) et l'en-tête de la
+feuille **Données** (date/heure de l'instantané).
+
+### 17.3 Suppression du fichier dans le conteneur
+
+Une fois le transfert vérifié (SHA-256 identique), **supprimer le fichier du
+conteneur** — il ne doit pas s'y accumuler :
+```bash
+dca exec -T backend rm storage/app/private/exports-analyse/export-analyse-<horodatage>.xlsx
+dca exec -T backend ls storage/app/private/exports-analyse/   # doit être vide (ou ne contenir que d'autres exports en attente de transfert)
+```
+
+### 17.4 Traçabilité
+
+Chaque exécution (réussie, bloquée, ou en `--dry-run`) écrit une ligne dans
+`journal_audit` (module `Export`) :
+- exécution réelle réussie : `resultat='Succès'`, `nouvelle_valeur` contient
+  le nombre de colonnes/lignes, le SHA-256 et le chemin du fichier ;
+- `--dry-run` : `resultat='Succès'`, `nouvelle_valeur` mentionne
+  « simulation », **sans** SHA-256 (aucun fichier produit) ;
+- livraison refusée (villes non classées) : `resultat='Échec'`.
+
+Consultable via `GET /api/admin/audit` (filtre `module=Export`) ou
+directement en base (lecture seule) :
+```sql
+select horodatage, auteur_id, resultat, nouvelle_valeur from journal_audit where module = 'Export' order by horodatage desc limit 20;
+```
+
+---
