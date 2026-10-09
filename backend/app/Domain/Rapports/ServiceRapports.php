@@ -26,8 +26,9 @@ use Illuminate\Support\Collection;
  *  - AUCUNE cross-tabulation (sexe × filière, score × filière, …) — seules des
  *    distributions marginales à une dimension.
  *
- * Périmètre : candidatures SOUMISES (`statut_interne != 'brouillon'`) — un
- * brouillon n'est pas une candidature de pilotage.
+ * Périmètre : candidatures SOUMISES (`Candidature::scopeSoumises()` —
+ * `statut_interne != 'brouillon'`, définition UNIQUE partagée avec
+ * `casa:export-analyse`) — un brouillon n'est pas une candidature de pilotage.
  */
 class ServiceRapports
 {
@@ -46,7 +47,7 @@ class ServiceRapports
     public function agreger(?Campagne $campagne): array
     {
         $rows = Candidature::query()
-            ->where('statut_interne', '!=', 'brouillon')
+            ->soumises()
             ->when($campagne !== null, fn ($q) => $q->where('campagne_id', $campagne->id))
             ->with(['candidat', 'filiere', 'evaluationDossier', 'entretien', 'decisionCandidature'])
             ->get();

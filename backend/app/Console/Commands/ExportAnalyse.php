@@ -33,7 +33,8 @@ class ExportAnalyse extends Command
 {
     protected $signature = 'casa:export-analyse
         {--operateur= : E-mail d\'un compte administrateur existant (résolu en auteur du journal_audit)}
-        {--dry-run : Affiche colonnes/effectifs/contrôles de cohérence, écrit une entrée journal_audit allégée, aucune sortie de données, aucun fichier}';
+        {--dry-run : Affiche colonnes/effectifs/contrôles de cohérence, écrit une entrée journal_audit allégée, aucune sortie de données, aucun fichier}
+        {--inclure-brouillons : Inclut les candidatures brouillon (défaut : candidatures soumises uniquement, même périmètre que le tableau de bord admin)}';
 
     protected $description = "Génère un .xlsx d'analyse administrative (candidatures pseudonymisées, agrégats masqués k-anonymat).";
 
@@ -51,8 +52,10 @@ class ExportAnalyse extends Command
             return self::FAILURE;
         }
 
+        $inclureBrouillons = (bool) $this->option('inclure-brouillons');
+
         try {
-            $resultat = $this->service->construire($operateurEmail);
+            $resultat = $this->service->construire($operateurEmail, $inclureBrouillons);
         } catch (RuntimeException $e) {
             $this->error($e->getMessage());
 
@@ -60,6 +63,8 @@ class ExportAnalyse extends Command
         }
 
         $operateur = $resultat['operateur'];
+        $perimetre = $resultat['perimetre'];
+        $this->info("Périmètre : {$perimetre}");
 
         if ($resultat['bloque']) {
             // Valeurs brutes affichées en CONSOLE SEULEMENT (éphémère,
@@ -76,7 +81,7 @@ class ExportAnalyse extends Command
                 'action' => 'Export analyse — refusé (villes non classées)',
                 'module' => 'Export',
                 'objet' => $operateur->email,
-                'nouvelle_valeur' => sprintf('%d valeur(s) de ville non classée(s) (voir la sortie console de la commande)', count($resultat['villes_a_classer'])),
+                'nouvelle_valeur' => sprintf('périmètre=%s ; %d valeur(s) de ville non classée(s) (voir la sortie console de la commande)', $perimetre, count($resultat['villes_a_classer'])),
                 'resultat' => 'Échec',
             ]);
 
@@ -101,7 +106,7 @@ class ExportAnalyse extends Command
                 'action' => 'Export analyse — simulation (--dry-run)',
                 'module' => 'Export',
                 'objet' => $operateur->email,
-                'nouvelle_valeur' => sprintf('simulation ; %d colonne(s) ; %d ligne(s)', count($resultat['colonnes']), count($resultat['lignes'])),
+                'nouvelle_valeur' => sprintf('simulation ; périmètre=%s ; %d colonne(s) ; %d ligne(s)', $perimetre, count($resultat['colonnes']), count($resultat['lignes'])),
                 'resultat' => 'Succès',
             ]);
 
@@ -130,7 +135,7 @@ class ExportAnalyse extends Command
                 'action' => 'Export analyse — fuite détectée après génération, fichier supprimé',
                 'module' => 'Export',
                 'objet' => $operateur->email,
-                'nouvelle_valeur' => "catégorie={$fuite['categorie']}",
+                'nouvelle_valeur' => "périmètre={$perimetre} ; catégorie={$fuite['categorie']}",
                 'resultat' => 'Échec',
             ]);
 
@@ -146,7 +151,8 @@ class ExportAnalyse extends Command
             'module' => 'Export',
             'objet' => $operateur->email,
             'nouvelle_valeur' => sprintf(
-                '%d colonne(s) ; %d ligne(s) ; SHA-256=%s ; fichier=%s',
+                'périmètre=%s ; %d colonne(s) ; %d ligne(s) ; SHA-256=%s ; fichier=%s',
+                $perimetre,
                 count($resultat['colonnes']),
                 count($resultat['lignes']),
                 $sha256,

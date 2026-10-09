@@ -60,14 +60,20 @@ final class ServiceExportAnalyse
 
     private const DOMAINES_EXPERIENCE = ['hotellerie', 'restauration', 'commerce'];
 
+    /** Libellés affichés du périmètre — réutilisés par la commande/console/journal_audit/Dictionnaire. */
+    private const PERIMETRE_SOUMISES = 'Candidatures soumises uniquement (hors brouillons — même périmètre que le tableau de bord admin, Candidature::scopeSoumises())';
+
+    private const PERIMETRE_TOUTES = 'Toutes les candidatures, brouillons compris (--inclure-brouillons)';
+
     /**
      * @return array<string, mixed> — `bloque=true` si des villes restent
      *                              "À classer" (aucune ligne/feuille alors produite, correction #1).
      */
-    public function construire(string $operateurEmail): array
+    public function construire(string $operateurEmail, bool $inclureBrouillons = false): array
     {
         $operateur = $this->resoudreOperateur($operateurEmail);
-        [$lignesBrutes, $codesTypeDocument] = $this->lireEnLectureSeule();
+        [$lignesBrutes, $codesTypeDocument, $nbBrouillonsExclus] = $this->lireEnLectureSeule($inclureBrouillons);
+        $perimetre = $inclureBrouillons ? self::PERIMETRE_TOUTES : self::PERIMETRE_SOUMISES;
 
         $villesAClasser = [];
         foreach ($lignesBrutes as $l) {
@@ -84,6 +90,7 @@ final class ServiceExportAnalyse
                 'operateur' => $operateur,
                 'colonnes' => $colonnes,
                 'villes_a_classer' => $villesAClasser,
+                'perimetre' => $perimetre,
             ];
         }
 
@@ -110,6 +117,10 @@ final class ServiceExportAnalyse
             $lignesBrutes
         );
 
+        $brouillonsExclusAffiche = $inclureBrouillons
+            ? '0 (option --inclure-brouillons active)'
+            : ($nbBrouillonsExclus < ServiceRapports::SEUIL_MASQUAGE ? '<'.ServiceRapports::SEUIL_MASQUAGE : (string) $nbBrouillonsExclus);
+
         return [
             'bloque' => false,
             'operateur' => $operateur,
@@ -120,6 +131,8 @@ final class ServiceExportAnalyse
             'coherence' => $coherence,
             'genere_le' => CarbonImmutable::now(),
             'valeurs_interdites' => $this->valeursInterdites($lignesBrutes),
+            'perimetre' => $perimetre,
+            'brouillons_exclus_affiche' => $brouillonsExclusAffiche,
         ];
     }
 
@@ -165,9 +178,9 @@ final class ServiceExportAnalyse
     }
 
     /**
-     * @return array{0: list<array<string, mixed>>, 1: list<string>}
+     * @return array{0: list<array<string, mixed>>, 1: list<string>, 2: int}
      */
-    private function lireEnLectureSeule(): array
+    private function lireEnLectureSeule(bool $inclureBrouillons): array
     {
         DB::beginTransaction();
         DB::statement('SET TRANSACTION READ ONLY');
@@ -175,7 +188,15 @@ final class ServiceExportAnalyse
         try {
             $codesTypeDocument = TypeDocument::query()->orderBy('code')->pluck('code')->all();
 
+            // Effectif des brouillons EXCLUS (0 si --inclure-brouillons :
+            // rien n'est exclu) — pour la ligne "Brouillons exclus" de la
+            // feuille Synthèse, jamais pour filtrer une seconde fois.
+            $nbBrouillonsExclus = $inclureBrouillons
+                ? 0
+                : Candidature::query()->where('statut_interne', 'brouillon')->count();
+
             $lignesBrutes = Candidature::query()
+                ->when(! $inclureBrouillons, fn ($q) => $q->soumises())
                 ->with([
                     'candidat.utilisateur',
                     'campagne',
@@ -197,7 +218,7 @@ final class ServiceExportAnalyse
             DB::rollBack();
         }
 
-        return [$lignesBrutes, $codesTypeDocument];
+        return [$lignesBrutes, $codesTypeDocument, $nbBrouillonsExclus];
     }
 
     /**

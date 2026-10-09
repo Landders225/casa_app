@@ -2182,10 +2182,18 @@ dca exec -T backend php artisan casa:export-analyse --operateur=<email d'un comp
 - `--operateur` est **obligatoire** — l'e-mail d'un compte `administrateur`
   existant (résolu en auteur de l'entrée `journal_audit`, pas de valeur
   libre acceptée).
-- `--dry-run` simule l'exécution : affiche les colonnes, les effectifs et un
-  contrôle de cohérence (zone/`residence_ci`) — **aucune donnée, aucun
-  fichier**. À utiliser en premier pour vérifier qu'aucune ville ne bloque
-  la livraison.
+- **Périmètre par défaut : candidatures SOUMISES uniquement** (hors
+  brouillons) — exactement la même définition que le KPI « Candidatures
+  soumises » du tableau de bord admin (`Candidature::scopeSoumises()`,
+  `statut_interne != 'brouillon'`, réutilisée telle quelle, jamais
+  dupliquée). Les deux chiffres concordent toujours. `--inclure-brouillons`
+  retrouve l'ancien périmètre (toutes les candidatures). Le périmètre
+  retenu est affiché en première ligne de la sortie (`--dry-run` ou pas),
+  dans la feuille Dictionnaire du fichier produit, et dans `journal_audit`.
+- `--dry-run` simule l'exécution : affiche le périmètre, les colonnes, les
+  effectifs et un contrôle de cohérence (zone/`residence_ci`) — **aucune
+  donnée, aucun fichier**. À utiliser en premier pour vérifier qu'aucune
+  ville ne bloque la livraison.
 - Si une valeur de `ville_residence` reste non classée par la table de
   correspondance (`App\Domain\Export\NormalisationVille`), la commande
   **refuse de produire un fichier** (`--dry-run` ou pas) et affiche les

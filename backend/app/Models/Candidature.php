@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -181,5 +182,20 @@ class Candidature extends Model
     public function estBrouillon(): bool
     {
         return $this->statut_interne === 'brouillon';
+    }
+
+    /**
+     * Candidature SOUMISE — DÉFINITION UNIQUE, partagée par le tableau de
+     * bord admin (`ServiceRapports::agreger()`, KPI « Candidatures
+     * soumises ») et par `casa:export-analyse` : tout sauf un brouillon.
+     * Les deux doivent toujours concorder sur le même chiffre — ne pas
+     * dupliquer cette condition ailleurs.
+     *
+     * @param  Builder<Candidature>  $query
+     * @return Builder<Candidature>
+     */
+    public function scopeSoumises(Builder $query): Builder
+    {
+        return $query->where('statut_interne', '!=', 'brouillon');
     }
 }

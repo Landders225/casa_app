@@ -325,20 +325,97 @@ class ExportAnalyseCommandTest extends TestCase
         $this->assertNotContains(45.0, $cellules);
     }
 
-    // --- Tous les états de dossier, brouillon compris (correction #6) --
+    // --- Périmètre : soumis uniquement par défaut (constat production) --
+    // Même définition que le tableau de bord admin : Candidature::scopeSoumises()
+    // (statut_interne != 'brouillon'), réutilisée telle quelle, jamais dupliquée.
 
-    public function test_inclut_les_candidatures_brouillon(): void
+    public function test_par_defaut_les_brouillons_sont_exclus(): void
     {
         $this->candidature(statutInterne: 'brouillon');
         $this->candidature(statutInterne: 'soumis');
 
         Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email]);
-        $chemin = $this->seulFichierExport();
-        $lignes = $this->lignesDeDonnees($chemin);
+        $lignes = $this->lignesDeDonnees($this->seulFichierExport());
+
+        $etats = array_column($lignes, 'etat_dossier');
+        $this->assertNotContains('brouillon', $etats, json_encode($lignes));
+        $this->assertContains('soumis', $etats, json_encode($lignes));
+        $this->assertCount(1, $lignes, 'Seule la candidature soumise doit être exportée.');
+    }
+
+    public function test_option_inclure_brouillons_retrouve_l_ancien_perimetre(): void
+    {
+        $this->candidature(statutInterne: 'brouillon');
+        $this->candidature(statutInterne: 'soumis');
+
+        Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email, '--inclure-brouillons' => true]);
+        $lignes = $this->lignesDeDonnees($this->seulFichierExport());
 
         $etats = array_column($lignes, 'etat_dossier');
         $this->assertContains('brouillon', $etats, json_encode($lignes));
         $this->assertContains('soumis', $etats, json_encode($lignes));
+        $this->assertCount(2, $lignes);
+    }
+
+    /** Le masquage k=5 (ville/zone) se calcule sur le périmètre FILTRÉ, pas sur le total brut. */
+    public function test_le_masquage_se_calcule_sur_le_perimetre_filtre(): void
+    {
+        // 6 brouillons "Bouaké" (exclus) + seulement 2 candidatures soumises
+        // "Bouaké" : si le masquage comptait les brouillons, 8 >= seuil et
+        // "Bouaké" resterait visible à tort ; sur le périmètre réel (2 < 5),
+        // elle doit être masquée en "Autre ville".
+        for ($i = 0; $i < 6; $i++) {
+            $this->candidature(['ville_residence' => 'Bouaké'], statutInterne: 'brouillon');
+        }
+        for ($i = 0; $i < 2; $i++) {
+            $this->candidature(['ville_residence' => 'Bouaké'], statutInterne: 'soumis');
+        }
+
+        Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email]);
+        $lignes = $this->lignesDeDonnees($this->seulFichierExport());
+
+        $this->assertCount(2, $lignes);
+        foreach ($lignes as $ligne) {
+            $this->assertSame('Autre ville', $ligne['ville_normalisee'], 'Masqué : 2 < 5 sur le périmètre réellement exporté (brouillons exclus du comptage).');
+        }
+    }
+
+    /** Le périmètre utilisé est affiché dans la sortie, --dry-run compris. */
+    public function test_le_perimetre_est_affiche_dans_la_sortie(): void
+    {
+        $this->candidature(statutInterne: 'soumis');
+
+        Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email]);
+        $this->assertStringContainsString('Périmètre : Candidatures soumises uniquement', Artisan::output());
+
+        Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email, '--dry-run' => true]);
+        $this->assertStringContainsString('Périmètre : Candidatures soumises uniquement', Artisan::output());
+
+        Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email, '--inclure-brouillons' => true]);
+        $this->assertStringContainsString('Périmètre : Toutes les candidatures, brouillons compris', Artisan::output());
+    }
+
+    /** La feuille Synthèse indique le nombre de brouillons exclus (masqué si < 5). */
+    public function test_synthese_indique_les_brouillons_exclus(): void
+    {
+        $this->candidature(statutInterne: 'soumis');
+        for ($i = 0; $i < 2; $i++) {
+            $this->candidature(statutInterne: 'brouillon');
+        }
+
+        Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email]);
+        $feuille = IOFactory::load($this->seulFichierExport())->getSheetByName('Synthèse');
+
+        $paires = [];
+        foreach ($feuille->getRowIterator() as $ligne) {
+            $a = $feuille->getCell('A'.$ligne->getRowIndex())->getValue();
+            $b = $feuille->getCell('B'.$ligne->getRowIndex())->getValue();
+            if ($a !== null && $a !== '') {
+                $paires[(string) $a] = $b;
+            }
+        }
+
+        $this->assertSame('<5', $paires['Exclus de cet export'] ?? null, '2 brouillons exclus < seuil : masqué.');
     }
 
     // --- Masquage k-anonymat au niveau ligne (correction #2) ------------

@@ -110,9 +110,9 @@ class AnalyseExcel
         $spreadsheet = new Spreadsheet;
 
         $this->feuilleDonnees($spreadsheet->getActiveSheet(), $resultat);
-        $this->feuilleDictionnaire($spreadsheet->createSheet(), $resultat['colonnes']);
+        $this->feuilleDictionnaire($spreadsheet->createSheet(), $resultat['colonnes'], $resultat['perimetre']);
         $this->feuilleVilles($spreadsheet->createSheet(), $resultat['villes']);
-        $this->feuilleSynthese($spreadsheet->createSheet(), $resultat['synthese']);
+        $this->feuilleSynthese($spreadsheet->createSheet(), $resultat['synthese'], $resultat['brouillons_exclus_affiche']);
 
         $writer = new Xlsx($spreadsheet);
         ob_start();
@@ -167,7 +167,7 @@ class AnalyseExcel
     /**
      * @param  list<string>  $colonnes
      */
-    private function feuilleDictionnaire(Worksheet $sheet, array $colonnes): void
+    private function feuilleDictionnaire(Worksheet $sheet, array $colonnes, string $perimetre): void
     {
         $sheet->setTitle('Dictionnaire');
 
@@ -192,6 +192,7 @@ class AnalyseExcel
         $ligne++;
         $ligne = $this->titreSection($sheet, $ligne, 'Notes');
         $notes = [
+            "Périmètre de cet export : {$perimetre}.",
             'Fichier pseudonymisé : donnée personnelle à diffusion restreinte, ne pas publier les lignes.',
             "Masquage : toute ville/commune/catégorie d'effectif global < ".ServiceRapports::SEUIL_MASQUAGE.' candidatures est masquée — jamais affichée en clair.',
             "Feuille Synthèse : commodité de présentation — ses comptages sont recalculables depuis la feuille Données (1 ligne = 1 candidature). La protection réelle de ce fichier n'est donc PAS l'agrégation de Synthèse, mais la diffusion RESTREINTE du fichier : id_pseudonyme est un pseudonyme stable (réversible par qui détient la base), pas une donnée anonyme.",
@@ -241,10 +242,15 @@ class AnalyseExcel
     /**
      * @param  array<string, array{effectifs: array<string, int|string>, total: ?int}>  $synthese
      */
-    private function feuilleSynthese(Worksheet $sheet, array $synthese): void
+    private function feuilleSynthese(Worksheet $sheet, array $synthese, string $brouillonsExclusAffiche): void
     {
         $sheet->setTitle('Synthèse');
         $ligne = 1;
+
+        $ligne = $this->titreSection($sheet, $ligne, 'Brouillons');
+        $ligne = $this->entetes($sheet, $ligne, ['Brouillons', 'Candidatures']);
+        $ligne = $this->paire($sheet, $ligne, 'Exclus de cet export', $brouillonsExclusAffiche);
+        $ligne++;
 
         foreach (['sexe' => 'Sexe', 'zone' => 'Zone', 'filiere' => 'Filière'] as $cle => $titre) {
             $ligne = $this->titreSection($sheet, $ligne, $titre);
