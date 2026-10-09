@@ -471,17 +471,16 @@ class ExportAnalyseCommandTest extends TestCase
 
     // --- Synthèse : jamais de total à côté d'une cellule masquée --------
 
-    public function test_synthese_masque_la_zone_sous_le_seuil_et_cache_le_total(): void
+    /**
+     * Lit le bloc "Zone" de la feuille Synthèse (entre le titre "Zone" et le
+     * titre "Filière" qui suit) sous forme de paires libellé => valeur.
+     *
+     * @return array<string, int|string>
+     */
+    private function blocZoneDeLaSynthese(string $chemin): array
     {
-        for ($i = 0; $i < 6; $i++) {
-            $this->candidature(['ville_residence' => 'Abidjan']);
-        }
-        $this->candidature(['ville_residence' => 'Maroc']); // zone Étranger, effectif 1 < 5
+        $feuille = IOFactory::load($chemin)->getSheetByName('Synthèse');
 
-        Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email]);
-        $feuille = IOFactory::load($this->seulFichierExport())->getSheetByName('Synthèse');
-
-        // Paires (libellé colonne A, valeur colonne B) dans l'ordre d'apparition.
         $paires = [];
         foreach ($feuille->getRowIterator() as $ligne) {
             $a = $feuille->getCell('A'.$ligne->getRowIndex())->getValue();
@@ -491,7 +490,6 @@ class ExportAnalyseCommandTest extends TestCase
             }
         }
 
-        // Isole le bloc "Zone" (entre le titre "Zone" et le titre "Filière" qui suit).
         $debut = null;
         $fin = null;
         foreach ($paires as $i => [$libelle]) {
@@ -501,21 +499,86 @@ class ExportAnalyseCommandTest extends TestCase
                 $fin = $i;
             }
         }
-        $blocZone = array_slice($paires, $debut, $fin - $debut);
 
         $parLibelle = [];
-        foreach ($blocZone as [$libelle, $valeur]) {
+        foreach (array_slice($paires, $debut, $fin - $debut) as [$libelle, $valeur]) {
             $parLibelle[$libelle] = $valeur;
         }
 
-        $this->assertSame('<5', $parLibelle['Abidjan'] ?? null, 'Abidjan (6, seul restant) doit être masqué par suppression secondaire.');
-        $this->assertSame('<5', $parLibelle['Étranger'] ?? null, 'Étranger (1 < 5) doit être masqué.');
-        $this->assertArrayNotHasKey('Total', $parLibelle, "Aucun total ne doit être affiché dans le bloc Zone : il permettrait de déduire l'effectif exact de la zone Étranger masquée.");
+        return $parLibelle;
+    }
 
-        // Les blocs Sexe/Filière, eux, n'ont RIEN à masquer (une seule
-        // catégorie, effectif 7 >= seuil) : leur Total, lui, reste affiché.
-        $debutSexe = array_search('Sexe', array_column($paires, 0), true);
-        $this->assertNotFalse($debutSexe);
+    // --- Fusion « Hors Abidjan » (ADR-38) — valeurs fictives uniquement -
+
+    /**
+     * Cas principal : la zone rare (1 ligne, sous le seuil) est fusionnée
+     * DANS le groupe Intérieur (6 lignes, au-dessus du seuil) — le groupe
+     * fusionné (7 lignes) n'est donc jamais lui-même sous le seuil.
+     */
+    public function test_zone_rare_est_fusionnee_dans_un_groupe_au_dessus_du_seuil(): void
+    {
+        for ($i = 0; $i < 6; $i++) {
+            $this->candidature(['ville_residence' => 'Bouaké']); // Intérieur, 6 >= seuil
+        }
+        $this->candidature(['ville_residence' => 'Maroc']); // zone Étranger, 1 < seuil
+
+        Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email]);
+        $lignes = $this->lignesDeDonnees($this->seulFichierExport());
+
+        $zones = array_unique(array_column($lignes, 'zone'));
+        $this->assertSame(['Hors Abidjan'], $zones, 'Zone rare ET Intérieur doivent toutes deux être relabellisées « Hors Abidjan » — jamais « Étranger » ni « Intérieur » isolément.');
+
+        $villesNormalisees = array_column($lignes, 'ville_normalisee');
+        $this->assertCount(1, array_filter($villesNormalisees, fn ($v) => $v === 'Autre ville'), 'La ligne fusionnée (ex-Étranger) doit porter « Autre ville ».');
+        // Les 6 lignes Bouaké (>= seuil) gardent leur propre nom de ville —
+        // la fusion de zone n'affecte pas le masquage PAR VILLE, orthogonal.
+        $this->assertCount(6, array_filter($villesNormalisees, fn ($v) => $v === 'Bouaké'));
+
+        // Dans Synthèse, "Hors Abidjan" porte le total fusionné (7) — jamais
+        // "Étranger" ni "Intérieur" séparément.
+        $blocZone = $this->blocZoneDeLaSynthese($this->seulFichierExport());
+        $this->assertArrayNotHasKey('Étranger', $blocZone);
+        $this->assertArrayNotHasKey('Intérieur', $blocZone);
+        $this->assertSame(7, $blocZone['Hors Abidjan'] ?? null);
+    }
+
+    /** Sans aucune zone rare, Intérieur n'est jamais renommé. */
+    public function test_sans_zone_rare_interieur_reste_interieur(): void
+    {
+        for ($i = 0; $i < 6; $i++) {
+            $this->candidature(['ville_residence' => 'Bouaké']);
+        }
+
+        Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email]);
+        $lignes = $this->lignesDeDonnees($this->seulFichierExport());
+
+        $this->assertSame(['Intérieur'], array_unique(array_column($lignes, 'zone')));
+    }
+
+    /**
+     * Cas limite : le groupe Intérieur + zones rares combiné reste LUI-MÊME
+     * sous le seuil (ici, aucune ligne Intérieur du tout : 0 + 1 < seuil) —
+     * la fusion s'étend alors aussi à Abidjan, pour TOUTES les lignes.
+     */
+    public function test_cas_limite_fusion_etendue_a_abidjan(): void
+    {
+        for ($i = 0; $i < 6; $i++) {
+            $this->candidature(['ville_residence' => 'Abidjan']);
+        }
+        $this->candidature(['ville_residence' => 'Maroc']); // zone Étranger, 1 < seuil ; 0 ligne Intérieur
+
+        Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email]);
+        $lignes = $this->lignesDeDonnees($this->seulFichierExport());
+
+        $zones = array_unique(array_column($lignes, 'zone'));
+        $this->assertSame(['Non précisée / Autre'], $zones, 'Même les lignes Abidjan doivent basculer : le groupe Intérieur+rare (1) reste sous le seuil.');
+
+        $villesNormalisees = array_unique(array_column($lignes, 'ville_normalisee'));
+        $this->assertSame(['Non précisée / Autre'], $villesNormalisees);
+
+        // Cellule vide : PhpSpreadsheet relit une chaîne vide comme `null`.
+        $communes = array_unique(array_map(fn ($v) => $v ?? '', array_column($lignes, 'commune_abidjan')));
+        $this->assertSame([''], $communes, 'Plus aucune commune individualisée une fois la fusion totale déclenchée.');
     }
 
     // --- Coherence --dry-run (correction #4) ----------------------------

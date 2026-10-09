@@ -692,6 +692,35 @@ Découvert en écrivant l'E2E : `Entretien.jsx` ne proposait **aucune UI** pour 
 
 ---
 
+## ADR-38 — Export d'analyse administratif pseudonymisé : dérogation encadrée à l'ADR-30 (Lot export-analyse)
+
+**Contexte.** L'ADR-30 pose le garde-fou k-anonymat des écrans/export de pilotage (`ServiceRapports`) : uniquement des agrégats, jamais une ligne individuelle. `casa:export-analyse` déroge délibérément à cette règle : c'est un export **ligne par ligne** (1 ligne = 1 candidature), destiné au pilotage demandé par l'administration — pas à une diffusion publique ni à un usage de recherche/mémoire. Cette dérogation doit être explicitement bornée, pas implicite.
+
+**Décision — l'export est pseudonymisé, PAS anonyme, et encadré par des garde-fous cumulatifs :**
+- **Lecture strictement en lecture seule** : `DB::statement('SET TRANSACTION READ ONLY')` (garantie moteur PostgreSQL, pas seulement conventionnelle) — `ServiceExportAnalyse::lireEnLectureSeule()`.
+- **k-anonymat (k=5, seuil réutilisé de `ServiceRapports::SEUIL_MASQUAGE`) appliqué à TROIS niveaux**, pas seulement aux villes/communes :
+  - ville/commune : `commune_abidjan`/`ville_normalisee` masqués en « Autre commune »/« Autre ville » si effectif < k ;
+  - **zone** : toute zone hors Abidjan/Intérieur (Étranger, Non précisée, future zone) d'effectif < k est FUSIONNÉE dans le groupe Intérieur sous « Hors Abidjan » (jamais un simple renommage isolé — la fusion grossit un groupe déjà ≥ k) ; cas limite où ce groupe fusionné resterait lui-même < k : fusion étendue à Abidjan sous « Non précisée / Autre », pour toute la ligne de l'export (`ServiceExportAnalyse::decisionFusionZone()`/`finaliserLigne()`) ;
+  - agrégats des feuilles Villes/Synthèse : suppression secondaire (`SuppressionSecondaire`), total masqué dès qu'une catégorie l'est.
+- **Normalisation des villes par table versionnée, explicite** (`NormalisationVille`) — jamais une règle floue/fuzzy-matching ; toute valeur non classée **bloque la livraison** (aucun fichier écrit, `--dry-run` ou pas).
+- **Pseudonymisation, pas anonymisation** : `id_pseudonyme` (HMAC-SHA256 tronqué, clé applicative) remplace l'UUID de candidature — stable, donc réversible par qui détient la base source. La protection réelle n'est pas l'irréversibilité mathématique, c'est la diffusion restreinte du fichier produit (cf. Dictionnaire livré dans le fichier).
+- **Scan anti-fuite après écriture réelle** (`GardeFuite`, jamais en `--dry-run`) : relit le .xlsx tel qu'écrit sur disque et cherche une cellule EXACTEMENT égale à un identifiant connu (cni, telephone, numero_cmu, email, numero_dossier, UUID candidat/candidature/utilisateur — jamais prenom/nom, faux positifs possibles avec des noms de villes) ; toute fuite détectée supprime le fichier, journalise un échec SANS la valeur, sort en code non nul.
+- **Empreinte SHA-256 du fichier dans `journal_audit`** (table append-only, ADR-12) à chaque exécution réelle réussie — traçabilité sans réintroduire la donnée elle-même (le blocage sur ville non classée, lui, ne journalise qu'un COMPTE, jamais la valeur brute).
+- **Fichier hors zone publique** (`storage/app/private/exports-analyse/`), `chmod 600`, **supprimé du conteneur après transfert vérifié** (procédure `docs/DEPLOIEMENT.md` §17) — jamais conservé indéfiniment sur le serveur.
+- **Accord écrit du DSI requis avant chaque campagne d'extraction** — cette dérogation à l'ADR-30 n'est pas un blanc-seing permanent : chaque exécution réelle sur la production est un acte distinct, autorisé au cas par cas, pas une routine automatisée.
+
+**Pseudonymisé ≠ anonyme — rappel explicite (y compris dans le fichier livré, feuille Dictionnaire) :** un pseudonyme stable reste ré-identifiable par qui détient la base source. C'est pour cette raison que la diffusion du fichier produit est elle-même soumise à l'accord du DSI, au même titre que son extraction.
+
+**Incident ayant motivé le renforcement du masquage de zone.** Une simulation en production (291 lignes) a fait apparaître 1 ligne en zone Étranger (ville saisie en un seul mot, incohérente avec `residence_ci = vrai` — une saisie candidat, non corrigée, cf. diagnostic en lecture seule). L'audit du code a montré que `zone` n'était alors soumise à AUCUN masquage k=5, contrairement à `commune_abidjan`/`ville_normalisee` — une ligne isolée par sa seule zone était donc repérable, puis recoupable avec le reste de ses colonnes. Un simple renommage de la zone rare aurait laissé le même problème (1 ligne toujours isolée sous un nouveau nom) : la fusion DANS un groupe déjà ≥ k était nécessaire.
+
+**Tests.** `NormalisationVilleTest` (Aboisso + villes de l'intérieur étendues, jeu des 82 variantes et sa somme inchangés) ; `ExportAnalyseCommandTest` (fusion dans un groupe ≥ k, absence de zone rare, cas limite de fusion étendue à Abidjan, valeur brute absente de `journal_audit` en cas de blocage, `GardeFuite` positif/négatif) — valeurs exclusivement fictives, aucune valeur réelle de candidat citée.
+
+**Documentation.** `docs/DEPLOIEMENT.md` §17 (procédure d'exploitation, rebuild `intl`, suppression du fichier après transfert) ; feuille Dictionnaire du fichier produit (description colonne par colonne, règle de fusion, pseudonyme ≠ anonyme, liste d'exclusion garantie) ; `docs/POINTS-OUVERTS.md` (cette ligne).
+
+**Divergences maquette.** Aucune (lot backend/CLI pur, aucun écran).
+
+---
+
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)
 
 > **Inventaire vivant à jour : [`docs/POINTS-OUVERTS.md`](POINTS-OUVERTS.md)** (Lot 9c, ADR-28).

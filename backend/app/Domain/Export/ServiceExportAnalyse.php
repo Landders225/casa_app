@@ -91,6 +91,7 @@ final class ServiceExportAnalyse
 
         $comptesCommunes = [];
         $comptesVilles = [];
+        $comptesZone = [];
         foreach ($lignesBrutes as $l) {
             $c = $l['_classement'];
             if ($c['zone'] === NormalisationVille::ZONE_ABIDJAN && $c['commune_abidjan'] !== null) {
@@ -99,10 +100,13 @@ final class ServiceExportAnalyse
             if ($c['zone'] === NormalisationVille::ZONE_INTERIEUR) {
                 $comptesVilles[$c['ville_interieur']] = ($comptesVilles[$c['ville_interieur']] ?? 0) + 1;
             }
+            $comptesZone[$c['zone']] = ($comptesZone[$c['zone']] ?? 0) + 1;
         }
 
+        $decisionFusionZone = $this->decisionFusionZone($comptesZone);
+
         $lignes = array_map(
-            fn (array $l) => $this->finaliserLigne($l, $comptesCommunes, $comptesVilles),
+            fn (array $l) => $this->finaliserLigne($l, $comptesCommunes, $comptesVilles, $decisionFusionZone),
             $lignesBrutes
         );
 
@@ -314,17 +318,68 @@ final class ServiceExportAnalyse
     }
 
     /**
+     * Décide, UNE FOIS pour tout l'export, si les zones rares (hors
+     * Abidjan/Intérieur, effectif global < k) doivent être fusionnées dans
+     * Intérieur (« Hors Abidjan »), et — cas limite où ce groupe fusionné
+     * resterait lui-même sous k — fusionnées en plus avec Abidjan
+     * (« Non précisée / Autre », pour TOUTES les lignes de l'export).
+     *
+     * Renommer une zone rare seule (ex. « Hors Abidjan » pour 1 ligne)
+     * ne suffirait pas : elle resterait isolée sous son nouveau nom. La
+     * fusion DOIT grossir un groupe déjà ≥ k (ADR-38).
+     *
+     * @param  array<string, int>  $comptesZone  zone brute => effectif
+     * @return array{zonesRares: list<string>, fusionnerAvecInterieur: bool, fusionnerAvecAbidjan: bool}
+     */
+    private function decisionFusionZone(array $comptesZone): array
+    {
+        $zonesRares = [];
+        foreach ($comptesZone as $zone => $n) {
+            $estAbidjanOuInterieur = in_array($zone, [NormalisationVille::ZONE_ABIDJAN, NormalisationVille::ZONE_INTERIEUR], true);
+            if (! $estAbidjanOuInterieur && $n < ServiceRapports::SEUIL_MASQUAGE) {
+                $zonesRares[] = $zone;
+            }
+        }
+
+        if ($zonesRares === []) {
+            return ['zonesRares' => [], 'fusionnerAvecInterieur' => false, 'fusionnerAvecAbidjan' => false];
+        }
+
+        $effectifFusionne = $comptesZone[NormalisationVille::ZONE_INTERIEUR] ?? 0;
+        foreach ($zonesRares as $zone) {
+            $effectifFusionne += $comptesZone[$zone];
+        }
+
+        return [
+            'zonesRares' => $zonesRares,
+            'fusionnerAvecInterieur' => true,
+            'fusionnerAvecAbidjan' => $effectifFusionne < ServiceRapports::SEUIL_MASQUAGE,
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $brute
      * @param  array<string, int>  $comptesCommunes
      * @param  array<string, int>  $comptesVilles
+     * @param  array{zonesRares: list<string>, fusionnerAvecInterieur: bool, fusionnerAvecAbidjan: bool}  $decisionFusionZone
      * @return array<string, mixed>
      */
-    private function finaliserLigne(array $brute, array $comptesCommunes, array $comptesVilles): array
+    private function finaliserLigne(array $brute, array $comptesCommunes, array $comptesVilles, array $decisionFusionZone): array
     {
         $classement = $brute['_classement'];
         $zone = $classement['zone'];
         $communeAffichee = '';
+        $zoneAffichee = $zone;
         $villeNormalisee = $zone;
+
+        if ($decisionFusionZone['fusionnerAvecAbidjan']) {
+            // Cas limite (ADR-38) : même Intérieur + zones rares combinés
+            // restent sous k — fusion totale avec Abidjan, plus aucune ligne
+            // de cet export ne peut porter une zone individualisée.
+            unset($brute['_ville_brute'], $brute['_classement'], $brute['_residence_ci'], $brute['_valeurs_interdites']);
+
+            return [...$brute, 'zone' => 'Non précisée / Autre', 'commune_abidjan' => '', 'ville_normalisee' => 'Non précisée / Autre'];
+        }
 
         if ($zone === NormalisationVille::ZONE_ABIDJAN) {
             $villeNormalisee = NormalisationVille::ZONE_ABIDJAN;
@@ -335,13 +390,19 @@ final class ServiceExportAnalyse
                     : $classement['commune_abidjan'];
             }
         } elseif ($zone === NormalisationVille::ZONE_INTERIEUR) {
+            $zoneAffichee = $decisionFusionZone['fusionnerAvecInterieur'] ? 'Hors Abidjan' : NormalisationVille::ZONE_INTERIEUR;
             $effectif = $comptesVilles[$classement['ville_interieur']] ?? 0;
             $villeNormalisee = $effectif < ServiceRapports::SEUIL_MASQUAGE ? 'Autre ville' : $classement['ville_interieur'];
+        } elseif (in_array($zone, $decisionFusionZone['zonesRares'], true)) {
+            // Zone rare (Étranger, Non précisée, future zone) fusionnée DANS
+            // le groupe Intérieur — jamais affichée seule (ADR-38).
+            $zoneAffichee = 'Hors Abidjan';
+            $villeNormalisee = 'Autre ville';
         }
 
         unset($brute['_ville_brute'], $brute['_classement'], $brute['_residence_ci'], $brute['_valeurs_interdites']);
 
-        return [...$brute, 'zone' => $zone, 'commune_abidjan' => $communeAffichee, 'ville_normalisee' => $villeNormalisee];
+        return [...$brute, 'zone' => $zoneAffichee, 'commune_abidjan' => $communeAffichee, 'ville_normalisee' => $villeNormalisee];
     }
 
     /**
