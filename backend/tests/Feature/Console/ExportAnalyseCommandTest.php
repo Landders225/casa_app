@@ -187,6 +187,23 @@ class ExportAnalyseCommandTest extends TestCase
         ]);
     }
 
+    /**
+     * La ville brute non classée (donnée personnelle) est affichée en
+     * CONSOLE SEULEMENT (éphémère, pour que l'opérateur corrige la table de
+     * correspondance) — jamais persistée dans journal_audit, qui ne garde
+     * qu'un compte.
+     */
+    public function test_la_ville_brute_non_classee_n_apparait_pas_dans_journal_audit(): void
+    {
+        $this->candidature(['ville_residence' => 'Mordor']);
+
+        Artisan::call('casa:export-analyse', ['--operateur' => $this->admin->email]);
+
+        $entree = JournalAudit::first();
+        $this->assertStringNotContainsString('Mordor', $entree->nouvelle_valeur, 'La ville brute ne doit jamais être persistée.');
+        $this->assertStringContainsString('1 valeur', $entree->nouvelle_valeur, 'Un compte, lui, peut/doit être journalisé.');
+    }
+
     public function test_le_blocage_n_affecte_pas_dry_run_non_plus(): void
     {
         $this->candidature(['ville_residence' => 'Mordor']);

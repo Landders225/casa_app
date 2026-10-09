@@ -69,8 +69,19 @@ final class NormalisationVille
     /** Alias directs d'Abidjan (commune non précisée). */
     private const ALIAS_ABIDJAN = ['abidjan', 'abj'];
 
-    /** Villes de l'Intérieur observées (liste blanche communiquée). */
+    /**
+     * Villes de l'Intérieur — liste blanche EXPLICITE (pas de règle floue) :
+     * d'abord les villes réellement observées dans les variantes
+     * communiquées, puis (Lot « Aboisso ») les principales villes de Côte
+     * d'Ivoire (chefs-lieux de région/département + villes courantes), pour
+     * ne plus exiger un déploiement à chaque nouvelle ville rencontrée. Les
+     * variantes SANS accent n'ont pas besoin d'entrée séparée : la clé est
+     * déjà sous sa forme sans accent (cf. cleNormalisee(), qui retire les
+     * accents de la valeur BRUTE avant la recherche — "adiake" et "Adiaké"
+     * retombent donc tous deux sur la même clé "adiake").
+     */
     private const VILLES_INTERIEUR = [
+        // Observées dans les variantes réelles communiquées.
         'san pedro' => 'San-Pedro',
         'bouake' => 'Bouaké',
         'daloa' => 'Daloa',
@@ -89,6 +100,46 @@ final class NormalisationVille
         'bouna' => 'Bouna',
         'gagnoa' => 'Gagnoa',
         'grand bereby' => 'Grand-Béréby',
+
+        // Aboisso : ville réelle non classée en simulation de production
+        // (Sud-Comoé, 1 candidat) — à l'origine de cet ajout.
+        'aboisso' => 'Aboisso',
+
+        // Principales villes de Côte d'Ivoire (chefs-lieux de région/
+        // département + villes courantes), ajoutées pour éviter un nouveau
+        // déploiement à chaque nouvelle ville rencontrée.
+        'abengourou' => 'Abengourou',
+        'adiake' => 'Adiaké',
+        'agboville' => 'Agboville',
+        'akoupe' => 'Akoupé',
+        'alepe' => 'Alépé',
+        'arrah' => 'Arrah',
+        'bangolo' => 'Bangolo',
+        'bocanda' => 'Bocanda',
+        'bondoukou' => 'Bondoukou',
+        'bouafle' => 'Bouaflé',
+        'daoukro' => 'Daoukro',
+        'dimbokro' => 'Dimbokro',
+        'duekoue' => 'Duékoué',
+        'ferkessedougou' => 'Ferkessédougou',
+        'grand lahou' => 'Grand-Lahou',
+        'guiglo' => 'Guiglo',
+        'issia' => 'Issia',
+        'jacqueville' => 'Jacqueville',
+        'katiola' => 'Katiola',
+        'lakota' => 'Lakota',
+        'mankono' => 'Mankono',
+        'odienne' => 'Odienné',
+        'oume' => 'Oumé',
+        'sassandra' => 'Sassandra',
+        'seguela' => 'Séguéla',
+        'sinfra' => 'Sinfra',
+        'sikensi' => 'Sikensi',
+        'soubre' => 'Soubré',
+        'tabou' => 'Tabou',
+        'tiassale' => 'Tiassalé',
+        'toumodi' => 'Toumodi',
+        'touba' => 'Touba',
     ];
 
     /** Valeurs désignant explicitement l'étranger. */

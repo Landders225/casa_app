@@ -62,6 +62,10 @@ class ExportAnalyse extends Command
         $operateur = $resultat['operateur'];
 
         if ($resultat['bloque']) {
+            // Valeurs brutes affichées en CONSOLE SEULEMENT (éphémère,
+            // nécessaire à l'opérateur pour corriger la table de
+            // correspondance) — JAMAIS persistées dans journal_audit, qui ne
+            // garde qu'un compte (une ville est une donnée personnelle).
             $this->error("Livraison refusée : des villes n'ont pas pu être classées (voir ci-dessous). Aucun fichier n'a été écrit.");
             $this->table(['ville (valeur brute)', 'effectif'], collect($resultat['villes_a_classer'])
                 ->map(fn (int $n, string $ville) => [$ville, $n])->values()->all());
@@ -72,7 +76,7 @@ class ExportAnalyse extends Command
                 'action' => 'Export analyse — refusé (villes non classées)',
                 'module' => 'Export',
                 'objet' => $operateur->email,
-                'nouvelle_valeur' => 'Villes non classées : '.implode(', ', array_keys($resultat['villes_a_classer'])),
+                'nouvelle_valeur' => sprintf('%d valeur(s) de ville non classée(s) (voir la sortie console de la commande)', count($resultat['villes_a_classer'])),
                 'resultat' => 'Échec',
             ]);
 

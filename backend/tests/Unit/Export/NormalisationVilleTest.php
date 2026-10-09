@@ -174,4 +174,90 @@ class NormalisationVilleTest extends TestCase
         $this->assertSame('Cocody', NormalisationVille::classer('ABIDJAN_COCODY')['commune_abidjan']);
         $this->assertSame('Cocody', NormalisationVille::classer('Abidjan,Cocody')['commune_abidjan']);
     }
+
+    // --- Aboisso (simulation de production, Sud-Comoé, 1 candidat) -----
+    // Test DÉDIÉ et SÉPARÉ du jeu des 82 variantes réelles ci-dessus : ne
+    // touche ni variantesReelles() ni la somme 327 qu'il vérifie.
+
+    public function test_aboisso_est_classee_interieur(): void
+    {
+        $resultat = NormalisationVille::classer('Aboisso');
+
+        $this->assertSame(NormalisationVille::ZONE_INTERIEUR, $resultat['zone']);
+        $this->assertSame('Aboisso', $resultat['ville_interieur']);
+        $this->assertNull($resultat['commune_abidjan']);
+    }
+
+    public function test_aboisso_sans_accent_et_en_majuscules_reste_classee_interieur(): void
+    {
+        $this->assertSame(NormalisationVille::ZONE_INTERIEUR, NormalisationVille::classer('ABOISSO')['zone']);
+    }
+
+    /**
+     * Principales villes de Côte d'Ivoire ajoutées pour éviter un nouveau
+     * déploiement à chaque nouvelle ville rencontrée (chefs-lieux de
+     * région/département + villes courantes) — chacune doit être Intérieur,
+     * avec le bon libellé canonique. Jeu de données SÉPARÉ des 82 variantes
+     * réelles (lui aussi ne doit jamais être fusionné avec elles).
+     *
+     * @return list<array{0: string, 1: string}> brut => libellé canonique attendu
+     */
+    public static function villesInterieurEtendues(): array
+    {
+        return [
+            ['abengourou', 'Abengourou'],
+            ['adiake', 'Adiaké'],
+            ['agboville', 'Agboville'],
+            ['akoupe', 'Akoupé'],
+            ['alepe', 'Alépé'],
+            ['arrah', 'Arrah'],
+            ['bangolo', 'Bangolo'],
+            ['bocanda', 'Bocanda'],
+            ['bondoukou', 'Bondoukou'],
+            ['bouafle', 'Bouaflé'],
+            ['daoukro', 'Daoukro'],
+            ['dimbokro', 'Dimbokro'],
+            ['duekoue', 'Duékoué'],
+            ['ferkessedougou', 'Ferkessédougou'],
+            ['grand-lahou', 'Grand-Lahou'],
+            ['guiglo', 'Guiglo'],
+            ['issia', 'Issia'],
+            ['jacqueville', 'Jacqueville'],
+            ['katiola', 'Katiola'],
+            ['lakota', 'Lakota'],
+            ['mankono', 'Mankono'],
+            ['odienne', 'Odienné'],
+            ['oume', 'Oumé'],
+            ['sassandra', 'Sassandra'],
+            ['seguela', 'Séguéla'],
+            ['sinfra', 'Sinfra'],
+            ['sikensi', 'Sikensi'],
+            ['soubre', 'Soubré'],
+            ['tabou', 'Tabou'],
+            ['tiassale', 'Tiassalé'],
+            ['toumodi', 'Toumodi'],
+            ['touba', 'Touba'],
+            // Variantes sans accent (déjà couvertes par le retrait d'accent
+            // de cleNormalisee(), vérifiées explicitement ici malgré tout).
+            ['Adiaké', 'Adiaké'],
+            ['FERKESSÉDOUGOU', 'Ferkessédougou'],
+            ['Séguéla', 'Séguéla'],
+        ];
+    }
+
+    /** @dataProvider villesInterieurEtendues */
+    public function test_villes_interieur_etendues_sont_classees_interieur(string $brut, string $libelleAttendu): void
+    {
+        $resultat = NormalisationVille::classer($brut);
+
+        $this->assertSame(NormalisationVille::ZONE_INTERIEUR, $resultat['zone'], "« {$brut} » doit être Intérieur");
+        $this->assertSame($libelleAttendu, $resultat['ville_interieur']);
+        $this->assertNull($resultat['commune_abidjan']);
+    }
+
+    /** Le comportement de blocage sur une ville réellement inconnue n'a pas changé. */
+    public function test_une_ville_toujours_inconnue_reste_a_classer_apres_l_ajout_d_aboisso(): void
+    {
+        $this->assertSame(NormalisationVille::ZONE_A_CLASSER, NormalisationVille::classer('Mordor')['zone']);
+    }
 }
