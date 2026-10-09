@@ -2204,7 +2204,48 @@ Le fichier produit est écrit **dans le conteneur**, hors zone publique
 (`storage/app/private/exports-analyse/`), avec les droits `600` — jamais
 accessible par une route HTTP ni par le volume `documents_data`.
 
-### 17.2 Récupération du fichier sur l'hôte
+### 17.1bis Procédure à une commande (recommandée) — `scripts-hote/export-analyse.sh`
+
+Automatise §17.1 à §17.3 (exécution, récupération AVEC vérification
+d'intégrité, suppression dans le conteneur) en une seule invocation, sur
+jupiter, en tant que `casa` :
+```bash
+/opt/casa/scripts-hote/export-analyse.sh <email d'un compte administrateur>
+```
+- **Demande écrite (mail) de l'administration requise avant chaque
+  extraction ; accord du DSI selon l'ADR-38** — ce script ne le vérifie pas
+  lui-même, c'est un acte humain préalable.
+- Lance `casa:export-analyse --operateur=<email>` dans le conteneur backend
+  (mêmes fichiers compose que §12.6bis, reconstruits explicitement — un
+  script non interactif ne voit pas l'alias `dca` du shell interactif).
+- Récupère le nom de fichier et le SHA-256 depuis la propre sortie de la
+  commande, copie le fichier vers `~/exports-tmp` via
+  `"${COMPOSE[@]}" exec -T backend cat "$CHEMIN_CONTENEUR" > ...` (méthode
+  validée en production, flux canalisé directement — pas `docker compose
+  cp`) sous un `umask 077` scopé à cette seule copie (sans effet sur le
+  `umask` du shell appelant) puis `chmod 600` explicite.
+- **Vérifie que le SHA-256 de la copie est identique à celui annoncé par la
+  commande AVANT toute suppression** — en cas de différence, s'arrête en
+  code ≠ 0 et **ne supprime rien**, ni la copie locale ni le fichier dans le
+  conteneur.
+- Supprime alors le fichier du conteneur (copie déjà vérifiée).
+- Affiche un récapitulatif **sans aucune donnée de candidat** (nom de
+  fichier horodaté, nombre de lignes, empreinte SHA-256), la commande `scp`
+  à lancer **depuis le poste de l'opérateur** (jamais depuis jupiter — avec
+  le rappel que si le compte `casa` n'a pas d'accès SSH, `casa@` se
+  remplace par le compte habituel, ex. `root@`), et un rappel de supprimer
+  `~/exports-tmp` une fois le fichier remis.
+
+En cas d'échec de la commande elle-même (ville non classée, fuite détectée
+par `GardeFuite`) : la sortie de `casa:export-analyse` est répercutée telle
+quelle (elle ne contient que des catégories/comptages, jamais un
+identifiant individuel, cf. ADR-38) et le script s'arrête en code ≠ 0 — rien
+n'est copié ni supprimé.
+
+Les étapes 17.2-17.3 ci-dessous restent documentées pour la procédure
+manuelle (dépannage, ou si le script n'est pas disponible).
+
+### 17.2 Récupération du fichier sur l'hôte (procédure manuelle)
 
 ```bash
 # Nom exact affiché par la commande (horodaté) :
@@ -2221,7 +2262,7 @@ Ou plus simplement, ouvrir le fichier dans un tableur et vérifier la feuille
 **Dictionnaire** (description colonne par colonne) et l'en-tête de la
 feuille **Données** (date/heure de l'instantané).
 
-### 17.3 Suppression du fichier dans le conteneur
+### 17.3 Suppression du fichier dans le conteneur (procédure manuelle)
 
 Une fois le transfert vérifié (SHA-256 identique), **supprimer le fichier du
 conteneur** — il ne doit pas s'y accumuler :
