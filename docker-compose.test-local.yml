@@ -34,6 +34,11 @@ services:
     env_file: !override
       - ./backend/.env.test-local
 
+  worker:
+    # backend/.env.production (prod.yml) est absent en mode test
+    env_file: !override
+      - ./backend/.env.test-local
+
   nginx:
     # HTTP seul, sur TOUTES les interfaces par défaut → http://<IP-serveur>:8090.
     ports: !override
