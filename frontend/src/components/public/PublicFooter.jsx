@@ -40,6 +40,8 @@ export function PublicFooter() {
             <div className="footer-partners-logo-wrap">
               <img
                 src="/partner_logo.png"
+                width={1491}
+                height={120}
                 alt="Logos des partenaires : Agence Italienne pour la Coopération au Développement (AICS), Fondation Arbre de Vie Côte d'Ivoire, Projet de Formation et d'Insertion aux Métiers de l'Hôtellerie et de la Restauration, CCI-Côte d'Ivoire"
                 className="footer-partners-logo"
               />

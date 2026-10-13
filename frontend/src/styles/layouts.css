@@ -50,7 +50,13 @@
    Footer
 --------------------------------------------------------------------------- */
 .site-footer { background: var(--casa-secondary-900); color: var(--casa-secondary-100); padding: var(--space-16) 0 var(--space-8); margin-top: var(--space-24); }
-.footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: var(--space-10); margin-bottom: var(--space-12); }
+/* 3 colonnes (CASA / Plateforme / Accès) — le bloc Partenaires suit sur sa
+   propre ligne via grid-column:1/-1 ci-dessous, il ne compte pas comme une
+   4e colonne. Un ancien grid-template à 4 pistes (1.4fr 1fr 1fr 1fr) pour 3
+   blocs réels laissait une colonne fantôme vide à droite sur grand écran —
+   corrigé ici (2fr 1fr 1fr : le bloc CASA, plus riche en texte, reste le
+   plus large). */
+.footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: var(--space-10); margin-bottom: var(--space-12); }
 @media (max-width: 860px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .footer-grid { grid-template-columns: 1fr; } }
 .site-footer h4 { color: #fff; font-size: var(--fs-body); margin-bottom: var(--space-4); }
@@ -59,20 +65,28 @@
 .site-footer a:hover { color: #fff; }
 .footer-bottom { border-top: 1px solid rgba(255,255,255,0.12); padding-top: var(--space-6); display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); font-size: var(--fs-caption); color: var(--casa-secondary-300); }
 
-/* Bandeau logos partenaires (Lot A) — image UNIQUE (partner_logo.png, ratio
-   très large ~12,4:1, fond blanc opaque sans transparence). Sort de la
-   colonne étroite du footer-grid (grid-column: 1/-1) pour disposer de toute
-   la largeur du container : c'est la seule façon de garder le texte des
-   logos lisible sans dépasser le viewport ni forcer de scroll horizontal. */
+/* Bandeau logos partenaires — image UNIQUE (partner_logo.png, 1491×120,
+   ratio ~12,4:1, fond blanc opaque sans transparence). Sort de la colonne
+   étroite du footer-grid (grid-column: 1/-1) pour disposer de toute la
+   largeur du container.
+   Bureau/tablette (>560px) : l'ENCART blanc occupe toute la largeur du
+   container (display:block, pas inline-block — qui se contentait de la
+   largeur de l'image et laissait l'encart s'arrêter bien avant le bord
+   droit sur grand écran) ; l'image à l'intérieur remplit cette largeur
+   jusqu'à sa taille native (max-width: 1491px, sa largeur réelle en
+   pixels) — jamais agrandie au-delà (flou), centrée par margin:auto dès
+   que le container dépasse cette taille.
+   Mobile (<=560px) : inchangé (déjà plein largeur avant ce correctif). */
 .footer-partners-col { grid-column: 1 / -1; }
 .footer-partners-logo-wrap {
-  display: inline-block;
+  display: block;
+  width: 100%;
   max-width: 100%;
   background: #fff;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
 }
-.footer-partners-logo { display: block; height: 64px; width: auto; max-width: 100%; object-fit: contain; }
+.footer-partners-logo { display: block; width: 100%; max-width: 1491px; height: auto; margin: 0 auto; }
 @media (max-width: 560px) {
   .footer-partners-logo-wrap { display: block; }
   .footer-partners-logo { height: auto; width: 100%; }
