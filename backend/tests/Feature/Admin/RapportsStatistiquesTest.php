@@ -180,6 +180,73 @@ class RapportsStatistiquesTest extends TestCase
         $this->assertSame(2, $villes['Autres villes']['candidatures']);
     }
 
+    // --- Harmonisation des libellés (NormalisationVille, option B) -----
+
+    /** Variantes de casse/accents/espaces/communes d'Abidjan : UN SEUL libellé « Abidjan ». */
+    public function test_les_variantes_d_abidjan_sont_regroupees_sous_un_seul_libelle(): void
+    {
+        foreach (['Abidjan', 'ABIDJAN', 'abidjan', 'Abidjan-Cocody', 'Abidjan - Yopougon', 'ABIDJAN'] as $variante) {
+            $this->candidature(opts: ['ville' => $variante]);
+        }
+
+        $villes = collect(
+            $this->actingAs($this->admin)->getJson('/api/admin/rapports')->assertOk()->json('data.top_villes')
+        )->keyBy('ville');
+
+        $this->assertCount(1, $villes->filter(fn ($v, $k) => str_starts_with($k, 'Abidjan')), 'une seule entrée Abidjan, quelles que soient les variantes');
+        $this->assertSame(6, $villes['Abidjan']['candidatures']);
+    }
+
+    /** Variantes de l'Intérieur (accents) : regroupées sous le libellé canonique. */
+    public function test_les_variantes_de_l_interieur_sont_regroupees_sous_le_libelle_canonique(): void
+    {
+        foreach (['Bouaké', 'bouake', 'BOUAKÉ', 'Bouake', 'bouaké'] as $variante) {
+            $this->candidature(opts: ['ville' => $variante]);
+        }
+
+        $villes = collect(
+            $this->actingAs($this->admin)->getJson('/api/admin/rapports')->assertOk()->json('data.top_villes')
+        )->keyBy('ville');
+
+        $this->assertSame(5, $villes['Bouaké']['candidatures']);
+        $this->assertArrayNotHasKey('bouake', $villes->all());
+    }
+
+    /** Valeur non classée (fictive) : jamais affichée comme catégorie à part — fondue dans « Autres villes ». */
+    public function test_une_ville_non_classee_rejoint_autres_villes(): void
+    {
+        foreach (range(1, 5) as $i) {
+            $this->candidature(opts: ['ville' => 'Abidjan']);
+        }
+        foreach (range(1, 6) as $i) {
+            $this->candidature(opts: ['ville' => 'Mordor']); // fictive, non classée — même au-dessus du seuil
+        }
+
+        $villes = collect(
+            $this->actingAs($this->admin)->getJson('/api/admin/rapports')->assertOk()->json('data.top_villes')
+        )->keyBy('ville');
+
+        $this->assertArrayNotHasKey('Mordor', $villes->all(), 'une ville non classée ne doit jamais être nommée, même si son effectif est élevé');
+        $this->assertArrayNotHasKey('À classer', $villes->all());
+        $this->assertSame(6, $villes['Autres villes']['candidatures'], 'fondue avec le reliquat, jamais une seconde entrée « Autres villes »');
+        $this->assertCount(2, $villes, '"Abidjan" + "Autres villes" seulement — pas de doublon');
+    }
+
+    /** Les KPI ne sont pas affectés par l'harmonisation des villes (calculés indépendamment de topVilles()). */
+    public function test_les_kpis_candidatures_et_eligibles_sont_inchanges_par_l_harmonisation_des_villes(): void
+    {
+        foreach (['Abidjan', 'ABIDJAN', 'abidjan'] as $variante) {
+            $this->candidature(opts: ['ville' => $variante, 'eligibilite' => 'eligible']);
+        }
+        $this->candidature(opts: ['ville' => 'Mordor', 'eligibilite' => 'non_eligible']);
+        $this->candidature(opts: ['ville' => 'Bouaké', 'eligibilite' => 'eligible']);
+
+        $r = $this->actingAs($this->admin)->getJson('/api/admin/rapports')->assertOk()->json('data');
+
+        $this->assertSame(5, $r['perimetre']['candidatures'], 'un KPI de comptage brut, jamais affecté par le libellé de ville');
+        $this->assertSame(4, $r['kpis']['eligibles'], '3 Abidjan + 1 Bouaké éligibles, 1 Mordor non éligible');
+    }
+
     public function test_un_taux_est_masque_si_son_denominateur_est_sous_le_seuil(): void
     {
         // 6 vérifiées (⇒ taux d'éligibilité calculable), mais 3 évaluées seulement.
@@ -404,5 +471,21 @@ class RapportsStatistiquesTest extends TestCase
         $paires = $this->pairesDuClasseur($binaire);
         $this->assertSame(3, $paires['Femmes']);
         $this->assertSame(2, $paires['Hommes']);
+    }
+
+    /** Le CSV et le XLSX reflètent le MÊME regroupement harmonisé que l'écran (une seule source, ServiceRapports). */
+    public function test_le_csv_et_le_xlsx_reflete_le_meme_regroupement_de_villes_que_l_ecran(): void
+    {
+        foreach (['Abidjan', 'ABIDJAN', 'abidjan', 'Abidjan-Cocody', 'Abidjan - Yopougon', 'ABIDJAN'] as $variante) {
+            $this->candidature(opts: ['ville' => $variante]);
+        }
+
+        $csv = $this->actingAs($this->admin)->get('/api/admin/rapports/export.csv')->assertOk()->getContent();
+        $this->assertStringContainsString('Abidjan;6', $csv);
+        $this->assertStringNotContainsString('ABIDJAN;', $csv, 'aucune variante brute ne doit survivre dans le CSV');
+
+        $binaire = $this->actingAs($this->admin)->get('/api/admin/rapports/export.xlsx')->assertOk()->getContent();
+        $paires = $this->pairesDuClasseur($binaire);
+        $this->assertSame(6, $paires['Abidjan']);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Rapports;
 
+use App\Domain\Export\NormalisationVille;
 use App\Models\Campagne;
 use App\Models\Candidature;
 use Illuminate\Support\Collection;
@@ -178,19 +179,44 @@ class ServiceRapports
     }
 
     /**
+     * Regroupe par ville NORMALISÉE (App\Domain\Export\NormalisationVille,
+     * déjà utilisée par casa:export-analyse — aucune règle dupliquée) :
+     * toutes les variantes d'une même ville (casse, accents, espaces,
+     * communes d'Abidjan) se comptent sous UN SEUL libellé. Une valeur non
+     * classée ("À classer") rejoint directement « Autres villes » — jamais
+     * affichée comme catégorie à part sur cet écran.
+     *
      * @param  Collection<int, Candidature>  $rows
      * @return list<array{ville:string, candidatures:int}>
      */
     private function topVilles(Collection $rows): array
     {
         $comptes = $rows
-            ->countBy(fn (Candidature $c) => $c->candidat->ville_residence)
+            ->map(function (Candidature $c) {
+                $classement = NormalisationVille::classer($c->candidat->ville_residence);
+
+                return match ($classement['zone']) {
+                    NormalisationVille::ZONE_ABIDJAN => 'Abidjan',
+                    NormalisationVille::ZONE_INTERIEUR => $classement['ville_interieur'],
+                    NormalisationVille::ZONE_ETRANGER => 'Étranger',
+                    NormalisationVille::ZONE_NON_PRECISEE => 'Non précisée',
+                    default => 'Autres villes', // À classer : jamais une catégorie à part ici.
+                };
+            })
+            ->countBy()
             ->sortDesc();
 
+        // « Autres villes » (valeurs non classées, ci-dessus) ne doit JAMAIS
+        // concourir comme ville nommée, même si son propre effectif ≥ k —
+        // sinon elle apparaîtrait deux fois (une fois nommée, une fois comme
+        // reliquat ci-dessous). Son effectif est fusionné dans le reliquat.
+        $effectifAutresVillesExplicite = $comptes->get('Autres villes', 0);
+        $comptesVillesNommables = $comptes->except(['Autres villes']);
+
         // Villes nommées : effectif ≥ k, plafonné à MAX_VILLES entrées.
-        $nommees = $comptes->filter(fn (int $n) => $n >= self::SEUIL_MASQUAGE)->take(self::MAX_VILLES);
-        // « Autres » = tout le reste (villes sous le seuil + au-delà du plafond).
-        $autres = $comptes->sum() - $nommees->sum();
+        $nommees = $comptesVillesNommables->filter(fn (int $n) => $n >= self::SEUIL_MASQUAGE)->take(self::MAX_VILLES);
+        // « Autres » = tout le reste (villes sous le seuil + au-delà du plafond + non classées).
+        $autres = $comptesVillesNommables->sum() - $nommees->sum() + $effectifAutresVillesExplicite;
 
         $liste = [];
         foreach ($nommees as $ville => $n) {
