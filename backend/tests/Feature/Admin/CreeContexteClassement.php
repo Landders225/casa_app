@@ -33,7 +33,7 @@ trait CreeContexteClassement
      * @param  array{
      *   sexe?: string, se02?: string, se06?: string, se05?: string, mo04?: int,
      *   domaines?: list<string>, eligibilite?: string, date_soumission?: \DateTimeInterface,
-     *   entretien_statut?: string
+     *   entretien_statut?: string, prenom?: string, nom?: string
      * }  $opts
      */
     protected function candidatureEvaluee(
@@ -44,7 +44,11 @@ trait CreeContexteClassement
         float $scoreEntretien,
         array $opts = [],
     ): Candidature {
-        $candidatUser = $this->creerCandidat(profil: ['sexe' => $opts['sexe'] ?? 'F']);
+        $candidatUser = $this->creerCandidat(profil: array_filter([
+            'sexe' => $opts['sexe'] ?? 'F',
+            'prenom' => $opts['prenom'] ?? null,
+            'nom' => $opts['nom'] ?? null,
+        ], fn ($v) => $v !== null));
         $membreId = $evaluateur->membreEquipe->id;
         $grilleId = Grille::active()->id;
 

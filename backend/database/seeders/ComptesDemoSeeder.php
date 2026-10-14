@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Candidat;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -44,6 +45,11 @@ class ComptesDemoSeeder extends Seeder
             'utilisateur_id' => $uCandidat,
             'prenom' => 'Aya',
             'nom' => 'Konan',
+            // `DB::table()->insert()` ne déclenche PAS `Candidat::booted()` (le
+            // hook `saving` qui maintient `recherche_normalisee` partout
+            // ailleurs) — recalculé ici explicitement avec la MÊME fonction
+            // (lot recherche-admin, ADR-39), jamais une seconde définition.
+            'recherche_normalisee' => Candidat::normaliserRecherche('Aya', 'Konan'),
             'sexe' => 'F',
             'date_naissance' => '2003-04-12',
             'cni' => 'CI102030405',

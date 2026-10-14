@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppShell } from '../../components/layout/AppShell.jsx'
 import { Alert } from '../../components/ui/Alert.jsx'
@@ -8,7 +8,7 @@ import { formatDateFr } from '../../lib/formatDate.js'
 import { evaluateurDossierPath } from '../../routing/routes.js'
 import { AssignModal } from './AssignModal.jsx'
 import { MotifConfirmDialog } from './MotifConfirmDialog.jsx'
-import { DECISION_LABELS, ELIGIBILITE_LABELS, STATUT_INTERNE_LABELS } from './optionLabels.js'
+import { DECISION_FILTRE_OPTIONS, DECISION_LABELS, ELIGIBILITE_LABELS, STATUT_INTERNE_LABELS } from './optionLabels.js'
 import { useAffectation } from './useAffectation.js'
 import { useCampagnes } from './useCampagnes.js'
 import { useCandidaturesAdmin } from './useCandidaturesAdmin.js'
@@ -16,6 +16,8 @@ import { useElimination } from './useElimination.js'
 import { useEvaluateurs } from './useEvaluateurs.js'
 
 const STATUTS = ['soumis', 'en_instruction', 'evalue', 'non_eligible']
+const ELIGIBILITES = ['non_verifie', 'eligible', 'non_eligible']
+const DELAI_DEBOUNCE_RECHERCHE_MS = 400
 
 /**
  * Supervision des candidatures + affectation en masse (Lot 8d-1) + élimination
@@ -29,18 +31,34 @@ const STATUTS = ['soumis', 'en_instruction', 'evalue', 'non_eligible']
  * pas de nouvelle fiche admin dédiée (Étape 1, Q5).
  */
 export function CandidaturesSupervision() {
+  const [rechercheSaisie, setRechercheSaisie] = useState('')
+  const [recherche, setRecherche] = useState('')
   const [statutInterne, setStatutInterne] = useState('')
   const [filiere, setFiliere] = useState('')
   const [evaluateurFiltre, setEvaluateurFiltre] = useState('')
   const [campagneFiltre, setCampagneFiltre] = useState('')
+  const [eligibiliteFiltre, setEligibiliteFiltre] = useState('')
+  const [decisionFiltre, setDecisionFiltre] = useState('')
+  const [triColonne, setTriColonne] = useState('')
+  const [triDirection, setTriDirection] = useState('')
   const [page, setPage] = useState(1)
   const [filieres, setFilieres] = useState([])
   const [selected, setSelected] = useState(() => new Set())
   const [showAssign, setShowAssign] = useState(false)
   const [eliminationCible, setEliminationCible] = useState(null)
+  const debounceRechercheRef = useRef(null)
 
   const { status, items, meta, reload } = useCandidaturesAdmin({
-    statutInterne, filiere, evaluateur: evaluateurFiltre, campagne: campagneFiltre, page,
+    recherche,
+    statutInterne,
+    filiere,
+    evaluateur: evaluateurFiltre,
+    campagne: campagneFiltre,
+    eligibilite: eligibiliteFiltre,
+    decision: decisionFiltre,
+    triColonne,
+    triDirection,
+    page,
   })
   const { items: evaluateurs } = useEvaluateurs()
   const { items: campagnes } = useCampagnes()
@@ -52,6 +70,58 @@ export function CandidaturesSupervision() {
   }, [])
 
   const resetPage = () => setPage(1)
+
+  // Sélection vidée à chaque changement de recherche/filtre/tri/page : aucune
+  // action groupée ne doit viser un dossier qui n'est plus affiché. Aucun
+  // usage actuel ne repose sur une sélection conservée d'une page à l'autre
+  // (« Affecter » lit `selected` immédiatement, dans la même page).
+  useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect
+    setSelected(new Set())
+  }, [recherche, statutInterne, filiere, evaluateurFiltre, campagneFiltre, eligibiliteFiltre, decisionFiltre, triColonne, triDirection, page])
+
+  // Recherche appliquée ~400 ms après la dernière frappe (pas une requête par
+  // lettre) — ou immédiatement sur Entrée (`onRechercheKeyDown`).
+  useEffect(() => {
+    debounceRechercheRef.current = setTimeout(() => {
+      setRecherche(rechercheSaisie)
+      resetPage()
+    }, DELAI_DEBOUNCE_RECHERCHE_MS)
+    return () => clearTimeout(debounceRechercheRef.current)
+  }, [rechercheSaisie])
+
+  const onRechercheKeyDown = (e) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    clearTimeout(debounceRechercheRef.current)
+    setRecherche(rechercheSaisie)
+    resetPage()
+  }
+
+  const trier = (colonne) => {
+    if (triColonne === colonne) {
+      setTriDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setTriColonne(colonne)
+      setTriDirection('asc')
+    }
+    resetPage()
+  }
+
+  const reinitialiser = () => {
+    setRechercheSaisie('')
+    setRecherche('')
+    setStatutInterne('')
+    setFiliere('')
+    setEvaluateurFiltre('')
+    setCampagneFiltre('')
+    setEligibiliteFiltre('')
+    setDecisionFiltre('')
+    setTriColonne('')
+    setTriDirection('')
+    setPage(1)
+  }
+
   const toggle = (id) => setSelected((prev) => {
     const next = new Set(prev)
     if (next.has(id)) next.delete(id)
@@ -86,6 +156,25 @@ export function CandidaturesSupervision() {
     }
   }
 
+  const enTeteTriable = (colonne, libelle) => (
+    <th>
+      <button
+        type="button"
+        onClick={() => trier(colonne)}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer', display: 'flex',
+          alignItems: 'center', gap: 4, font: 'inherit', color: 'inherit', padding: 0,
+        }}
+      >
+        {libelle}
+        <i
+          className={`fa-solid ${triColonne === colonne ? (triDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'}`}
+          aria-hidden="true"
+        />
+      </button>
+    </th>
+  )
+
   return (
     <AppShell title="Candidatures">
       <div className="page-head">
@@ -102,11 +191,33 @@ export function CandidaturesSupervision() {
         ) : null}
       </div>
 
-      <div className="flex gap-3" style={{ marginBottom: 'var(--space-5)', flexWrap: 'wrap' }}>
+      <div className="flex gap-3" style={{ marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
+        <input
+          type="search"
+          className="input"
+          style={{ maxWidth: 260 }}
+          placeholder="N° dossier, nom ou prénom…"
+          aria-label="Rechercher un dossier"
+          value={rechercheSaisie}
+          onChange={(e) => setRechercheSaisie(e.target.value)}
+          onKeyDown={onRechercheKeyDown}
+        />
         <select className="select" style={{ maxWidth: 220 }} value={statutInterne} onChange={(e) => { setStatutInterne(e.target.value); resetPage() }}>
           <option value="">Tous les statuts</option>
           {STATUTS.map((s) => (
             <option key={s} value={s}>{STATUT_INTERNE_LABELS[s]?.label ?? s}</option>
+          ))}
+        </select>
+        <select className="select" style={{ maxWidth: 220 }} value={eligibiliteFiltre} onChange={(e) => { setEligibiliteFiltre(e.target.value); resetPage() }}>
+          <option value="">Toutes les éligibilités</option>
+          {ELIGIBILITES.map((e) => (
+            <option key={e} value={e}>{ELIGIBILITE_LABELS[e]?.label ?? e}</option>
+          ))}
+        </select>
+        <select className="select" style={{ maxWidth: 220 }} value={decisionFiltre} onChange={(e) => { setDecisionFiltre(e.target.value); resetPage() }}>
+          <option value="">Toutes les décisions</option>
+          {DECISION_FILTRE_OPTIONS.map((d) => (
+            <option key={d.value} value={d.value}>{d.label}</option>
           ))}
         </select>
         <select className="select" style={{ maxWidth: 220 }} value={filiere} onChange={(e) => { setFiliere(e.target.value); resetPage() }}>
@@ -128,7 +239,16 @@ export function CandidaturesSupervision() {
             <option key={c.id} value={c.id}>{c.nom}</option>
           ))}
         </select>
+        <button type="button" className="btn btn-outline btn-sm" onClick={reinitialiser}>
+          Réinitialiser
+        </button>
       </div>
+
+      {status === 'ready' ? (
+        <p className="text-muted caption" style={{ marginBottom: 'var(--space-4)' }}>
+          {meta?.total ?? items.length} dossier{(meta?.total ?? items.length) === 1 ? '' : 's'}
+        </p>
+      ) : null}
 
       {status === 'loading' ? (
         <div className="text-center" style={{ padding: 'var(--space-16)' }}>
@@ -157,16 +277,16 @@ export function CandidaturesSupervision() {
                       onChange={toggleAll}
                     />
                   </th>
-                  <th>N° dossier</th>
-                  <th>Candidat</th>
+                  {enTeteTriable('numero_dossier', 'N° dossier')}
+                  {enTeteTriable('candidat', 'Candidat')}
                   <th>Filière</th>
                   <th>Statut</th>
                   <th>Éligibilité</th>
                   <th>Évaluateur</th>
-                  <th>Score dossier</th>
-                  <th>Score entretien</th>
+                  {enTeteTriable('score_dossier', 'Score dossier')}
+                  {enTeteTriable('score_entretien', 'Score entretien')}
                   <th>Décision</th>
-                  <th>Date</th>
+                  {enTeteTriable('date_soumission', 'Date')}
                   <th aria-hidden="true" />
                 </tr>
               </thead>

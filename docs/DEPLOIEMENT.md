@@ -865,6 +865,40 @@ dcp ps                                                      # 5x healthy (worker
 # rejouer la checklist § 11 (au moins 1, 5, 8, 9, 10)
 ```
 
+> ⚠️ **Mise à jour incluant le lot recherche-admin (ADR-39,
+> `..._add_recherche_normalisee_to_candidat_table`) : NE PAS suivre l'ordre
+> générique ci-dessus tel quel.** Cette migration ajoute une colonne que le
+> modèle `Candidat` (code NEUF) écrit à CHAQUE sauvegarde — si les conteneurs
+> sont recréés avec le code neuf avant que la colonne existe, toute écriture
+> `candidat` (inscription, profil) échoue en 500 le temps que `migrate
+> --force` passe. Inverser l'ordre : migrer AVANT de recréer, pendant que les
+> ANCIENS conteneurs servent encore (ils ne connaissent pas cette colonne,
+> aucun conflit) :
+>
+> ```bash
+> cd /srv/casa
+> /srv/casa/scripts-hote/backup-db.sh                      # sauvegarde d'abord
+> git fetch --tags && git checkout v1.2.0                  # le tag incluant ce lot
+>
+> dcp build backend                                         # construit la NOUVELLE image seule
+> dcp run --rm --no-deps backend php artisan migrate --force
+> #   -> conteneur jetable, code NEUF, mais tourne contre la base de prod ;
+> #      --no-deps : ne démarre pas postgres/worker/etc. à côté (déjà up) ;
+> #      les anciens backend/frontend/nginx continuent de servir en parallèle.
+>
+> dcp up -d --build --force-recreate                        # SEULEMENT maintenant : recrée backend/worker/frontend/nginx
+> dcp exec backend php artisan queue:restart
+> dcp ps
+> # rejouer la checklist § 11 (au moins 1, 5, 8, 9, 10)
+> ```
+>
+> Remplacer `dcp` par l'alias réel du mode du serveur (`dca`/`dct`, § 15/14) —
+> même principe, mêmes commandes. Pour toute AUTRE mise à jour (qui n'ajoute
+> pas de colonne lue inconditionnellement par du code neuf), l'ordre générique
+> ci-dessus reste correct : une migration qui échoue simplement en silence
+> faute de colonne (`whereHas`, colonne lue avec `?? null`, etc.) ne casse
+> rien pendant la fenêtre recréation→migration.
+
 > ⚠️ **`--force-recreate` est nécessaire ici, pas juste `--build`.** `up -d
 > --build` seul ne recrée QUE les services dont l'image a changé (`backend`,
 > `frontend`) — jamais `nginx` (image stock, sans `build:` dans le compose).

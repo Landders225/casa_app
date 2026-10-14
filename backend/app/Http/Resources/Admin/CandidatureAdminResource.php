@@ -7,8 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Candidature vue par l'ADMINISTRATEUR — `GET /api/admin/candidatures` (Lot 6a),
- * vue de supervision pour choisir qui affecter.
+ * Candidature vue par l'ADMINISTRATEUR — `POST /api/admin/candidatures` (Lot 6a,
+ * POST depuis le lot recherche-admin, ADR-39), vue de supervision pour choisir
+ * qui affecter.
  *
  * ⚠️ 🔴 ADMINISTRATEUR STRICT. Expose `statut_interne`,
  * `statut_eligibilite_interne`, l'évaluateur affecté, les scores figés et la

@@ -27,6 +27,25 @@ use RecursiveIteratorIterator;
  * littéral fixe à 100%, sans aucune concaténation ni variable — contrairement
  * à un `whereRaw`/`selectRaw`, cette commande n'accepte même pas de
  * paramètre côté PostgreSQL.
+ *
+ * EXCEPTION whitelistée (lot recherche-admin, ADR-39) :
+ * `App\Http\Controllers\Api\Admin\CandidatureSupervisionController::trierAvecNullsLast()`
+ * appelle `orderByRaw("$colonneQualifiee $dir NULLS LAST")` — `NULLS LAST`
+ * n'a pas d'équivalent dans le Query Builder Eloquent (MySQL ne le supporte
+ * pas, Laravel ne l'a donc jamais abstrait), et un ORDER BY ne peut de toute
+ * façon jamais lier un IDENTIFIANT de colonne via `?` (seules les VALEURS se
+ * lient). Preuve que rien n'est injectable malgré l'absence de binding :
+ * `$colonneQualifiee` est un des 5 littéraux PHP choisis par le `switch` de
+ * `appliquerTri()` (jamais une chaîne issue de `$request`) et `$dir` est
+ * verrouillé à la ligne au-dessus à `'asc'`/`'desc'` par un simple ternaire —
+ * aucune des deux variables ne peut contenir autre chose qu'une valeur fixée
+ * par le code lui-même. La recherche elle-même (`appliquerRecherche()`)
+ * n'utilise AUCUN SQL brut : `where('candidat.recherche_normalisee', 'ilike',
+ * ...)` est un `where()` Eloquent ordinaire (même précédent qu'`AuditController`),
+ * la normalisation (casse/accents/apostrophes/tirets) étant précalculée côté
+ * PHP à l'écriture (`Candidat::normaliserRecherche()`, migration
+ * `2026_09_19_100000_add_recherche_normalisee_to_candidat_table.php`) plutôt
+ * qu'appelée en SQL (`unaccent()`) à la lecture.
  */
 class PasDeSqlBrutTest extends TestCase
 {
@@ -51,6 +70,9 @@ class PasDeSqlBrutTest extends TestCase
     /** fichier (relatif à app/) => motifs explicitement whitelistés, avec preuve ci-dessus. */
     private const EXCEPTIONS = [
         'Domain/Export/ServiceExportAnalyse.php' => ["DB::statement('SET TRANSACTION READ ONLY')"],
+        'Http/Controllers/Api/Admin/CandidatureSupervisionController.php' => [
+            'orderByRaw("$colonneQualifiee $dir NULLS LAST")',
+        ],
     ];
 
     public function test_aucune_requete_sql_brute_sous_app(): void

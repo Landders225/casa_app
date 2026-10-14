@@ -13,8 +13,9 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  *   GET /api/admin/evaluateurs
  *
  * Alimente le sélecteur de `POST /admin/affectations` et le filtre
- * `?evaluateur=` de `GET /admin/candidatures` (Lot 6a) — aucun des deux
- * n'avait de point de lecture pour peupler un choix côté client.
+ * `evaluateur` du corps de `POST /admin/candidatures` (Lot 6a, POST depuis
+ * ADR-39) — aucun des deux n'avait de point de lecture pour peupler un choix
+ * côté client.
  *
  * Non paginé (équipe de taille réduite, cf. `GET /api/filieres`). Liste
  * BLANCHE stricte via `EvaluateurResource` : jamais l'e-mail ni une donnée de

@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
- * `GET /api/admin/candidatures` (Lot 6a) — vue de supervision, 🔴 admin-only.
+ * `POST /api/admin/candidatures` (Lot 6a, POST depuis le lot recherche-admin
+ * — ADR-39) — vue de supervision, 🔴 admin-only.
  */
 class SupervisionCandidaturesTest extends TestCase
 {
@@ -36,7 +37,7 @@ class SupervisionCandidaturesTest extends TestCase
     {
         $c = $this->candidatureEvaluee($this->campagne, $this->evaluateur, 'cuisine', 60.0, 30.0);
 
-        $this->actingAs($this->admin)->getJson('/api/admin/candidatures')
+        $this->actingAs($this->admin)->postJson('/api/admin/candidatures')
             ->assertOk()
             ->assertJsonPath('data.0.numero_dossier', $c->numero_dossier)
             ->assertJsonPath('data.0.statut_interne', 'evalue')
@@ -51,11 +52,11 @@ class SupervisionCandidaturesTest extends TestCase
         $this->candidatureEvaluee($this->campagne, $this->evaluateur, 'cuisine', 60.0, 30.0);
         $this->candidatureEvaluee($this->campagne, $this->evaluateur, 'restaurant-bar', 50.0, 20.0);
 
-        $this->actingAs($this->admin)->getJson('/api/admin/candidatures?filiere=cuisine')
+        $this->actingAs($this->admin)->postJson('/api/admin/candidatures', ['filiere' => 'cuisine'])
             ->assertOk()->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.filiere.code', 'cuisine');
 
-        $this->actingAs($this->admin)->getJson('/api/admin/candidatures?evaluateur=non_affecte')
+        $this->actingAs($this->admin)->postJson('/api/admin/candidatures', ['evaluateur' => 'non_affecte'])
             ->assertOk()->assertJsonCount(0, 'data'); // toutes affectées par le contexte
     }
 
@@ -66,17 +67,17 @@ class SupervisionCandidaturesTest extends TestCase
         ]);
         $brouillon->forceFill(['statut_interne' => 'brouillon'])->saveQuietly();
 
-        $this->actingAs($this->admin)->getJson('/api/admin/candidatures')
+        $this->actingAs($this->admin)->postJson('/api/admin/candidatures')
             ->assertOk()->assertJsonCount(0, 'data');
 
-        $this->actingAs($this->admin)->getJson('/api/admin/candidatures?inclure_brouillons=1')
+        $this->actingAs($this->admin)->postJson('/api/admin/candidatures', ['inclure_brouillons' => 1])
             ->assertOk()->assertJsonCount(1, 'data');
     }
 
     public function test_supervision_admin_only(): void
     {
         foreach ([$this->evaluateur, $this->creerCandidat('c@casa-demo.ci')] as $intrus) {
-            $this->actingAs($intrus)->getJson('/api/admin/candidatures')->assertStatus(403);
+            $this->actingAs($intrus)->postJson('/api/admin/candidatures')->assertStatus(403);
         }
     }
 }

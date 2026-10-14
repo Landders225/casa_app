@@ -35,9 +35,20 @@ function candidature(over = {}) {
   }
 }
 
-function mockGet({ candidatures = [candidature()], meta = { current_page: 1, last_page: 1, total: 1 } } = {}) {
+/**
+ * La LISTE des candidatures passe désormais par `POST /admin/candidatures`
+ * (ADR-39, pas GET) : seule cette route répond par ce mock sur `post` —
+ * `mockResolvedValueOnce`/`mockRejectedValueOnce` posés par un test pour
+ * l'affectation/l'élimination (autres chemins `post`) restent prioritaires
+ * sur l'appel suivant, cette implémentation par défaut ne les court-circuite
+ * pas (FIFO des mocks vi/jest : le « once » est consommé avant de retomber ici).
+ */
+function mockCandidatures({ candidatures = [candidature()], meta = { current_page: 1, last_page: 1, total: 1 } } = {}) {
+  apiClient.post.mockImplementation((path) => {
+    if (path === '/admin/candidatures') return Promise.resolve({ data: candidatures, meta })
+    return Promise.resolve({ data: [] })
+  })
   apiClient.get.mockImplementation((path) => {
-    if (path.startsWith('/admin/candidatures')) return Promise.resolve({ data: candidatures, meta })
     if (path === '/admin/evaluateurs') return Promise.resolve({ data: EVALUATEURS })
     if (path === '/admin/campagnes') return Promise.resolve({ data: CAMPAGNES })
     if (path === '/filieres') return Promise.resolve({ data: FILIERES })
@@ -65,7 +76,7 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('CandidaturesSupervision — affichage', () => {
   it("affiche les dossiers renvoyés par l'API, rien de plus", async () => {
-    mockGet()
+    mockCandidatures()
     renderScreen()
 
     expect(await screen.findByText('CASA-2026-000001')).toBeInTheDocument()
@@ -74,7 +85,7 @@ describe('CandidaturesSupervision — affichage', () => {
   })
 
   it('changer un filtre relance la requête avec le bon paramètre', async () => {
-    mockGet()
+    mockCandidatures()
     renderScreen()
     await screen.findByText('CASA-2026-000001')
 
@@ -82,18 +93,39 @@ describe('CandidaturesSupervision — affichage', () => {
     await user.selectOptions(screen.getByDisplayValue('Tous les statuts'), 'en_instruction')
 
     await waitFor(() => {
-      const called = apiClient.get.mock.calls.some(([path]) => path === '/admin/candidatures?statut_interne=en_instruction')
+      const called = apiClient.post.mock.calls.some(
+        ([path, body]) => path === '/admin/candidatures' && body.statut_interne === 'en_instruction',
+      )
       expect(called).toBe(true)
+    })
+  })
+
+  it('changer un filtre vide la sélection (aucune action groupée sur un dossier qui disparaît)', async () => {
+    mockCandidatures()
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i }))
+    expect(await screen.findByRole('button', { name: /affecter \(1\)/i })).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByDisplayValue('Tous les statuts'), 'en_instruction')
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /affecter \(/i })).not.toBeInTheDocument()
     })
   })
 })
 
 describe('CandidaturesSupervision — affectation en masse (atomique)', () => {
   it('sélection -> affecter -> succès -> POST correct, sélection vidée, liste rechargée', async () => {
-    mockGet()
-    apiClient.post.mockResolvedValueOnce({ data: { affectees: 1, evaluateur: { id: 'eval-1', prenom: 'Yann', nom: 'Kacou' } } })
+    mockCandidatures()
+    const appelsCandidaturesAvant = () => apiClient.post.mock.calls.filter(([p]) => p === '/admin/candidatures').length
     renderScreen()
     await screen.findByText('CASA-2026-000001')
+    const listeAvant = appelsCandidaturesAvant()
+
+    apiClient.post.mockResolvedValueOnce({ data: { affectees: 1, evaluateur: { id: 'eval-1', prenom: 'Yann', nom: 'Kacou' } } })
 
     const user = userEvent.setup()
     await user.click(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i }))
@@ -103,25 +135,28 @@ describe('CandidaturesSupervision — affectation en masse (atomique)', () => {
     await user.selectOptions(dialog.querySelector('select'), 'eval-1')
     await user.click(screen.getByRole('button', { name: 'Affecter' }))
 
-    await waitFor(() => expect(apiClient.post).toHaveBeenCalledTimes(1))
-    expect(apiClient.post).toHaveBeenCalledWith('/admin/affectations', { evaluateur_id: 'eval-1', candidature_ids: ['c-1'] })
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/affectations', { evaluateur_id: 'eval-1', candidature_ids: ['c-1'] }))
 
-    // Le modal se ferme, la sélection est vidée, la liste est rechargée (2e GET).
+    // Le modal se ferme, la sélection est vidée, la liste est rechargée.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /affecter \(/i })).not.toBeInTheDocument()
-    await waitFor(() => expect(apiClient.get.mock.calls.filter(([p]) => p.startsWith('/admin/candidatures')).length).toBeGreaterThanOrEqual(2))
+    await waitFor(() => expect(appelsCandidaturesAvant()).toBeGreaterThan(listeAvant))
   })
 
   it('422 atomique -> message VERBATIM affiché, sélection PRÉSERVÉE (le modal reste ouvert)', async () => {
-    mockGet()
+    mockCandidatures()
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    // Posée APRÈS le chargement initial de la liste : la liste et
+    // l'affectation partagent désormais `apiClient.post` (ADR-39), un
+    // rejet « once » posé avant le rendu serait consommé par la liste.
     apiClient.post.mockRejectedValueOnce(
       new ApiError('validation', {
         status: 422,
         errors: { candidature_ids: ['Non affectable(s) (doit être « soumise » ou « en instruction ») : CASA-2026-000001. Aucune affectation effectuée.'] },
       }),
     )
-    renderScreen()
-    await screen.findByText('CASA-2026-000001')
 
     const user = userEvent.setup()
     await user.click(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i }))
@@ -141,16 +176,17 @@ describe('CandidaturesSupervision — affectation en masse (atomique)', () => {
 
 describe('CandidaturesSupervision — élimination manuelle mono-cible (Lot 8d-3, D-6b-4)', () => {
   it('précondition : bouton désactivé si déjà non éligible', async () => {
-    mockGet({ candidatures: [candidature({ statut_eligibilite_interne: 'non_eligible' })] })
+    mockCandidatures({ candidatures: [candidature({ statut_eligibilite_interne: 'non_eligible' })] })
     renderScreen()
     await screen.findByText('CASA-2026-000001')
     expect(screen.getByRole('button', { name: 'Éliminer' })).toBeDisabled()
   })
 
   it('motif obligatoire (bouton bloqué), succès -> POST mono-cible puis liste rechargée', async () => {
-    mockGet()
+    mockCandidatures()
     renderScreen()
     await screen.findByText('CASA-2026-000001')
+    const appelsCandidaturesAvant = apiClient.post.mock.calls.filter(([p]) => p === '/admin/candidatures').length
 
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Éliminer' }))
@@ -162,20 +198,21 @@ describe('CandidaturesSupervision — élimination manuelle mono-cible (Lot 8d-3
     expect(confirmBtn).toBeEnabled()
 
     apiClient.post.mockResolvedValueOnce({ data: { numero_dossier: 'CASA-2026-000001', statut_eligibilite_interne: 'non_eligible' } })
-    const getCallsAvant = apiClient.get.mock.calls.filter(([p]) => p.startsWith('/admin/candidatures')).length
     await user.click(confirmBtn)
 
     await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/candidatures/c-1/elimination', { motif: 'Pièce falsifiée' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     // Mono-cible (D-6b-4) : un seul candidat visé par le POST, pas d'endpoint bulk.
-    await waitFor(() => expect(apiClient.get.mock.calls.filter(([p]) => p.startsWith('/admin/candidatures')).length).toBeGreaterThan(getCallsAvant))
+    await waitFor(() => expect(apiClient.post.mock.calls.filter(([p]) => p === '/admin/candidatures').length).toBeGreaterThan(appelsCandidaturesAvant))
   })
 
   it('422 backend -> message affiché verbatim, le modal reste ouvert', async () => {
-    mockGet()
-    apiClient.post.mockRejectedValueOnce(new ApiError('validation', { status: 422, message: 'Le motif doit contenir au moins 3 caractères.' }))
+    mockCandidatures()
     renderScreen()
     await screen.findByText('CASA-2026-000001')
+
+    // Posée APRÈS le chargement initial (même raison que le test d'affectation ci-dessus).
+    apiClient.post.mockRejectedValueOnce(new ApiError('validation', { status: 422, message: 'Le motif doit contenir au moins 3 caractères.' }))
 
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Éliminer' }))

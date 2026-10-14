@@ -124,8 +124,9 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
         */
         // Affectation d'un évaluateur (résout D-4a-1).
         Route::post('/affectations', [AffectationController::class, 'store']);
-        // Vue de supervision transverse.
-        Route::get('/candidatures', [CandidatureSupervisionController::class, 'index']);
+        // Vue de supervision transverse + recherche serveur (ADR-39 : POST pour ne
+        // pas archiver les noms de candidats recherchés dans les access log).
+        Route::post('/candidatures', [CandidatureSupervisionController::class, 'rechercher']);
         // Filières : activation / désactivation.
         Route::patch('/filieres/{filiere}', [AdminFiliereController::class, 'changerStatut']);
         // Campagnes : liste (Lot 8d-1) + transitions d'état (ouvrir / clôturer)

@@ -35,6 +35,18 @@ export const DECISION_LABELS = {
 }
 
 /**
+ * Options du FILTRE Décision (recherche candidatures) — les 4 valeurs
+ * ci-dessus + `sans_decision` (`decision_candidature` absente), jamais une
+ * valeur réelle de `decision_candidature.decision`. Libellés repris de
+ * `DECISION_LABELS` pour rester identiques à ceux déjà affichés dans le
+ * tableau.
+ */
+export const DECISION_FILTRE_OPTIONS = [
+  ...Object.entries(DECISION_LABELS).map(([value, { label }]) => ({ value, label })),
+  { value: 'sans_decision', label: 'Sans décision' },
+]
+
+/**
  * Rôles d'un membre d'équipe (Lot 11b) — les SEULES valeurs proposées à la
  * création d'un compte via l'écran « Équipe ». « Candidat » est volontairement
  * absent : il ne se crée pas par cette voie (serveur : 422). L'ordre place le

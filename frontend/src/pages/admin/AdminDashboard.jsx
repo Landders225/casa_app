@@ -26,7 +26,7 @@ const CAMPAGNE_LABEL = { ouverte: 'Ouverte', brouillon: 'Brouillon', cloturee: '
 
 /**
  * Tableau de bord administrateur (Lot 8d-1). 4 KPI = `meta.total` de 4 appels
- * `GET /admin/candidatures` filtrés (aucun calcul reconstitué) + une carte
+ * `POST /admin/candidatures` filtrés (ADR-39, aucun calcul reconstitué) + une carte
  * Campagnes (liste depuis le nouvel endpoint). Pas de graphique (D-8c1-1,
  * même choix qu'au 8c-1) : aucun taux d'éligibilité/sélection n'est
  * dérivable des filtres exposés par le backend.

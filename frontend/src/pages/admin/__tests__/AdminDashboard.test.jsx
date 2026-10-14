@@ -5,7 +5,7 @@ import { useAuth } from '../../../auth/useAuth.js'
 import { apiClient } from '../../../lib/apiClient.js'
 import { AdminDashboard } from '../AdminDashboard.jsx'
 
-vi.mock('../../../lib/apiClient.js', () => ({ apiClient: { get: vi.fn() } }))
+vi.mock('../../../lib/apiClient.js', () => ({ apiClient: { get: vi.fn(), post: vi.fn() } }))
 vi.mock('../../../auth/useAuth.js', () => ({ useAuth: vi.fn() }))
 
 function renderScreen() {
@@ -24,11 +24,15 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('AdminDashboard — 4 KPI = meta.total de 4 appels filtrés, aucun calcul reconstitué', () => {
   it('affiche les 4 KPI depuis meta.total, et la liste des campagnes depuis le nouvel endpoint', async () => {
+    apiClient.post.mockImplementation((path, body) => {
+      if (path !== '/admin/candidatures') return Promise.resolve({ data: [] })
+      if (Object.keys(body).length === 0) return Promise.resolve({ data: [], meta: { total: 42 } })
+      if (body.evaluateur === 'non_affecte') return Promise.resolve({ data: [], meta: { total: 7 } })
+      if (body.statut_interne === 'en_instruction') return Promise.resolve({ data: [], meta: { total: 12 } })
+      if (body.statut_interne === 'evalue') return Promise.resolve({ data: [], meta: { total: 23 } })
+      return Promise.resolve({ data: [] })
+    })
     apiClient.get.mockImplementation((path) => {
-      if (path === '/admin/candidatures') return Promise.resolve({ data: [], meta: { total: 42 } })
-      if (path === '/admin/candidatures?evaluateur=non_affecte') return Promise.resolve({ data: [], meta: { total: 7 } })
-      if (path === '/admin/candidatures?statut_interne=en_instruction') return Promise.resolve({ data: [], meta: { total: 12 } })
-      if (path === '/admin/candidatures?statut_interne=evalue') return Promise.resolve({ data: [], meta: { total: 23 } })
       if (path === '/admin/campagnes') return Promise.resolve({ data: [{ id: 'c1', nom: 'Cohorte 1 — 2026', statut: 'ouverte', date_ouverture: '2026-05-01', date_cloture: '2026-06-30', places_totales: 120 }] })
       return Promise.resolve({ data: [] })
     })
@@ -46,7 +50,8 @@ describe('AdminDashboard — 4 KPI = meta.total de 4 appels filtrés, aucun calc
   })
 
   it('erreur réseau -> alerte, pas de plantage', async () => {
-    apiClient.get.mockRejectedValue(new Error('network'))
+    apiClient.post.mockRejectedValue(new Error('network'))
+    apiClient.get.mockResolvedValue({ data: [] })
     renderScreen()
     expect(await screen.findByText(/n'a pas pu être chargé/i)).toBeInTheDocument()
   })
