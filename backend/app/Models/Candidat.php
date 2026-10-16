@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Normalizer;
 
 /**
  * CASA — profil candidat, table `candidat` (docs/mld.md §1). 1-1 avec `utilisateur`.
@@ -76,16 +77,42 @@ class Candidat extends Model
     /**
      * Normalisation utilisée pour la recherche candidatures admin (ADR-39) :
      * insensible à la casse, aux accents (`Str::ascii`), aux apostrophes et
-     * aux tirets. SOURCE UNIQUE — ne jamais dupliquer cette règle ailleurs
-     * (même principe que `NormalisationVille::classer()`).
+     * aux tirets — et, depuis le correctif prod, aux variantes de
+     * PRÉSENTATION Unicode (lettres mathématiques italiques/grasses/script,
+     * pleine largeur, ligatures) via NFKC avant la translittération ASCII.
+     * SOURCE UNIQUE — ne jamais dupliquer cette règle ailleurs (même
+     * principe que `NormalisationVille::classer()`).
      */
     public static function normaliserRecherche(?string $prenom, ?string $nom): string
     {
-        $brut = trim(($prenom ?? '').' '.($nom ?? ''));
+        $brut = trim(self::normaliserUnicode($prenom ?? '').' '.self::normaliserUnicode($nom ?? ''));
         $sansSeparateurs = str_replace(["'", '’', '-'], '', Str::ascii($brut));
         $espacesUniques = trim(preg_replace('/\s+/', ' ', $sansSeparateurs) ?? '');
 
         return mb_strtolower($espacesUniques);
+    }
+
+    /**
+     * Correctif prod (constat réel : 1 candidat/527 écrit ENTIÈREMENT en
+     * lettres Unicode « mathématiques », blocs U+1D400–U+1D7FF + U+210E —
+     * 0 lettre ASCII, `recherche_normalisee` ressortait vide). NFKC
+     * (`Normalizer::FORM_KC`) réduit ces variantes de présentation à leur
+     * forme canonique (𝑎𝑏𝑐 → abc, ℎ → h, ﬁ → fi, Ａ → A) — nécessaire
+     * AVANT `Str::ascii()` ci-dessus, qui ne connaît que le bloc Latin et
+     * supprime silencieusement tout caractère hors de ce bloc, NFKC ou pas.
+     * Garde-fou : `Normalizer` (extension `intl`) absent, ou normalisation
+     * refusée (`false`, chaîne malformée) -> valeur d'origine inchangée,
+     * jamais d'exception.
+     */
+    private static function normaliserUnicode(string $valeur): string
+    {
+        if (! class_exists(Normalizer::class)) {
+            return $valeur;
+        }
+
+        $normalisee = Normalizer::normalize($valeur, Normalizer::FORM_KC);
+
+        return $normalisee === false ? $valeur : $normalisee;
     }
 
     /**

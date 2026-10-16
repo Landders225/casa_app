@@ -240,4 +240,107 @@ class CandidatRechercheNormaliseeTest extends TestCase
             DB::table('candidat')->where('utilisateur_id', $utilisateurId)->value('recherche_normalisee'),
         );
     }
+
+    /**
+     * CORRECTIF PROD : un candidat enregistré en lettres Unicode « stylisées »
+     * (ici un jeton fictif en italique mathématique, même bloc que le cas
+     * réel constaté — U+1D400–U+1D7FF) doit être trouvable par un terme tapé
+     * en ASCII simple. Avant le correctif NFKC, `recherche_normalisee`
+     * ressortait vide pour un tel nom et cette recherche échouait.
+     */
+    public function test_terme_ascii_retrouve_un_candidat_enregistre_en_lettres_stylisees(): void
+    {
+        $this->seedContexteClassement();
+        $campagne = Campagne::ouverte()->firstOrFail();
+        $admin = $this->creerAdmin('admin@casa-demo.ci');
+        $evaluateur = $this->creerEvaluateur('eval@casa-demo.ci');
+        // "𝑇𝑒𝑠𝑡" (italique mathématique) + "𝐀𝐰𝐚" (gras mathématique) — jetons
+        // fictifs, construits caractère par caractère, pas un nom réel.
+        $candidature = $this->candidatureEvaluee($campagne, $evaluateur, 'cuisine', 60.0, 30.0, [
+            'prenom' => '𝑇𝑒𝑠𝑡', 'nom' => '𝐀𝐰𝐚',
+        ]);
+
+        $this->assertSame('test awa', $candidature->candidat->fresh()->recherche_normalisee);
+
+        $this->actingAs($admin)->postJson('/api/admin/candidatures', ['recherche' => 'test awa'])
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.numero_dossier', $candidature->numero_dossier);
+    }
+
+    /**
+     * Garde-fou : un candidat dont le nom ne contient AUCUNE lettre
+     * translittérable, même après NFKC (ici des idéogrammes fictifs —
+     * jamais un vrai nom), a une `recherche_normalisee` légitimement vide —
+     * mais reste trouvable par numéro de dossier, qui ne dépend pas de cette
+     * colonne. La recherche par nom, elle, ne le trouve pas (comportement
+     * attendu et documenté, pas un bug : rien à translittérer).
+     */
+    public function test_candidat_avec_normalisation_vide_reste_trouvable_par_numero_dossier(): void
+    {
+        $this->seedContexteClassement();
+        $campagne = Campagne::ouverte()->firstOrFail();
+        $admin = $this->creerAdmin('admin@casa-demo.ci');
+        $evaluateur = $this->creerEvaluateur('eval@casa-demo.ci');
+        $candidature = $this->candidatureEvaluee($campagne, $evaluateur, 'cuisine', 60.0, 30.0, [
+            'prenom' => '測試', 'nom' => '案例',
+        ]);
+
+        $this->assertSame('', $candidature->candidat->fresh()->recherche_normalisee);
+
+        $dossierPartiel = substr($candidature->numero_dossier, -6);
+        $this->actingAs($admin)->postJson('/api/admin/candidatures', ['recherche' => $dossierPartiel])
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.numero_dossier', $candidature->numero_dossier);
+    }
+
+    /**
+     * Migration `2026_10_16_100000_refresh_recherche_normalisee_apres_correctif_unicode` :
+     * reproduit l'état réel constaté en prod (une ligne dont
+     * `recherche_normalisee` est restée `''` à cause de l'ancienne fonction
+     * sans NFKC, sur un nom en lettres stylisées) puis rejoue
+     * `Candidat::rafraichirRechercheNormalisee()` — exactement ce que fait
+     * cette migration — pour prouver qu'elle corrige bien la ligne.
+     */
+    public function test_la_migration_de_correctif_unicode_corrige_une_ligne_restee_vide(): void
+    {
+        $utilisateurId = (string) Str::uuid();
+        $candidatId = (string) Str::uuid();
+        DB::table('utilisateur')->insert([
+            'id' => $utilisateurId,
+            'email' => 'fixture-correctif-unicode@casa-demo.ci',
+            'mot_de_passe_hash' => 'x',
+            'role' => 'candidat',
+            'actif' => true,
+            'cree_le' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        // État réel constaté : nom en lettres mathématiques (U+1D400–U+1D7FF),
+        // `recherche_normalisee` restée vide après le PREMIER backfill (lequel
+        // utilisait l'ancienne fonction, sans NFKC).
+        DB::table('candidat')->insert([
+            'id' => $candidatId,
+            'utilisateur_id' => $utilisateurId,
+            'prenom' => '𝑇𝑒𝑠𝑡',
+            'nom' => '𝐀𝐰𝐚',
+            'recherche_normalisee' => '',
+            'sexe' => 'F',
+            'date_naissance' => '2000-01-01',
+            'cni' => 'CI222222222',
+            'telephone' => '0700000002',
+            'ville_residence' => 'Abidjan - Cocody',
+            'residence_ci' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Candidat::rafraichirRechercheNormalisee();
+
+        $this->assertSame(
+            'test awa',
+            DB::table('candidat')->where('id', $candidatId)->value('recherche_normalisee'),
+        );
+    }
 }
