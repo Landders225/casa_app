@@ -793,6 +793,65 @@ gpg -c --cipher-algo AES256 -o /srv/backups/env-production-<horodatage>.gpg back
   contrainte que les sauvegardes base/pièces, point ouvert ci-dessus).
 - Restauration : `gpg -d /srv/backups/env-production-<horodatage>.gpg > backend/.env.production` (demande la phrase de passe).
 
+### 12.1bis Alerte hôte horaire (disque, témoin de sauvegarde, conteneurs)
+
+Script **`scripts-hote/alerte-casa.py`**, dans le dépôt : contrôle, à chaque
+exécution, l'occupation disque (`/` et `/home`), l'âge du témoin
+`.derniere-sauvegarde-ok` écrit par `backup-db.sh` (§12.1), l'accès à Docker
+(`docker info`) et l'état de chaque conteneur (`casa-postgres-1`,
+`casa-backend-1`, `casa-frontend-1`, `casa-nginx-1`, `casa-worker-1`) ; envoie
+UN SEUL e-mail groupé si au moins un contrôle est en alerte, un rappel au
+bout de 24 h si rien n'a changé, un e-mail « RÉSOLU » au retour à la normale,
+et un rapport hebdomadaire de vie même quand tout va bien (preuve que le
+canal d'alerte fonctionne). Tourne comme le compte de déploiement (`casa`,
+**pas root**) ; ne dépend d'aucun conteneur ni de `docker compose` pour lire
+ses propres identifiants SMTP — il lit **directement**
+`backend/.env.production` sur le disque avec un petit parseur Python dédié
+(mêmes règles de guillemets/`#`/`$` que Docker Compose, vérifiées
+empiriquement), pour continuer à fonctionner même si Docker ou la stack sont
+en panne — c'est justement l'un des cas qu'il doit savoir détecter.
+
+#### Pourquoi (incidents des 17 et 19/10/2026)
+
+Le 17/10, le worker Laravel est mort silencieusement ; le 19/10, le disque
+racine de jupiter a atteint 100 % pendant ~36 h (§12.1 ci-dessus). Dans les
+deux cas, personne n'a été prévenu avant qu'un utilisateur ne remarque le
+problème. `alerte-casa.py`, lancé chaque heure par cron, comble ce trou.
+
+```bash
+chmod +x scripts-hote/alerte-casa.py    # déjà exécutable dans le dépôt, au cas où
+crontab -e
+# ajouter (adresses réelles à la place des exemples, séparées par des
+# virgules, JAMAIS écrites dans ce dépôt) :
+5 * * * * ALERTE_DESTINATAIRES="vous@exemple.org,autre@exemple.org" /opt/casa/scripts-hote/alerte-casa.py >> /home/casa/.alerte-casa/cron.log 2>&1
+```
+
+Vérification manuelle avant la mise en cron (envoie un vrai e-mail de test
+aux destinataires, respecte le même pinning de certificat que la prod) :
+```bash
+ALERTE_DESTINATAIRES="vous@exemple.org" /opt/casa/scripts-hote/alerte-casa.py --tester-envoi
+```
+
+Toutes les variables d'environnement reconnues (seuils, chemins, noms des
+conteneurs, délais anti-bruit) sont documentées en tête du script
+lui-même — s'y référer plutôt qu'ici pour ne pas désynchroniser deux
+descriptions (piège déjà rencontré pour `backup-db.sh`, cf. §12.1). Point
+notable : `BACKUP_DIR` doit être positionné à la **même valeur** que celle
+réellement utilisée par `backup-db.sh` sur ce serveur (`/srv/backups` par
+défaut dans ce script-ci, mais `/home/casa/backups` est le défaut
+d'`alerte-casa.py` — à aligner explicitement dans le cron, sinon fausse
+alerte permanente sur le témoin de sauvegarde).
+
+État anti-bruit (fichiers JSON par contrôle) et verrou conservés dans
+`/home/casa/.alerte-casa/` (`ALERTE_ETAT_DIR`) — à ne jamais toucher à la
+main ; les supprimer force simplement un nouvel e-mail « nouveau problème »
+au prochain passage même si l'alerte est déjà connue.
+
+**Hors périmètre, non câblé par ce script** (comme pour
+`php artisan queue:monitor`, §9.3/§9.4) : aucune supervision externe
+(Nagios, Uptime Kuma, etc.) — c'est actuellement le SEUL mécanisme
+d'alerte de la plateforme.
+
 ### 12.2 (fusionné dans §12.1 — le script sauvegarde les deux en un passage)
 
 ### 12.3 Restauration

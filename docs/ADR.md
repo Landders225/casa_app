@@ -797,6 +797,30 @@ Découvert en écrivant l'E2E : `Entretien.jsx` ne proposait **aucune UI** pour 
 
 ---
 
+## ADR-41 — Alerte hôte horaire : disque, témoin de sauvegarde, conteneurs (`alerte-casa.py`)
+
+**Contexte.** Le 17/10/2026, le worker Laravel (traitement des e-mails en file) est mort silencieusement ; le 19/10/2026, le disque racine de jupiter a atteint 100 % pendant ~36 h (cf. ADR-40). Dans les deux cas, personne n'a été prévenu avant qu'un utilisateur ne constate le problème — aucun mécanisme d'alerte n'existe sur jupiter en dehors d'une relecture manuelle des logs.
+
+**Décision — `scripts-hote/alerte-casa.py`, lancé par cron chaque heure, sur le compte de déploiement (`casa`, PAS root) :**
+- **Contrôles** : occupation disque (`/` et `/home`, seuil configurable, défaut 85 %), âge du témoin `.derniere-sauvegarde-ok` écrit par `backup-db.sh` (ADR-40 ; défaut : alerte au-delà de 26 h), accès Docker (`docker info`), état de chacun des 5 conteneurs (`running` + `healthy`/sans healthcheck).
+- **Lecture directe de `backend/.env.production` sur le disque, SANS `docker compose config`** : décision explicitement demandée — `docker compose config` résoudrait et afficherait TOUS les secrets de production pour n'en lire que les 10 clés `MAIL_*`, et rendrait le script dépendant de Docker pour fonctionner, alors que « Docker est en panne » est précisément l'un des cas qu'il doit savoir détecter indépendamment. À la place : un parseur Python dédié (`lire_env_production`), dont les règles (guillemets simples/doubles, `#` littéral vs commentaire selon l'espace précédent, `\"` échappé, contenu après un guillemet fermant ignoré, **aucune interpolation `${VAR}`**, coupure sur le premier `=` seulement) ont été établies **empiriquement** par sondage de `docker compose config` sur des fichiers `.env` 100 % fictifs, afin de garantir que ce que le script lit correspond exactement à ce que le conteneur backend reçoit réellement.
+- **Schéma SMTP et pinning identiques à `App\Mail`** : `determiner_schema()` réplique exactement `MailManager::transportConfig` (vide + port 465 → `smtps`, sinon `smtp` ; seuls `smtp`/`smtps` sont acceptés, conformément à `EsmtpTransportFactory::getSupportedSchemes()`) plutôt que de supposer STARTTLS par défaut. L'empreinte SHA-256 du certificat (`MAIL_PEER_FINGERPRINT`, normalisée comme `App\Mail\PeerFingerprint`) est vérifiée **avant toute authentification** (avant `login()`), pour les deux transports (`SMTP.starttls()` et `SMTP_SSL`) — une empreinte différente interrompt la connexion sans qu'aucune commande `AUTH` ne soit jamais envoyée, et sans jamais placer le mot de passe dans un message d'erreur.
+- **Anti-bruit** : un seul e-mail groupé par passage (jamais un message par contrôle en alerte), état persistant par contrôle (`ALERTE_ETAT_DIR/*.json`, écriture atomique), rappel après `ALERTE_RAPPEL_HEURES` (défaut 24 h) si rien n'a changé, e-mail « RÉSOLU » au retour à la normale, **aucun état marqué comme traité si l'envoi SMTP échoue** (nouvel essai à l'heure suivante, jamais de faux « c'est fait »). Rapport hebdomadaire de vie (`ALERTE_RAPPORT_HEBDO_JOURS`, défaut 7 j) même quand tout va bien — preuve que le canal fonctionne, lui aussi soumis à la même règle (non marqué envoyé si l'envoi échoue).
+- **Verrou `flock`** anti-double-exécution (cron se chevauchant avec un lancement manuel), acquis avant toute autre action.
+- **Codes de sortie dédiés** : 0 OK, 1 configuration manquante, 2 verrou pris, 3 fichier d'environnement illisible, 4 échec d'envoi SMTP.
+
+**Testabilité.** `scripts-hote/tests/test-alerte-casa.py` — fonctions pures testées directement (parseur d'environnement, résolution de schéma, normalisation d'empreinte, calcul de pourcentage disque) ; témoin de sauvegarde et conteneurs testés contre des fixtures Docker réelles et jetables ; scénario complet d'anti-bruit (nouveau → silence → rappel 24 h → résolu → rapport hebdomadaire) exercé par invocation RÉELLE du script en sous-processus, avec le temps simulé (`ALERTE_MAINTENANT_ISO`) et l'envoi intercepté dans un fichier (`ALERTE_ENVOI_STUB_FICHIER`) plutôt que mocké au niveau du code ; non-fuite du mot de passe fictif vérifiée dans TOUTE sortie (stdout, stderr, log, fichier stub) ; **pinning de certificat vérifié contre un vrai petit serveur TLS de test local** (certificat auto-signé généré par le test via `openssl`), pour les deux schémas `smtp`+STARTTLS et `smtps`, empreinte correcte (l'e-mail part réellement, `AUTH` est reçu) et incorrecte (connexion fermée, `AUTH` jamais reçu, message d'erreur sans le mot de passe). Exécuté réellement le 2026-10-20 dans un conteneur `docker:27-cli` avec accès au démon Docker de l'hôte (même nécessité qu'ADR-40 : `flock` n'existe pas sous Git Bash Windows) — **72 assertions, 0 échec**. Non couvert : un vrai fournisseur SMTP externe (le serveur de test est un sous-ensemble minimal du protocole, à seule fin de test) ; une vraie panne réseau sortante du serveur hôte.
+
+**Non traité ici** (hors demande) : pose effective du cron sur jupiter (procédure documentée, à exécuter par l'équipe, adresses réelles jamais écrites dans ce dépôt) ; toute supervision externe du mécanisme lui-même (Nagios, Uptime Kuma…) — c'est aujourd'hui le SEUL canal d'alerte de la plateforme, une panne du compte `casa`, de `cron`, ou du réseau sortant resterait invisible.
+
+**Tests.** `scripts-hote/tests/test-alerte-casa.py` (13 groupes de scénarios, détail ci-dessus).
+
+**Documentation.** `docs/DEPLOIEMENT.md` § 12.1bis (installation, cron, `--tester-envoi`, variables, piège `BACKUP_DIR` à aligner avec `backup-db.sh`).
+
+**Divergences maquette.** Aucune (script d'exploitation, aucun écran).
+
+---
+
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)
 
 > **Inventaire vivant à jour : [`docs/POINTS-OUVERTS.md`](POINTS-OUVERTS.md)** (Lot 9c, ADR-28).
