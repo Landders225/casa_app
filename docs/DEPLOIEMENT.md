@@ -674,53 +674,96 @@ devtools).
 sudo mkdir -p /srv/backups && sudo chown "$USER":"$USER" /srv/backups
 ```
 
-Script **`scripts-hote/backup-db.sh`**, dans le dépôt (committé — plus besoin de
-le recréer à la main sur chaque serveur) : dump PostgreSQL compressé **ET**
-archive du volume `casa_documents_data` (pièces justificatives) en un seul
-passage, permissions `600`, rétention configurable. Cible les conteneurs par
-leur nom **fixe** (`casa-postgres-1`, volume `casa_documents_data` — identique
-en mode test-local **et** Apache, `name: casa` dans tous les overlays) : ce
-script ne lit aucun `.env` et continue de fonctionner sans modification à
-travers un changement de mode.
+Script **`scripts-hote/backup-db.sh`**, dans le dépôt : dump PostgreSQL
+compressé **ET** archive du volume `casa_documents_data` (pièces
+justificatives) en un seul passage, **écriture atomique et vérifiée**
+(`.partial` → intégrité → renommage), **rotation par NOMBRE** (pas par âge),
+**contrôle d'espace avant d'écrire**, verrou anti-double-exécution. Cible les
+conteneurs par leur nom **fixe** (`casa-postgres-1`, volume
+`casa_documents_data` — identique en mode test-local **et** Apache, `name:
+casa` dans tous les overlays) : ce script ne lit aucun `.env` et continue de
+fonctionner sans modification à travers un changement de mode. Tourne comme
+le compte de déploiement (`casa`, membre du groupe `docker`) — **pas root**.
+
+#### Incident du 19/10/2026 — disque racine de jupiter plein ~36 h
+
+Cause réelle (pas une absence de rotation : le script alors actif en avait
+une, 7 jours, et elle fonctionnait) : l'archive des pièces (~1,2 à 1,9 Go
+chacune) s'accumulait sur un disque **partagé** avec les builds Docker et
+Maarch (23 Go) ; le disque a fini par manquer d'espace un soir, et le script
+d'alors n'avait ni contrôle d'espace préalable ni écriture atomique — le
+dump et l'archive de cette nuit-là sont restés **tronqués**, indiscernables
+d'une sauvegarde réussie, sans ligne d'erreur distincte dans `backup.log`
+(juste l'absence de ligne `OK`, jamais surveillée). `scripts-hote/backup-db.sh`
+corrige les deux : il refuse de démarrer si l'espace est insuffisant, et
+n'expose jamais un fichier `.partial`/tronqué sous son nom final.
+
+**Pic d'occupation disque pendant une sauvegarde** : jusqu'à
+`RETENTION_DOCS_COUNT` archives documents déjà en place (défaut **3**, ~1,8 Go
+chacune observé en prod) + la nouvelle en cours d'écriture ≈ 4 × 1,8 Go
+≈ **7,2 Go**, plus le **plancher de 3 Go** que le script exige de garder
+libres après coup — prévoir **~10 Go** de marge sur la partition de
+`BACKUP_DIR`.
 
 ```bash
 chmod +x scripts-hote/backup-db.sh    # déjà exécutable dans le dépôt, au cas où
 crontab -e
-# ajouter (BACKUP_DIR/RETENTION_DAYS par défaut : /srv/backups, 14 jours) :
+# ajouter (valeurs par défaut : BACKUP_DIR=/srv/backups,
+# RETENTION_DB_COUNT=14, RETENTION_DOCS_COUNT=3) :
 15 2 * * * /opt/casa/scripts-hote/backup-db.sh >> /srv/backups/backup.log 2>&1
 ```
 
 Sortie attendue (dans `backup.log`) :
 ```
-[2026-10-06T02:15:03+00:00] Sauvegarde OK : /srv/backups/casa-db-20261006-021503.sql.gz (…), /srv/backups/casa-documents-20261006-021503.tar.gz (…)
+[2026-10-20T02:15:03+00:00] Espace disponible avant sauvegarde : 42 Go (requis : 200 Mo + plancher 3 Go).
+[2026-10-20T02:15:04+00:00] Dump PostgreSQL OK : /srv/backups/casa-db-20261020-021503.sql.gz (…).
+[2026-10-20T02:15:35+00:00] Archive pièces OK : /srv/backups/casa-documents-20261020-021503.tar.gz (…).
+[2026-10-20T02:15:35+00:00] Sauvegarde OK : /srv/backups/casa-db-20261020-021503.sql.gz (…), /srv/backups/casa-documents-20261020-021503.tar.gz (…)
+```
+En cas d'échec, à n'importe quelle étape, une ligne `ÉCHEC (code N)` est
+toujours écrite (codes de sortie documentés en tête du script), et
+`/srv/backups/.derniere-sauvegarde-ok` (horodatage de la dernière réussite)
+n'est **pas** mis à jour — surveillable par une alerte externe (non
+construite ici : simple fichier témoin).
+
+**Audit sans suppression** des archives déjà en place (intégrité +
+lisibilité, utile après l'incident ou lors de la bascule ci-dessous) :
+```bash
+scripts-hote/backup-db.sh --verifier-existant
 ```
 
-⚠️ **Réalité sur jupiter (06/10/2026)** : le cron actif n'utilise PAS ce
-script committé, mais un script **PROVISOIRE, HORS DÉPÔT** :
+**Règle à suivre avant tout build ou sauvegarde manuelle** :
+```bash
+df -h /
+```
+
+#### Bascule depuis le script provisoire (hors dépôt)
+
+Jusqu'au 19/10/2026, le cron de `casa` pointait vers un script **PROVISOIRE,
+HORS DÉPÔT**, `/home/casa/backup-casa-provisoire.sh` (rétention 7 jours par
+âge, pas d'écriture atomique, pas de contrôle d'espace — cf. incident
+ci-dessus). Procédure de bascule (exécutée à la main, pas par ce script) :
 
 ```bash
-15 2 * * * /home/casa/backup-casa-provisoire.sh >> /srv/backups/backup.log 2>&1
+# 1. Essai manuel du script durci, AVANT de toucher au cron :
+/opt/casa/scripts-hote/backup-db.sh
+tail -5 /srv/backups/backup.log
+cat /srv/backups/.derniere-sauvegarde-ok   # doit afficher un horodatage récent
+
+# 2. Conserver le provisoire sous un nom inerte (pas supprimé, juste retiré
+#    du cron) jusqu'à la première nuit réussie du nouveau script :
+mv /home/casa/backup-casa-provisoire.sh /home/casa/backup-casa-provisoire.sh.inactif
+
+# 3. Remplacer la commande du cron existant (même horaire, même compte) :
+crontab -e
+# remplacer la ligne 15 2 * * * .../backup-casa-provisoire.sh ...
+# par           15 2 * * * /opt/casa/scripts-hote/backup-db.sh >> /srv/backups/backup.log 2>&1
 ```
 
-`/home/casa/backup-casa-provisoire.sh` (pas versionné) fait :
-- `pg_dump` de la base `casa`, compressé (`gzip`) ;
-- une archive (`tar`) du volume `casa_documents_data`, via un conteneur
-  `alpine` jetable — root DANS le conteneur (pour lire le volume quelles que
-  soient ses permissions), puis `chown` du fichier produit vers l'UID de
-  l'hôte (le compte de déploiement en reste propriétaire, pas root) ;
-- sortie dans `/srv/backups`, permissions `600` ;
-- rétention **7 jours** (`find ... -mtime +7 -delete`) ;
-- une ligne `Sauvegarde OK` dans `backup.log` en cas de succès.
-
-**Point ouvert** : ces sauvegardes restent SUR LE MÊME SERVEUR
+**Point ouvert** (inchangé) : ces sauvegardes restent SUR LE MÊME SERVEUR
 (`/srv/backups`, même disque que la base) — une copie hors site (autre
 machine, stockage objet...) n'est pas encore définie. Un sinistre touchant
 le disque de jupiter emporterait aussi les sauvegardes. À planifier.
-
-**Écart à résorber** (pas traité dans ce lot) : le script committé
-`scripts-hote/backup-db.sh` et le script provisoire réellement actif sur
-jupiter ne sont PAS le même fichier — à terme, consolider sur un seul
-(committé, testé, déployé).
 
 #### Copie chiffrée de `backend/.env.production` (manuelle, hors dépôt)
 
