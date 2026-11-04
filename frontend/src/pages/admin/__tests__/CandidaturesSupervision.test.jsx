@@ -224,3 +224,191 @@ describe('CandidaturesSupervision — élimination manuelle mono-cible (Lot 8d-3
     expect(screen.getByRole('dialog', { name: 'Éliminer ce dossier ?' })).toBeInTheDocument()
   })
 })
+
+/**
+ * Sélection « tous les N résultats » + répartition automatique (ADR-45).
+ * Aucun identifiant de dossier n'est envoyé : critères + nombres seulement.
+ */
+const APERCU = {
+  nombre_correspondants: 45,
+  nombre_affectables: 40,
+  ignores: { deja_affectes: 3, non_eligibles: 2, statut_non_affectable: 0 },
+  evaluateurs: [
+    { id: 'eval-2', prenom: 'Aya', nom: 'Bamba', charge_actuelle: 0, a_recevoir: 20, charge_finale: 20 },
+    { id: 'eval-1', prenom: 'Yann', nom: 'Kacou', charge_actuelle: 0, a_recevoir: 20, charge_finale: 20 },
+  ],
+}
+
+function mockListeLongue({ apercu = () => Promise.resolve({ data: APERCU }), execution } = {}) {
+  mockCandidatures({
+    candidatures: [candidature(), candidature({ id: 'c-2', numero_dossier: 'CASA-2026-000002' })],
+    meta: { current_page: 1, last_page: 3, total: 45 },
+  })
+  const liste = apiClient.post.getMockImplementation()
+  apiClient.post.mockImplementation((path, body) => {
+    if (path === '/admin/affectations/automatique/apercu') return apercu(body)
+    if (path === '/admin/affectations/automatique') {
+      return execution ? execution(body) : Promise.resolve({ data: { ...APERCU, affectees: 40 } })
+    }
+    return liste(path, body)
+  })
+}
+
+async function passerEnModeTous(user) {
+  await screen.findByText('CASA-2026-000001')
+  await user.click(screen.getByRole('checkbox', { name: 'Tout sélectionner' }))
+  await user.click(screen.getByRole('button', { name: /sélectionner les 45 dossiers correspondant/i }))
+}
+
+const appelsPost = (path) => apiClient.post.mock.calls.filter(([p]) => p === path)
+
+describe('CandidaturesSupervision — sélection de tous les résultats (ADR-45)', () => {
+  it("la case d'en-tête coche la page, puis le bandeau propose les N résultats", async () => {
+    mockListeLongue()
+    renderScreen()
+    const user = userEvent.setup()
+    await screen.findByText('CASA-2026-000001')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Tout sélectionner' }))
+    expect(screen.getByText(/les 2 dossiers de cette page sont sélectionnés/i)).toBeInTheDocument()
+    // Mode page : seule l'affectation manuelle est proposée.
+    expect(screen.getByRole('button', { name: /affecter \(2\)/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /répartir automatiquement/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /sélectionner les 45 dossiers correspondant/i }))
+
+    expect(screen.getByText(/les 45 dossiers correspondant à votre recherche et vos filtres sont sélectionnés/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /répartir automatiquement \(45\)/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /affecter \(/i })).not.toBeInTheDocument()
+    const ligne = screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i })
+    expect(ligne).toBeChecked()
+    expect(ligne).toBeDisabled()
+  })
+
+  it('« Tout désélectionner » quitte le mode et vide la sélection', async () => {
+    mockListeLongue()
+    renderScreen()
+    const user = userEvent.setup()
+    await passerEnModeTous(user)
+
+    await user.click(screen.getByRole('button', { name: 'Tout désélectionner' }))
+
+    expect(screen.queryByRole('button', { name: /répartir automatiquement/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /affecter \(/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i })).not.toBeChecked()
+  })
+
+  it('changer un filtre OU de page vide le mode « tous » (ADR-39 inchangé)', async () => {
+    mockListeLongue()
+    renderScreen()
+    const user = userEvent.setup()
+
+    await passerEnModeTous(user)
+    await user.selectOptions(screen.getByDisplayValue('Tous les statuts'), 'soumis')
+    await waitFor(() => expect(screen.queryByRole('button', { name: /répartir automatiquement/i })).not.toBeInTheDocument())
+
+    await passerEnModeTous(user)
+    await user.click(screen.getByRole('button', { name: 'Page suivante' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: /répartir automatiquement/i })).not.toBeInTheDocument())
+  })
+
+  it("aperçu (critères figés, aucun id) puis confirmation -> POST avec les nombres de l'aperçu, succès annoncé", async () => {
+    mockListeLongue()
+    renderScreen()
+    const user = userEvent.setup()
+    await screen.findByText('CASA-2026-000001')
+    await user.selectOptions(screen.getByDisplayValue('Toutes les filières'), 'cuisine')
+    await passerEnModeTous(user)
+    const listeAvant = appelsPost('/admin/candidatures').length
+
+    await user.click(screen.getByRole('button', { name: /répartir automatiquement \(45\)/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Répartir automatiquement' })
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/affectations/automatique/apercu', {
+      criteres: { filiere: 'cuisine' },
+      nombre_correspondants: 45,
+    }))
+    expect(await within(dialog).findByText(/40 dossiers seront répartis entre 2 évaluateurs : 20 chacun/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/5 ignorés : 3 déjà affecté\(s\), 2 non éligible\(s\)/i)).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Répartir 40 dossiers' }))
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/affectations/automatique', {
+      criteres: { filiere: 'cuisine' },
+      nombre_correspondants: 45,
+      nombre_affectables: 40,
+    }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('40 dossiers répartis entre 2 évaluateurs.')
+    expect(screen.queryByRole('button', { name: /répartir automatiquement/i })).not.toBeInTheDocument()
+    await waitFor(() => expect(appelsPost('/admin/candidatures').length).toBeGreaterThan(listeAvant))
+    for (const [path, body] of apiClient.post.mock.calls) {
+      if (path.startsWith('/admin/affectations/automatique')) expect(body).not.toHaveProperty('candidature_ids')
+    }
+  })
+
+  it("décocher un évaluateur relance l'aperçu avec la restriction", async () => {
+    mockListeLongue()
+    renderScreen()
+    const user = userEvent.setup()
+    await passerEnModeTous(user)
+    await user.click(screen.getByRole('button', { name: /répartir automatiquement/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Répartir automatiquement' })
+    await within(dialog).findByText(/seront répartis/i)
+
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Aya Bamba' }))
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/affectations/automatique/apercu', {
+      criteres: {},
+      nombre_correspondants: 45,
+      evaluateur_ids: ['eval-1'],
+    }))
+  })
+
+  it('409 à la confirmation -> message verbatim, modal ouvert, confirmation bloquée jusqu’au recalcul', async () => {
+    mockListeLongue({
+      execution: () => Promise.reject(new ApiError('http', {
+        status: 409,
+        message: "Les dossiers affectables ont changé (39 au lieu de 40) : recalculez l'aperçu et reconfirmez.",
+        payload: { code: 'liste_modifiee' },
+      })),
+    })
+    renderScreen()
+    const user = userEvent.setup()
+    await passerEnModeTous(user)
+    await user.click(screen.getByRole('button', { name: /répartir automatiquement/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Répartir automatiquement' })
+    await user.click(await within(dialog).findByRole('button', { name: 'Répartir 40 dossiers' }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('39 au lieu de 40')
+    expect(within(dialog).getByRole('button', { name: 'Répartir 40 dossiers' })).toBeDisabled()
+
+    const apercusAvant = appelsPost('/admin/affectations/automatique/apercu').length
+    await user.click(within(dialog).getByRole('button', { name: "Recalculer l'aperçu" }))
+    await waitFor(() => expect(appelsPost('/admin/affectations/automatique/apercu').length).toBe(apercusAvant + 1))
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Répartir 40 dossiers' })).toBeEnabled())
+  })
+
+  it("liste modifiée dès l'aperçu -> fermer recharge la liste et vide la sélection", async () => {
+    mockListeLongue({
+      apercu: () => Promise.reject(new ApiError('http', {
+        status: 409,
+        message: 'La liste a changé (46 dossiers correspondent au lieu de 45) : rechargez la liste et reconfirmez votre sélection.',
+        payload: { code: 'liste_modifiee' },
+      })),
+    })
+    renderScreen()
+    const user = userEvent.setup()
+    await passerEnModeTous(user)
+    const listeAvant = appelsPost('/admin/candidatures').length
+    await user.click(screen.getByRole('button', { name: /répartir automatiquement/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Répartir automatiquement' })
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('46 dossiers correspondent au lieu de 45')
+
+    await user.click(within(dialog).getByRole('button', { name: 'Annuler' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /répartir automatiquement/i })).not.toBeInTheDocument()
+    await waitFor(() => expect(appelsPost('/admin/candidatures').length).toBeGreaterThan(listeAvant))
+  })
+})

@@ -886,6 +886,48 @@ Découvert en écrivant l'E2E : `Entretien.jsx` ne proposait **aucune UI** pour 
 
 ---
 
+## ADR-45 — Affectation automatique par critères : « tous les N résultats » répartis entre évaluateurs
+
+**Contexte.** Page admin « Candidatures » : la case « tout sélectionner » ne couvre que la page affichée (20 lignes), et la sélection est vidée à chaque changement de page, de filtre, de tri ou de recherche (règle voulue pour la sécurité des actions de masse). À l'échelle d'une vraie campagne (230 dossiers soumis à la clôture de « Cohorte 1 — 2026 »), l'affectation un évaluateur à la fois, page par page, n'est pas praticable. L'administration veut sélectionner TOUS les dossiers correspondant aux filtres et laisser le système les répartir.
+
+**Préalable (commit séparé) — corrections de l'affectation manuelle.** Audit de `POST /admin/affectations` : (1) un dossier ÉLIMINÉ restait affectable, puisque l'élimination ne touche que `statut_eligibilite_interne` et laisse `statut_interne` à `soumis`/`en_instruction`. Il est désormais refusé (422 atomique, message dédié « dossier non éligible », numéros listés). (2) Un évaluateur au compte DÉSACTIVÉ pouvait recevoir des dossiers. Il est désormais refusé (422), et `GET /admin/evaluateurs` ne liste plus que les comptes actifs. **Conséquence assumée** : le filtre « Évaluateur » de la supervision, alimenté par la même liste, ne propose plus un évaluateur désactivé (ses dossiers restent visibles sans ce filtre).
+
+**Décision — sélection PAR CRITÈRES, jamais par liste d'identifiants :**
+- **Source unique des filtres** : `App\Domain\Supervision\FiltreCandidatures` (règles de validation + application), extraite à l'identique de `CandidatureSupervisionController`. La recherche paginée ET l'affectation automatique l'utilisent : « les N dossiers correspondant à vos critères » sont, par construction, exactement le `meta.total` de la liste. Côté client, `criteresSupervision()` (`useCandidaturesAdmin.js`) est la source unique du corps envoyé.
+- **Deux routes POST, administrateur strict** (ADR-39 : le terme de recherche, potentiellement un nom, reste dans le corps et n'atteint jamais une URL archivée par les journaux d'accès) :
+  - `POST /api/admin/affectations/automatique/apercu` `{ criteres, evaluateur_ids?, nombre_correspondants }` — RIEN n'est écrit ;
+  - `POST /api/admin/affectations/automatique` `{ …, nombre_affectables }` — exécution.
+  `criteres` est validé en `array:<clés>` : une clé hors liste blanche (tri, page, `inclure_brouillons`…) donne un 422, jamais ignorée en silence.
+- **Dossiers affectés parmi les N** : `soumis` ET non affectés ET non `non_eligible`. Les dossiers **déjà affectés sont toujours ignorés** : aucune option « réaffecter », la réaffectation reste un acte manuel. Brouillons toujours exclus (comme la liste). L'aperçu détaille les ignorés (déjà affectés / non éligibles / statut non affectable).
+- **Évaluateurs** : par défaut tous les évaluateurs ACTIFS ; restriction possible (`evaluateur_ids`), chacun devant être un évaluateur actif (sinon 422).
+- **Répartition « toujours le moins chargé »** (`RepartitionEquilibree`, fonction pure) : dossiers pris par `numero_dossier` croissant (indépendamment du tri affiché). Chacun va à l'évaluateur de charge courante minimale ; à égalité, départage par nom, prénom, id. Les écarts de charge existants sont comblés d'abord, puis la répartition est égale à une unité près. Déterministe.
+- **Charge existante** = dossiers `en_instruction` de l'évaluateur dans la ou les campagnes des dossiers concernés (pas les cohortes précédentes ; les dossiers `evalue` ne comptent pas).
+
+**Garde-fous** (un code applicatif chacun, via `App\Exceptions\AffectationAutomatiqueRefusee`, même forme `{message, code}` que `CampagneFermeeException`, ADR-44) :
+- N recalculé > **1 000** → 422 `plafond_depasse` (« affinez vos filtres ») ;
+- N recalculé ≠ N attendu (le client envoie le nombre qu'il a vu) → 409 `liste_modifiee` (« rechargez et reconfirmez ») ;
+- à l'exécution, M recompté **sous verrou** (`SELECT … FOR UPDATE`) ≠ M de l'aperçu → 409 `liste_modifiee` ;
+- une campagne concernée déjà **publiée** → 409 `campagne_publiee`. Une campagne **clôturée** reste autorisée (c'est le cas normal) ;
+- évaluateur restreint invalide → 422 `evaluateur_invalide` ; aucun actif → 422 `aucun_evaluateur` ; rien d'affectable → 422 `rien_a_affecter`.
+
+L'exception implémente **`ShouldntReport`** : un refus est une réponse métier normale et n'atteint jamais les logs applicatifs. **Trouvé au smoke curl** : sans cette interface, Laravel journalise l'exception malgré son `render()`, et en dev (fichier `laravel.log` non inscriptible) le refus se transformait en 500.
+
+**Transaction unique, idempotence.** Verrou, recomptage, puis **un `UPDATE` par évaluateur** (pas un par dossier), dont la clause `WHERE` revérifie les conditions d'affectabilité. Si le nombre de lignes modifiées diffère, tout est annulé. Une seconde exécution ne trouve plus aucun dossier libre (409 sur rejeu, 422 `rien_a_affecter` sur nouvel aperçu) : aucun dossier ne reçoit deux affectations. Une affectation concurrente attend le verrou, puis PostgreSQL réévalue les lignes : le recomptage échoue proprement.
+
+**Journal d'audit** : 1 ligne globale `Affectation automatique` contenant **uniquement des nombres** (« 212 dossiers répartis entre 4 évaluateurs »), plus **1 ligne par dossier**, même forme que l'affectation manuelle (D-6a-1) : `Affectation évaluateur`, numéro de dossier, nom de l'évaluateur, `motif = 'Répartition automatique'`. C'est la traçabilité en cas de litige, stockée dans le journal d'audit en base (append-only), pas dans les logs applicatifs. Les réponses de l'API ne contiennent que des nombres et les évaluateurs, jamais un dossier ni un candidat.
+
+**Interface.** La case d'en-tête coche la PAGE. Un bandeau propose alors « Sélectionner les N dossiers correspondant à votre recherche et vos filtres ». En mode « tous », la mention est explicite, il y a un « Tout désélectionner », les cases de ligne sont cochées et désactivées (pas d'exclusion individuelle) et le seul bouton est « Répartir automatiquement (N) ». Le mode page garde uniquement l'affectation manuelle à un évaluateur. Le mode « tous » fige les critères et N au clic, et il est vidé comme la sélection à tout changement de recherche, de filtre, de tri ou de page : la règle de la page n'est pas assouplie. La modale affiche l'aperçu serveur (affectables, ignorés, charge actuelle / à recevoir / finale par évaluateur, évaluateurs cochables) avant toute écriture. Sur un refus, le message serveur est affiché tel quel et la confirmation reste bloquée jusqu'à un nouvel aperçu. Au passage : la case « Tout sélectionner » était dans un `<th aria-hidden="true">`, donc invisible des lecteurs d'écran (corrigé), et les boutons de pagination reçoivent un `aria-label`.
+
+**Performance.** 300 dossiers / 4 évaluateurs : 0,33 s et 316 requêtes SQL dans le test de volume (dont 301 insertions au journal ; les écritures `candidature` sont 4 `UPDATE`).
+
+**Tests.** `AffectationAutomatiqueTest` (22 cas : un échec par garde-fou, répartition, déterminisme, ensemble ignoré, égalité N = `meta.total` de la liste, charge par campagne, idempotence, journal, non-fuite, non-journalisation applicative, droits, volume) ; `RepartitionEquilibreeTest` (fonction pure) ; `AffectationTest` / `EvaluateursListeTest` complétés (préalable) ; `SupervisionCandidaturesTest` inchangé et vert (non-régression de la recherche après extraction) ; vitest `CandidaturesSupervision.test.jsx` (+7 : bandeau, mode « tous », réinitialisation sur filtre et page, aperçu puis confirmation sans aucun id, restriction d'évaluateurs, 409 à la confirmation, liste modifiée dès l'aperçu).
+
+**Points ouverts** (`docs/POINTS-OUVERTS.md`) : plafond de charge par évaluateur, répartition par filière / spécialité, conflits d'intérêts, exclusion individuelle de dossiers en mode « tous ».
+
+**Divergences maquette.** La maquette n'offre que l'affectation à un évaluateur sur une sélection de page : la répartition automatique est un ajout.
+
+---
+
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)
 
 > **Inventaire vivant à jour : [`docs/POINTS-OUVERTS.md`](POINTS-OUVERTS.md)** (Lot 9c, ADR-28).

@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
  * `Candidat::normaliserRecherche()` (lot recherche-admin, ADR-39) — SOURCE
  * UNIQUE utilisée à la fois pour précalculer `recherche_normalisee` (hook
  * `Candidat::booted()`) et pour normaliser le terme tapé côté contrôleur
- * (`CandidatureSupervisionController::appliquerRecherche()`). Test PUR (pas
+ * (`FiltreCandidatures::appliquerRecherche()`). Test PUR (pas
  * de DB) : la fonction est statique et déterministe. Jetons fictifs
  * uniquement.
  */

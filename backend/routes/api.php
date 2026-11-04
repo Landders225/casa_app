@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Piece\ContraintesFichier;
+use App\Http\Controllers\Api\Admin\AffectationAutomatiqueController;
 use App\Http\Controllers\Api\Admin\AffectationController;
 use App\Http\Controllers\Api\Admin\AuditController;
 use App\Http\Controllers\Api\Admin\CampagneController as AdminCampagneController;
@@ -131,6 +132,10 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
         */
         // Affectation d'un évaluateur (résout D-4a-1).
         Route::post('/affectations', [AffectationController::class, 'store']);
+        // Affectation automatique par critères (ADR-45) : aperçu puis exécution,
+        // sélection par filtres (jamais par liste d'identifiants), POST (ADR-39).
+        Route::post('/affectations/automatique/apercu', [AffectationAutomatiqueController::class, 'apercu']);
+        Route::post('/affectations/automatique', [AffectationAutomatiqueController::class, 'store']);
         // Vue de supervision transverse + recherche serveur (ADR-39 : POST pour ne
         // pas archiver les noms de candidats recherchés dans les access log).
         Route::post('/candidatures', [CandidatureSupervisionController::class, 'rechercher']);

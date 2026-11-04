@@ -6,12 +6,13 @@ import { Spinner } from '../../components/ui/Spinner.jsx'
 import { apiClient } from '../../lib/apiClient.js'
 import { formatDateFr } from '../../lib/formatDate.js'
 import { evaluateurDossierPath } from '../../routing/routes.js'
+import { AffectationAutomatiqueModal } from './AffectationAutomatiqueModal.jsx'
 import { AssignModal } from './AssignModal.jsx'
 import { MotifConfirmDialog } from './MotifConfirmDialog.jsx'
 import { DECISION_FILTRE_OPTIONS, DECISION_LABELS, ELIGIBILITE_LABELS, STATUT_INTERNE_LABELS } from './optionLabels.js'
 import { useAffectation } from './useAffectation.js'
 import { useCampagnes } from './useCampagnes.js'
-import { useCandidaturesAdmin } from './useCandidaturesAdmin.js'
+import { criteresSupervision, useCandidaturesAdmin } from './useCandidaturesAdmin.js'
 import { useElimination } from './useElimination.js'
 import { useEvaluateurs } from './useEvaluateurs.js'
 
@@ -29,6 +30,13 @@ const DELAI_DEBOUNCE_RECHERCHE_MS = 400
  * Le lien « Voir » renvoie vers la fiche évaluateur EXISTANTE
  * (`/evaluateur/candidatures/:id`, recouvrement ADR-10 déjà acquis au 8c-1) —
  * pas de nouvelle fiche admin dédiée (Étape 1, Q5).
+ *
+ * Sélection « tous les N résultats » (ADR-45) : la case d'en-tête coche la
+ * PAGE ; un bandeau propose ensuite d'étendre la sélection à tous les dossiers
+ * correspondant aux critères. Ce mode ne transporte AUCUN identifiant : il
+ * fige les critères et N au clic, et n'ouvre que la répartition automatique
+ * (le mode page garde l'affectation manuelle à un évaluateur). Il est vidé,
+ * comme la sélection, à tout changement de recherche/filtre/tri/page.
  */
 export function CandidaturesSupervision() {
   const [rechercheSaisie, setRechercheSaisie] = useState('')
@@ -45,6 +53,10 @@ export function CandidaturesSupervision() {
   const [filieres, setFilieres] = useState([])
   const [selected, setSelected] = useState(() => new Set())
   const [showAssign, setShowAssign] = useState(false)
+  // Mode « tous les N résultats » : `{ criteres, nombre }` figés au clic, ou null.
+  const [selectionTous, setSelectionTous] = useState(null)
+  const [showAuto, setShowAuto] = useState(false)
+  const [messageSucces, setMessageSucces] = useState(null)
   const [eliminationCible, setEliminationCible] = useState(null)
   const debounceRechercheRef = useRef(null)
 
@@ -78,6 +90,7 @@ export function CandidaturesSupervision() {
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect
     setSelected(new Set())
+    setSelectionTous(null)
   }, [recherche, statutInterne, filiere, evaluateurFiltre, campagneFiltre, eligibiliteFiltre, decisionFiltre, triColonne, triDirection, page])
 
   // Recherche appliquée ~400 ms après la dernière frappe (pas une requête par
@@ -128,9 +141,51 @@ export function CandidaturesSupervision() {
     else next.add(id)
     return next
   })
-  const toggleAll = () => setSelected((prev) => (
-    prev.size === items.length ? new Set() : new Set(items.map((c) => c.id))
-  ))
+  const toutDeselectionner = () => {
+    setSelected(new Set())
+    setSelectionTous(null)
+  }
+  const toggleAll = () => {
+    if (selectionTous) {
+      toutDeselectionner()
+      return
+    }
+    setSelected((prev) => (
+      prev.size === items.length ? new Set() : new Set(items.map((c) => c.id))
+    ))
+  }
+  const pageEntiereCochee = items.length > 0 && selected.size === items.length
+  const selectionnerTous = () => {
+    setMessageSucces(null)
+    setSelectionTous({
+      criteres: criteresSupervision({
+        recherche,
+        statutInterne,
+        filiere,
+        evaluateur: evaluateurFiltre,
+        campagne: campagneFiltre,
+        eligibilite: eligibiliteFiltre,
+        decision: decisionFiltre,
+      }),
+      nombre: meta?.total ?? items.length,
+    })
+  }
+
+  const succesAuto = (res) => {
+    const recoivent = res.evaluateurs.filter((e) => e.a_recevoir > 0).length
+    setShowAuto(false)
+    toutDeselectionner()
+    setMessageSucces(`${res.affectees} dossier${res.affectees > 1 ? 's' : ''} réparti${res.affectees > 1 ? 's' : ''} entre ${recoivent} évaluateur${recoivent > 1 ? 's' : ''}.`)
+    reload()
+  }
+  const annulerAuto = (code) => {
+    setShowAuto(false)
+    // La liste a changé côté serveur : on recharge et on fait reconfirmer.
+    if (code === 'liste_modifiee') {
+      toutDeselectionner()
+      reload()
+    }
+  }
 
   const confirmAssign = async (evaluateurId) => {
     try {
@@ -182,7 +237,13 @@ export function CandidaturesSupervision() {
           <h2>Candidatures</h2>
           <p className="text-muted">Supervision de l'ensemble des dossiers reçus, toutes filières confondues.</p>
         </div>
-        {selected.size > 0 ? (
+        {selectionTous ? (
+          <div className="flex gap-2">
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowAuto(true)}>
+              <i className="fa-solid fa-shuffle" aria-hidden="true" /> Répartir automatiquement ({selectionTous.nombre})
+            </button>
+          </div>
+        ) : selected.size > 0 ? (
           <div className="flex gap-2">
             <button type="button" className="btn btn-outline btn-sm" onClick={() => { resetError(); setShowAssign(true) }}>
               <i className="fa-solid fa-user-plus" aria-hidden="true" /> Affecter ({selected.size})
@@ -250,6 +311,40 @@ export function CandidaturesSupervision() {
         </p>
       ) : null}
 
+      {messageSucces ? (
+        <div style={{ marginBottom: 'var(--space-3)' }}>
+          <Alert variant="success">{messageSucces}</Alert>
+        </div>
+      ) : null}
+
+      {status === 'ready' && selectionTous ? (
+        <div className="alert alert-info" style={{ marginBottom: 'var(--space-3)' }}>
+          <i className="fa-solid fa-circle-info" aria-hidden="true" />
+          <div>
+            <strong>
+              Les {selectionTous.nombre} dossier{selectionTous.nombre > 1 ? 's' : ''} correspondant à votre recherche et vos filtres {selectionTous.nombre > 1 ? 'sont sélectionnés' : 'est sélectionné'}.
+            </strong>{' '}
+            <button type="button" className="btn btn-link btn-sm" onClick={toutDeselectionner}>
+              Tout désélectionner
+            </button>
+          </div>
+        </div>
+      ) : status === 'ready' && pageEntiereCochee ? (
+        <div className="alert alert-info" style={{ marginBottom: 'var(--space-3)' }}>
+          <i className="fa-solid fa-circle-info" aria-hidden="true" />
+          <div>
+            {items.length < (meta?.total ?? items.length)
+              ? `Les ${items.length} dossiers de cette page sont sélectionnés.`
+              : `Les ${items.length} dossier${items.length > 1 ? 's' : ''} de la liste ${items.length > 1 ? 'sont sélectionnés' : 'est sélectionné'}.`}{' '}
+            <button type="button" className="btn btn-link btn-sm" onClick={selectionnerTous}>
+              {(meta?.total ?? items.length) > 1
+                ? `Sélectionner les ${meta?.total ?? items.length} dossiers correspondant à votre recherche et vos filtres`
+                : 'Sélectionner le dossier correspondant à votre recherche et vos filtres'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {status === 'loading' ? (
         <div className="text-center" style={{ padding: 'var(--space-16)' }}>
           <Spinner large />
@@ -269,11 +364,11 @@ export function CandidaturesSupervision() {
             <table className="table">
               <thead>
                 <tr>
-                  <th aria-hidden="true">
+                  <th>
                     <input
                       type="checkbox"
                       aria-label="Tout sélectionner"
-                      checked={selected.size === items.length && items.length > 0}
+                      checked={Boolean(selectionTous) || pageEntiereCochee}
                       onChange={toggleAll}
                     />
                   </th>
@@ -301,7 +396,8 @@ export function CandidaturesSupervision() {
                         <input
                           type="checkbox"
                           aria-label={`Sélectionner ${c.numero_dossier}`}
-                          checked={selected.has(c.id)}
+                          checked={Boolean(selectionTous) || selected.has(c.id)}
+                          disabled={Boolean(selectionTous)}
                           onChange={() => toggle(c.id)}
                         />
                       </td>
@@ -346,11 +442,11 @@ export function CandidaturesSupervision() {
 
           {meta && meta.last_page > 1 ? (
             <div className="pagination" style={{ marginTop: 'var(--space-5)', justifyContent: 'center' }}>
-              <button type="button" className="page-btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+              <button type="button" className="page-btn" aria-label="Page précédente" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
                 <i className="fa-solid fa-chevron-left" aria-hidden="true" />
               </button>
               <span className="caption">Page {meta.current_page} / {meta.last_page}</span>
-              <button type="button" className="page-btn" disabled={page >= meta.last_page} onClick={() => setPage((p) => p + 1)}>
+              <button type="button" className="page-btn" aria-label="Page suivante" disabled={page >= meta.last_page} onClick={() => setPage((p) => p + 1)}>
                 <i className="fa-solid fa-chevron-right" aria-hidden="true" />
               </button>
             </div>
@@ -366,6 +462,16 @@ export function CandidaturesSupervision() {
           error={assignError}
           onCancel={() => setShowAssign(false)}
           onConfirm={confirmAssign}
+        />
+      ) : null}
+
+      {showAuto && selectionTous ? (
+        <AffectationAutomatiqueModal
+          criteres={selectionTous.criteres}
+          nombreCorrespondants={selectionTous.nombre}
+          evaluateurs={evaluateurs}
+          onCancel={annulerAuto}
+          onSuccess={succesAuto}
         />
       ) : null}
 

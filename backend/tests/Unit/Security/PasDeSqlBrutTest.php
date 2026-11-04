@@ -39,7 +39,7 @@ use RecursiveIteratorIterator;
  * `appliquerTri()` (jamais une chaîne issue de `$request`) et `$dir` est
  * verrouillé à la ligne au-dessus à `'asc'`/`'desc'` par un simple ternaire —
  * aucune des deux variables ne peut contenir autre chose qu'une valeur fixée
- * par le code lui-même. La recherche elle-même (`appliquerRecherche()`)
+ * par le code lui-même. La recherche elle-même (`FiltreCandidatures::appliquerRecherche()`)
  * n'utilise AUCUN SQL brut : `where('candidat.recherche_normalisee', 'ilike',
  * ...)` est un `where()` Eloquent ordinaire (même précédent qu'`AuditController`),
  * la normalisation (casse/accents/apostrophes/tirets) étant précalculée côté
