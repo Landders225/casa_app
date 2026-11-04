@@ -4,6 +4,7 @@ namespace Tests\Feature\Console;
 
 use App\Models\Campagne;
 use App\Models\JournalAudit;
+use App\Models\Publication;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Feature\Evaluateur\CreeContexteEvaluation;
@@ -232,6 +233,28 @@ class RouvrirCampagneCommandTest extends TestCase
         ])->assertFailed();
 
         $this->assertSame('ouverte', $campagne->fresh()->statut);
+        $this->assertSame(0, JournalAudit::count());
+    }
+
+    public function test_echec_resultats_deja_publies(): void
+    {
+        $campagne = $this->campagneCloturee();
+        $admin = $this->creerAdmin();
+
+        Publication::create([
+            'campagne_id' => $campagne->id,
+            'publiee_le' => now(),
+            'publiee_par' => $admin->membreEquipe->id,
+        ]);
+
+        $this->artisan('casa:rouvrir-campagne', [
+            'campagne' => $campagne->id,
+            '--nouvelle-cloture' => '2026-12-31',
+            '--raison' => 'x',
+            '--operateur' => $admin->email,
+        ])->assertFailed();
+
+        $this->assertSame('cloturee', $campagne->fresh()->statut);
         $this->assertSame(0, JournalAudit::count());
     }
 

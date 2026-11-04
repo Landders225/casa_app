@@ -19,9 +19,12 @@ const STATUT_BADGE = {
  * l'absence de candidature). Aucun état interne, aucune notion d'éligibilité.
  *
  * `campagneOuverte` (ADR-42) n'intervient QUE si `status === 'none'` : un
- * candidat qui a déjà un dossier n'est jamais concerné (le comportement
- * tolérant sur les brouillons après clôture est volontaire, cf.
- * docs/POINTS-OUVERTS.md). `false` strictement masque le CTA ; `null`
+ * candidat qui a déjà un dossier n'est jamais concerné ICI DIRECTEMENT — la
+ * tolérance qui le dispensait autrefois a été ANNULÉE (ADR-44) : si sa
+ * campagne a fermé, c'est le wizard qui le détecte dès le chargement et
+ * affiche l'écran dédié (`CampagneFermee`), pas ce tableau de bord, qui
+ * continue d'afficher un CTA « Reprendre » menant vers cet écran. `false`
+ * strictement masque le CTA du cas `status === 'none'` ; `null`
  * (chargement/échec) ou `true` l'affichent — fail-open, ce n'est qu'un
  * confort d'affichage, jamais la vraie barrière (toujours serveur).
  */

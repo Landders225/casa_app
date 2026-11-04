@@ -102,6 +102,25 @@ describe('apiClient', () => {
     await expect(apiClient.get('/x')).rejects.toMatchObject({ kind: 'rate_limited', retryAfter: 42 })
   })
 
+  it('un 409 avec un corps JSON arbitraire (ex. code applicatif) est conservé dans `payload`', async () => {
+    document.cookie = 'XSRF-TOKEN=x;path=/'
+    fetch.mockResolvedValueOnce(jsonResponse(409, {
+      message: 'Les candidatures sont closes.',
+      code: 'campagne_fermee',
+    }))
+
+    const err = await apiClient.post('/candidatures', {}).catch((e) => e)
+
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err.kind).toBe('http')
+    expect(err.status).toBe(409)
+    // Non mocké au niveau d'apiClient : c'est le VRAI pipeline send() ->
+    // toApiError() (apiClient.js) qui doit reporter le corps JSON complet
+    // dans `payload`, sans quoi `err.payload?.code` ne serait jamais lisible
+    // par les hooks candidat (ADR-44).
+    expect(err.payload).toEqual({ message: 'Les candidatures sont closes.', code: 'campagne_fermee' })
+  })
+
   it('un échec réseau devient kind "network"', async () => {
     fetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
     await expect(apiClient.get('/me')).rejects.toMatchObject({ kind: 'network' })

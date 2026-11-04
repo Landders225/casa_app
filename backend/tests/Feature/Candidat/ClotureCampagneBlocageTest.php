@@ -7,6 +7,7 @@ use App\Models\Candidature;
 use App\Models\Filiere;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -95,6 +96,51 @@ class ClotureCampagneBlocageTest extends TestCase
             ->postJson('/api/candidatures', ['filiere_id' => $this->idFiliere('cuisine')])
             ->assertStatus(409)
             ->assertJsonPath('code', 'campagne_fermee');
+    }
+
+    public function test_dossier_de_la_campagne_a_cloturee_reste_bloque_meme_si_une_campagne_b_est_ouverte(): void
+    {
+        $this->rendreCandidatureComplete($this->candidature);
+        $this->cloturerCampagne(); // campagne A (celle du setUp) -> cloturee
+
+        // Campagne B, distincte, ouverte — ne doit RIEN changer pour un
+        // dossier rattaché à A : c'est la campagne RATTACHÉE qui compte,
+        // jamais « une campagne ouverte » au sens large (ADR-44).
+        Campagne::create([
+            'nom' => 'Cohorte B',
+            'statut' => 'ouverte',
+            'date_ouverture' => '2026-01-01',
+            'date_cloture' => '2026-02-01',
+            'places_totales' => 10,
+        ]);
+
+        $this->actingAs($this->user)
+            ->postJson("/api/candidatures/{$this->candidature->id}/soumettre")
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'campagne_fermee');
+
+        $this->actingAs($this->user)
+            ->patchJson("/api/candidatures/{$this->candidature->id}/reponses", ['sc01_scolarise_actuellement' => 'oui'])
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'campagne_fermee');
+
+        $this->assertSame('brouillon', $this->candidature->fresh()->statut_interne);
+    }
+
+    public function test_aucune_trace_de_log_pour_un_409_campagne_fermee(): void
+    {
+        Log::spy();
+        $this->cloturerCampagne();
+
+        $this->actingAs($this->user)
+            ->postJson("/api/candidatures/{$this->candidature->id}/soumettre")
+            ->assertStatus(409);
+
+        // Flux métier ATTENDU (CampagneFermeeException::report() === false) :
+        // aucune trace, à aucun niveau — ne pas noyer les vraies anomalies.
+        Log::shouldNotHaveReceived('error');
+        Log::shouldNotHaveReceived('warning');
+        Log::shouldNotHaveReceived('info');
     }
 
     // --- Routes NON gardées : restent accessibles malgré la clôture ---

@@ -29,8 +29,13 @@ use Illuminate\Support\Str;
  *  3. `--nouvelle-cloture` valide (AAAA-MM-JJ, date réellement existante)
  *     ET strictement future.
  *  4. Campagne trouvée ET statut EXACTEMENT 'cloturee'.
- *  5. Aucune AUTRE campagne 'ouverte' (même garde que `changerStatut()`).
- *  6. Confirmation interactive — AUCUN `--force` : jamais scriptable, exige
+ *  5. Aucune `publication` pour cette campagne (Lot 5b) — rouvrir une
+ *     campagne dont les résultats sont déjà communiqués aux candidats
+ *     laisserait de NOUVEAUX dépôts (brouillon, soumission) atterrir dans
+ *     une campagne dont la décision est figée, sans jamais pouvoir être
+ *     réintégrés au classement déjà publié.
+ *  6. Aucune AUTRE campagne 'ouverte' (même garde que `changerStatut()`).
+ *  7. Confirmation interactive — AUCUN `--force` : jamais scriptable, exige
  *     un vrai terminal (`dca exec backend ...`, SANS `-T`).
  *
  * La nouvelle date de clôture reste PUREMENT INDICATIVE, comme à la création
@@ -112,6 +117,12 @@ class RouvrirCampagne extends Command
         }
         if ($campagne->statut !== 'cloturee') {
             $this->error("Seule une campagne « cloturee » peut être rouverte par cette commande (statut actuel : « {$campagne->statut} »).");
+
+            return self::FAILURE;
+        }
+
+        if ($campagne->publication()->exists()) {
+            $this->error("Les résultats de la campagne « {$campagne->nom} » sont déjà publiés : elle ne peut pas être rouverte.");
 
             return self::FAILURE;
         }
