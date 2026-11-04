@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Candidat;
 
+use App\Exceptions\CampagneFermeeException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Candidat\CreerCandidatureRequest;
 use App\Http\Resources\CandidatureCandidatResource;
@@ -56,7 +57,11 @@ class CandidatureController extends Controller
         abort_if($candidat === null, 422, 'Profil candidat incomplet : impossible de créer une candidature.');
 
         $ouvertes = Campagne::query()->where('statut', 'ouverte')->get();
-        abort_if($ouvertes->count() !== 1, 409, 'Aucune campagne ouverte pour candidater.');
+        if ($ouvertes->count() !== 1) {
+            // ADR-44 : `code` dédié désormais ajouté (cohérence avec les
+            // autres points de blocage de ce lot) — comportement 409 inchangé.
+            throw new CampagneFermeeException('Aucune campagne ouverte pour candidater.');
+        }
         $campagne = $ouvertes->first();
 
         $existe = Candidature::query()

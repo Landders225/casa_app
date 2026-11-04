@@ -185,6 +185,18 @@ class Candidature extends Model
     }
 
     /**
+     * La campagne RATTACHÉE à CETTE candidature (`campagne_id`) n'est plus
+     * `ouverte` (ADR-44) — jamais « la campagne ouverte unique » :
+     * une candidature garde sa propre campagne même après qu'une autre a pu
+     * ouvrir/clôturer depuis. Source de vérité unique, réutilisée par
+     * `EnsureCandidatureModifiable` et `SoumissionController`.
+     */
+    public function campagneFermee(): bool
+    {
+        return $this->campagne->statut !== 'ouverte';
+    }
+
+    /**
      * Candidature SOUMISE — DÉFINITION UNIQUE, partagée par le tableau de
      * bord admin (`ServiceRapports::agreger()`, KPI « Candidatures
      * soumises ») et par `casa:export-analyse` : tout sauf un brouillon.

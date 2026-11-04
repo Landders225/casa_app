@@ -838,6 +838,8 @@ Découvert en écrivant l'E2E : `Entretien.jsx` ne proposait **aucune UI** pour 
 
 **Divergences maquette.** Aucune (la maquette ne modélisait pas cet état).
 
+**Addendum (mise à jour ultérieure).** La tolérance « brouillon modifiable et soumissible après clôture » décrite ci-dessus comme un comportement volontaire a été **ANNULÉE** par **ADR-44** : l'audit de production a montré un écart trop important entre brouillons et dossiers soumis pour la laisser en l'état. Le reste de cette entrée (signal `GET /api/campagne-ouverte`, écran du tableau de bord) reste inchangé et vrai.
+
 ---
 
 ## ADR-43 — Réouverture exceptionnelle d'une campagne clôturée (`casa:rouvrir-campagne`)
@@ -857,6 +859,30 @@ Découvert en écrivant l'E2E : `Entretien.jsx` ne proposait **aucune UI** pour 
 **Documentation.** `docs/DEPLOIEMENT.md` § 18 (exécution — **avec un vrai terminal, `dca exec backend ... casa:rouvrir-campagne`, SANS `-T`** — garde-fous, traçabilité, rappel sur la date indicative) ; `docs/POINTS-OUVERTS.md` (réouverture exceptionnelle traitée) ; addendum à **ADR-23** (pointeur depuis la ligne « irréversible »).
 
 **Divergences maquette.** Aucune (procédure d'exploitation serveur, aucun écran — délibérément, cf. ci-dessus).
+
+---
+
+## ADR-44 — Clôture de campagne : blocage effectif de tout dépôt candidat (annule la tolérance ADR-42)
+
+**Contexte.** Audit de production : 428 brouillons pour seulement 230 dossiers soumis sur la campagne « Cohorte 1 — 2026 », alors clôturée. La tolérance décrite à l'ADR-42 (*« un candidat avec un brouillon en cours au moment de la clôture peut le terminer et le soumettre normalement »*) s'est révélée disproportionnée à cette échelle : la clôture doit redevenir une vraie barrière pour TOUT dépôt, pas seulement pour la création d'une nouvelle candidature. Décision de l'administration : annuler cette tolérance. La seule voie de retour reste `casa:rouvrir-campagne` (ADR-43), hors interface.
+
+**Décision — une garde centrale, pas des vérifications éparpillées :**
+- **`Candidature::campagneFermee(): bool`** (nouvelle méthode sur le modèle, même famille que `estBrouillon()`) — source de vérité UNIQUE : `$this->campagne->statut !== 'ouverte'`. C'est TOUJOURS la campagne RATTACHÉE à la candidature (`campagne_id`) qui compte, jamais « la campagne ouverte unique » — un brouillon garde sa propre campagne même si une autre a pu ouvrir/clôturer depuis.
+- **`App\Exceptions\CampagneFermeeException`** (nouvelle) — forme UNIQUE de réponse (`{"message": …, "code": "campagne_fermee"}`, 409) via son propre `render()`, réutilisée à chaque point de blocage. Un code applicatif dédié, distinct de tout autre 409 (« déjà soumise », « dossier verrouillé », « autre campagne déjà ouverte ») — le front n'a plus à deviner la cause d'un 409 depuis un message en texte libre.
+- **`EnsureCandidatureModifiable`** (middleware déjà central, couvre les 9 routes `candidatures/{id}/...` du Lot 3a/3b) : nouveau check `campagneFermee()` ajouté APRÈS le check `estBrouillon()` existant — ordre inchangé (propriété → soumission → campagne), aucune des deux vérifications préexistantes touchée.
+- **`SoumissionController`** (`/soumettre`, route sœur qui n'est délibérément PAS fusionnée dans le middleware ci-dessus : cela aurait changé le message exact de l'erreur « déjà soumise » attendu par 2 tests déjà verts, `SoumissionTest::test_re_soumission_bloquee_409` et `test_candidature_deja_soumise_sans_cmu_reste_valide_aucune_revalidation`) : même check `campagneFermee()`, appelé juste après son propre check `estBrouillon()` existant, avant tout calcul de complétude.
+- **`CandidatureController::store`** (création, déjà gardée depuis le Lot 6a) : son 409 existant porte désormais le même `code` — cohérence pure, comportement HTTP inchangé.
+- **`POST /register`** (inscription, écran public) : bloquée UNIQUEMENT si aucune campagne n'est `ouverte` ET qu'au moins une est déjà `cloturee` — un cycle a réellement eu lieu et s'est refermé. AVANT toute première ouverture (aucune campagne, ou seulement des `brouillon`), l'inscription reste permise : bloquer ce cas serait à tort (le programme n'a simplement pas encore démarré). Choix du mécanisme : refus au `POST` (409 + `code`) plutôt qu'un endpoint public préalable — l'inscription est un geste rare (une fois par candidat), contrairement au tableau de bord candidat consulté à chaque connexion (ADR-42) ; une route publique de plus aurait élargi la surface (throttle, ADR-23) pour un gain d'UX marginal.
+- **`CandidatureCandidatResource`** : ajout d'un booléen `campagne.ouverte` (liste blanche stricte — jamais `statut`/dates/places, réservés à l'admin) pour que le wizard détecte un brouillon désormais bloqué DÈS le chargement, sans attendre un 409 au premier enregistrement.
+- **Front** (`useCandidatureForm.js`, `CandidatureWizard.jsx`, `InscriptionPage.jsx`) : toute méthode mutante du hook détecte `err.payload?.code === 'campagne_fermee'` et bascule `status` vers un écran dédié (réutilise/étend l'écran `CampagneFermee` du Lot ADR-42, désormais paramétré par `numero` de dossier quand un brouillon existait). `submit()` disambigue désormais EXPLICITEMENT les 2 causes possibles d'un 409 sur `/soumettre` (déjà soumise vs. campagne fermée) — avant ce lot, un seul cas existait et le code ne distinguait rien.
+
+**Cas limites.** Course soumission/clôture : fenêtre de lecture-puis-écriture non verrouillée, de même nature que le garde-fou préexistant « une seule campagne ouverte » (`CampagneController::changerStatut`) — acceptée telle quelle, aucun verrou supplémentaire introduit pour ce lot. Réouverture (`casa:rouvrir-campagne`) : aucune logique neuve nécessaire, `campagneFermee()` redevient `false` dès que le statut repasse à `ouverte` — testé en non-régression. Évaluateurs/administrateurs : aucune de leurs routes ne passe par ce garde, non concernés.
+
+**Tests.** `ClotureCampagneBlocageTest` — un cas d'échec par route gardée (les 9 routes du groupe `candidature.modifiable` + `/soumettre`, 409 + `code`, aucune écriture), un cas « reste accessible » par route non gardée (profil, consultation, pièces), création de candidature avec le nouveau `code`, non-régression complète après `casa:rouvrir-campagne`. `InscriptionFermetureCampagneTest` — bloquée (cycle clos), autorisée avant 1ʳᵉ ouverture (`brouillon`), autorisée si une campagne est ouverte, redevient possible après réouverture exceptionnelle. Les 2 tests `SoumissionTest` sur le message « déjà soumise » restent inchangés et verts.
+
+**Documentation.** Addendum à **ADR-42** (la tolérance qu'il décrivait est annulée) ; `docs/POINTS-OUVERTS.md` (ligne « brouillon modifiable après clôture » passée de 🟡 Décidé à 🟢 Traité) ; `docs/DEPLOIEMENT.md` (note : `casa:rouvrir-campagne` est désormais le seul retour en arrière pour TOUT dépôt candidat, pas seulement les nouvelles candidatures).
+
+**Divergences maquette.** Aucune (la maquette ne modélisait pas cet état, comme à l'ADR-42).
 
 ---
 

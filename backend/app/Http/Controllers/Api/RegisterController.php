@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Eligibilite\ServiceEligibiliteInitiale;
+use App\Exceptions\CampagneFermeeException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\UserResource;
+use App\Models\Campagne;
 use App\Models\Candidat;
 use App\Models\JournalAudit;
 use App\Models\User;
@@ -39,6 +41,18 @@ class RegisterController extends Controller
     public function store(RegisterRequest $request): JsonResponse
     {
         $data = $request->validated();
+
+        // ADR-44 : bloque l'inscription SEULEMENT si un cycle a déjà eu
+        // lieu et s'est fermé (au moins une campagne `cloturee`) ET qu'aucune
+        // n'est actuellement `ouverte`. AVANT la toute première ouverture
+        // (aucune campagne, ou seulement des `brouillon`), l'inscription reste
+        // autorisée — bloquer ce cas serait à tort (pas de clôture à proprement
+        // parler, juste un programme pas encore lancé).
+        $aucuneOuverte = Campagne::query()->where('statut', 'ouverte')->doesntExist();
+        $unCycleDejaClos = Campagne::query()->where('statut', 'cloturee')->exists();
+        if ($aucuneOuverte && $unCycleDejaClos) {
+            throw new CampagneFermeeException('Les inscriptions sont closes pour le moment.');
+        }
 
         $motifs = $this->eligibiliteInitiale->evaluer(
             CarbonImmutable::parse($data['date_naissance']),

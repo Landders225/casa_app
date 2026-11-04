@@ -156,7 +156,11 @@ describe('CandidatureWizard', () => {
     apiClient.patch.mockResolvedValue({ data: PROFIL })
     apiClient.post.mockImplementation((path) => {
       if (path === '/candidatures') {
-        return Promise.reject(new ApiError('http', { status: 409, message: 'Aucune campagne ouverte pour candidater.' }))
+        return Promise.reject(new ApiError('http', {
+          status: 409,
+          message: 'Aucune campagne ouverte pour candidater.',
+          payload: { code: 'campagne_fermee' },
+        }))
       }
       return Promise.resolve({ data: {} })
     })

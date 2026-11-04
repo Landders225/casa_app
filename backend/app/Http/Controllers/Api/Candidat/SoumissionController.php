@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Candidat;
 
 use App\Domain\Candidature\ValidateurCompletude;
 use App\Domain\Eligibilite\ServiceEligibilite;
+use App\Exceptions\CampagneFermeeException;
 use App\Http\Controllers\Controller;
 use App\Models\Candidature;
 use App\Models\CritereEliminatoireDeclenche;
@@ -41,6 +42,15 @@ class SoumissionController extends Controller
 
         // Déjà soumise : même réponse quelle que soit l'éligibilité interne.
         abort_if(! $candidature->estBrouillon(), 409, 'Cette candidature a déjà été soumise.');
+
+        // ADR-44 : la tolérance « brouillon soumissible après clôture »
+        // (ADR-42) est annulée — la campagne RATTACHÉE à CETTE candidature doit
+        // être ouverte, pas « une campagne ouverte » au sens large.
+        if ($candidature->campagneFermee()) {
+            throw new CampagneFermeeException(
+                "Les candidatures sont closes. Votre dossier n'a pas été soumis.",
+            );
+        }
 
         $candidature->load([
             'candidat.utilisateur', 'campagne', 'reponseFormulaire', 'experiences', 'piecesDossier',

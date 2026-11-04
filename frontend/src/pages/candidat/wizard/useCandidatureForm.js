@@ -75,6 +75,13 @@ function piecesFromResource(res) {
 
 let tempSeq = 0
 
+/** ADR-44 : code applicatif dédié renvoyé par tout point de blocage lié
+ * à une campagne fermée (création, soumission, édition de brouillon,
+ * inscription) — distinct de tout autre 409 (déjà soumis, verrouillé...). */
+function estCampagneFermee(err) {
+  return err instanceof ApiError && err.payload?.code === 'campagne_fermee'
+}
+
 /**
  * État complet du formulaire de candidature (wizard 10 étapes).
  *
@@ -122,6 +129,12 @@ export function useCandidatureForm() {
           if (c.data.statut_public !== 'brouillon') {
             setCandidature(c.data)
             setStatus('submitted')
+          } else if (c.data.campagne?.ouverte === false) {
+            // ADR-44 : brouillon existant mais campagne rattachée
+            // fermée — écran dédié dès le chargement, avant toute tentative
+            // d'édition (qui échouerait de toute façon au premier 409).
+            setCandidature(c.data)
+            setStatus('campagne_fermee')
           } else {
             hydrate(c.data, fils)
             setStatus('ready')
@@ -175,7 +188,8 @@ export function useCandidatureForm() {
       setServerErrors({})
       return true
     } catch (err) {
-      if (err instanceof ApiError && err.kind === 'validation') {
+      if (estCampagneFermee(err)) setStatus('campagne_fermee')
+      else if (err instanceof ApiError && err.kind === 'validation') {
         setServerErrors(Object.fromEntries(Object.entries(err.errors).map(([k, v]) => [k, v[0]])))
       }
       throw err
@@ -194,10 +208,10 @@ export function useCandidatureForm() {
       setReponses(reponsesFromResource(res.data))
       return res.data
     } catch (err) {
-      // Aucune campagne ouverte (Lot 6a, ADR-42) — distinct de l'« already
+      // Aucune campagne ouverte (Lot 6a, ADR-42/44) — distinct de l'« already
       // submitted » de submit() ci-dessous : traité ICI, jamais relancé, pour
       // que l'écran affiche un message dédié plutôt que de l'avaler en silence.
-      if (err instanceof ApiError && err.status === 409) {
+      if (estCampagneFermee(err)) {
         setStatus('campagne_fermee')
         return null
       }
@@ -208,8 +222,13 @@ export function useCandidatureForm() {
   const confirmFiliere = useCallback(async (cand) => {
     const target = cand ?? candidature
     if (!target || target.cqp_confirme) return
-    const res = await apiClient.post(`/candidatures/${target.id}/confirmer-filiere`)
-    setCandidature(res.data)
+    try {
+      const res = await apiClient.post(`/candidatures/${target.id}/confirmer-filiere`)
+      setCandidature(res.data)
+    } catch (err) {
+      if (estCampagneFermee(err)) setStatus('campagne_fermee')
+      throw err
+    }
   }, [candidature])
 
   // --- Expériences ---
@@ -224,40 +243,60 @@ export function useCandidatureForm() {
     setExperiences((xs) => xs.map((x) => (x.id === rowId ? target : x)))
     if (!candidature) return
     const isTemp = String(rowId).startsWith('tmp-')
-    if (isTemp) {
-      // Les deux champs saisis -> on matérialise la ligne côté serveur (elle
-      // devient éditable + prête à recevoir le justificatif).
-      if (target.domaine && target.duree_categorie) {
-        const res = await apiClient.post(`/candidatures/${candidature.id}/experiences`, {
-          domaine: target.domaine,
-          duree_categorie: target.duree_categorie,
-        })
-        setExperiences((xs) => xs.map((x) => (x.id === rowId ? { ...x, id: res.data.id } : x)))
+    try {
+      if (isTemp) {
+        // Les deux champs saisis -> on matérialise la ligne côté serveur (elle
+        // devient éditable + prête à recevoir le justificatif).
+        if (target.domaine && target.duree_categorie) {
+          const res = await apiClient.post(`/candidatures/${candidature.id}/experiences`, {
+            domaine: target.domaine,
+            duree_categorie: target.duree_categorie,
+          })
+          setExperiences((xs) => xs.map((x) => (x.id === rowId ? { ...x, id: res.data.id } : x)))
+        }
+      } else {
+        await apiClient.patch(`/candidatures/${candidature.id}/experiences/${rowId}`, { [field]: value })
       }
-    } else {
-      await apiClient.patch(`/candidatures/${candidature.id}/experiences/${rowId}`, { [field]: value })
+    } catch (err) {
+      if (estCampagneFermee(err)) setStatus('campagne_fermee')
+      throw err
     }
   }, [candidature])
 
   const removeExperience = useCallback(async (rowId) => {
-    if (candidature && !String(rowId).startsWith('tmp-')) {
-      await apiClient.del(`/candidatures/${candidature.id}/experiences/${rowId}`)
+    try {
+      if (candidature && !String(rowId).startsWith('tmp-')) {
+        await apiClient.del(`/candidatures/${candidature.id}/experiences/${rowId}`)
+      }
+      setExperiences((xs) => xs.filter((x) => x.id !== rowId))
+    } catch (err) {
+      if (estCampagneFermee(err)) setStatus('campagne_fermee')
+      throw err
     }
-    setExperiences((xs) => xs.filter((x) => x.id !== rowId))
   }, [candidature])
 
   const uploadExperienceJustif = useCallback(async (rowId, file) => {
     if (!candidature || String(rowId).startsWith('tmp-')) return
     const form = new FormData()
     form.append('fichier', file)
-    const res = await apiClient.postForm(`/candidatures/${candidature.id}/experiences/${rowId}/justificatif`, form)
-    setExperiences((xs) => xs.map((x) => (x.id === rowId ? { ...x, justificatif: res.data } : x)))
+    try {
+      const res = await apiClient.postForm(`/candidatures/${candidature.id}/experiences/${rowId}/justificatif`, form)
+      setExperiences((xs) => xs.map((x) => (x.id === rowId ? { ...x, justificatif: res.data } : x)))
+    } catch (err) {
+      if (estCampagneFermee(err)) setStatus('campagne_fermee')
+      throw err
+    }
   }, [candidature])
 
   const removeExperienceJustif = useCallback(async (rowId) => {
     if (!candidature) return
-    await apiClient.del(`/candidatures/${candidature.id}/experiences/${rowId}/justificatif`)
-    setExperiences((xs) => xs.map((x) => (x.id === rowId ? { ...x, justificatif: null } : x)))
+    try {
+      await apiClient.del(`/candidatures/${candidature.id}/experiences/${rowId}/justificatif`)
+      setExperiences((xs) => xs.map((x) => (x.id === rowId ? { ...x, justificatif: null } : x)))
+    } catch (err) {
+      if (estCampagneFermee(err)) setStatus('campagne_fermee')
+      throw err
+    }
   }, [candidature])
 
   // --- Pièces du dossier ---
@@ -265,18 +304,28 @@ export function useCandidatureForm() {
     if (!candidature) return
     const form = new FormData()
     form.append('fichier', file)
-    const res = await apiClient.postForm(`/candidatures/${candidature.id}/pieces/${type}`, form)
-    setPieces((p) => ({ ...p, [type]: res.data }))
+    try {
+      const res = await apiClient.postForm(`/candidatures/${candidature.id}/pieces/${type}`, form)
+      setPieces((p) => ({ ...p, [type]: res.data }))
+    } catch (err) {
+      if (estCampagneFermee(err)) setStatus('campagne_fermee')
+      throw err
+    }
   }, [candidature])
 
   const removePiece = useCallback(async (type) => {
     if (!candidature) return
-    await apiClient.del(`/candidatures/${candidature.id}/pieces/${type}`)
-    setPieces((p) => {
-      const next = { ...p }
-      delete next[type]
-      return next
-    })
+    try {
+      await apiClient.del(`/candidatures/${candidature.id}/pieces/${type}`)
+      setPieces((p) => {
+        const next = { ...p }
+        delete next[type]
+        return next
+      })
+    } catch (err) {
+      if (estCampagneFermee(err)) setStatus('campagne_fermee')
+      throw err
+    }
   }, [candidature])
 
   // --- Classement ---
@@ -293,9 +342,14 @@ export function useCandidatureForm() {
   const saveClassement = useCallback(async () => {
     if (!candidature || !classementDirtyRef.current) return true
     const ordre = classementRef.current.map((c) => c.id)
-    await apiClient.put(`/candidatures/${candidature.id}/classement`, { ordre })
-    classementDirtyRef.current = false
-    return true
+    try {
+      await apiClient.put(`/candidatures/${candidature.id}/classement`, { ordre })
+      classementDirtyRef.current = false
+      return true
+    } catch (err) {
+      if (estCampagneFermee(err)) setStatus('campagne_fermee')
+      throw err
+    }
   }, [candidature])
 
   // --- Profil (étape identité) ---
@@ -313,6 +367,14 @@ export function useCandidatureForm() {
     } catch (err) {
       if (err instanceof ApiError && err.kind === 'validation') {
         return { errors: err.errors }
+      }
+      // ADR-44 : un 409 sur /soumettre a désormais 2 causes distinctes
+      // — vérifier le code AVANT de supposer « déjà soumise » (sinon un
+      // brouillon bloqué par une campagne fermée afficherait, à tort, l'écran
+      // « déjà soumis »).
+      if (estCampagneFermee(err)) {
+        setStatus('campagne_fermee')
+        return { conflict: true, campagneFermee: true }
       }
       if (err instanceof ApiError && err.status === 409) {
         setStatus('submitted')

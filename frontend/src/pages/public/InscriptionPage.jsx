@@ -63,7 +63,11 @@ export function InscriptionPage() {
       navigate(paths.candidat, { replace: true })
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.kind === 'validation') {
+        if (err.payload?.code === 'campagne_fermee') {
+          // ADR-44 : inscriptions closes (aucune campagne ouverte, un
+          // cycle a déjà eu lieu) — message dédié plutôt que le repli générique.
+          setFormError(err.message)
+        } else if (err.kind === 'validation') {
           const errs = err.errors && Object.keys(err.errors).length ? err.errors : null
           if (errs) {
             setFieldErrors(errs)

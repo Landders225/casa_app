@@ -50,6 +50,11 @@ class CandidatureCandidatResource extends JsonResource
             'campagne' => $this->whenLoaded('campagne', fn () => [
                 'id' => $this->campagne->id,
                 'nom' => $this->campagne->nom,
+                // ADR-44 — booléen SEUL (jamais `statut`/dates/places,
+                // réservés à l'admin, `CampagneResource`) : permet au wizard de
+                // détecter dès le chargement qu'un brouillon existant ne peut
+                // plus être édité, sans attendre un 409 au premier enregistrement.
+                'ouverte' => $this->campagne->statut === 'ouverte',
             ]),
 
             'reponses' => $this->whenLoaded(

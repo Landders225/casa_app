@@ -2498,3 +2498,14 @@ order by horodatage desc limit 10;
 ```
 Une confirmation refusée, ou n'importe quel garde-fou refusé, n'écrit
 **aucune** ligne — seule une réouverture effectivement appliquée est tracée.
+
+### 18.5 Depuis ADR-44 : seul retour en arrière pour TOUT dépôt candidat
+
+Cette commande n'est plus seulement le recours pour « aucune campagne
+ouverte » à la création d'un dossier (§ 18 ci-dessus, inchangé) : depuis
+ADR-44, la clôture bloque aussi l'édition d'un brouillon existant, sa
+soumission et l'inscription (`POST /register`). Si un support signale une
+erreur « Les candidatures sont closes » (candidat) ou « Les inscriptions
+sont closes pour le moment. » (inscription) alors que l'administration
+souhaite rouvrir la fenêtre, **la procédure est strictement identique** à
+celle du § 18.1 — aucune commande supplémentaire, aucun paramètre différent.
