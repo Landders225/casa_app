@@ -2424,3 +2424,77 @@ select horodatage, auteur_id, resultat, nouvelle_valeur from journal_audit where
 ```
 
 ---
+
+## 18. Réouverture exceptionnelle d'une campagne clôturée (`casa:rouvrir-campagne`)
+
+La clôture d'une campagne reste **irréversible depuis l'interface** (§ 10,
+ADR-23/ADR-34 — pas de bouton « rouvrir »). Si l'administration accorde
+malgré tout un délai après coup, cette commande serveur, journalisée,
+couvre ce cas précis — **ADR-43**. Elle n'est **JAMAIS** exposée dans
+l'interface web, volontairement.
+
+### 18.1 Exécution — AVEC UN VRAI TERMINAL
+
+⚠️ La commande demande une **confirmation interactive** avant d'écrire quoi
+que ce soit — elle exige donc un TTY réel :
+```bash
+dca exec backend php artisan casa:rouvrir-campagne <uuid-campagne> \
+  --nouvelle-cloture=<AAAA-MM-JJ> \
+  --raison="<motif de la réouverture>" \
+  --operateur=<email d'un compte administrateur>
+```
+**SANS `-T`** (contrairement à la plupart des autres commandes de ce
+document, ex. § 17 `dca exec -T backend ...`) — `-T` désactive le
+pseudo-terminal dont `$this->confirm()` a besoin ; lancée avec `-T`, la
+commande ne pourrait jamais recevoir de réponse et resterait bloquée (ou
+échouerait selon le shell).
+
+L'UUID de la campagne s'obtient via `GET /api/admin/campagnes` (écran
+« Campagnes » de l'interface) ou directement en base (lecture seule) :
+```sql
+select id, nom, statut, date_cloture from campagne order by date_ouverture desc;
+```
+
+### 18.2 Garde-fous (dans l'ordre — chacun bloque TOUTE écriture)
+
+| # | Garde-fou | Message si refus |
+|---|---|---|
+| 1 | `--operateur` résout un compte `administrateur` RÉEL | « Aucun compte administrateur trouvé pour l'e-mail « … ». » |
+| 2 | `--raison` non vide | « --raison est obligatoire… » |
+| 3 | `--nouvelle-cloture` : format AAAA-MM-JJ, date RÉELLEMENT existante, strictement future | messages distincts par cas (absente / mal formée / inexistante / pas future) |
+| 4 | Campagne trouvée ET statut EXACTEMENT `cloturee` | « Campagne introuvable. » / « Seule une campagne « cloturee » peut être rouverte… » |
+| 5 | Aucune AUTRE campagne déjà `ouverte` (règle « une seule ouverte », inchangée depuis le Lot 6a) | « Une autre campagne est déjà ouverte… » |
+| 6 | Confirmation interactive — **aucun `--force`**, jamais scriptable | répondre « non » annule proprement, sans aucune écriture (code de sortie succès, pas une erreur) |
+
+À l'invite de confirmation, la commande rappelle le nom de la campagne, les
+anciennes/nouvelles dates de clôture, le motif et l'opérateur avant de
+demander confirmation — relire avant de répondre « oui ».
+
+### 18.3 ⚠️ La date de clôture reste purement indicative
+
+**Rouvrir une campagne ne programme AUCUNE re-clôture automatique.** Comme à
+la création (§ 10, ADR-42), `--nouvelle-cloture` n'est qu'une donnée
+d'affichage — la commande elle-même l'affiche en rappel explicite à la fin
+de son exécution. La campagne restera `ouverte` indéfiniment au-delà de
+cette date jusqu'à :
+- un nouveau clic manuel sur « Clôturer » dans l'interface (§ 10), ou
+- une nouvelle exécution volontaire de cette même commande.
+
+Si une re-clôture à une date précise est nécessaire, **elle doit être
+planifiée humainement** (rappel calendaire, ticket de suivi…) — rien dans
+le produit ne la déclenchera.
+
+### 18.4 Traçabilité
+
+Chaque exécution réussie écrit UNE ligne dans `journal_audit` (module
+`Campagnes`, action « Réouverture exceptionnelle de campagne »), avec le
+motif dans la colonne `motif` (premier usage réel de cette colonne —
+`changerStatut()` ne l'utilise pas) :
+```sql
+select horodatage, auteur_id, objet, ancienne_valeur, nouvelle_valeur, motif
+from journal_audit
+where module = 'Campagnes' and action = 'Réouverture exceptionnelle de campagne'
+order by horodatage desc limit 10;
+```
+Une confirmation refusée, ou n'importe quel garde-fou refusé, n'écrit
+**aucune** ligne — seule une réouverture effectivement appliquée est tracée.
