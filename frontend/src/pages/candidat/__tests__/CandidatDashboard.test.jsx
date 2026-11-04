@@ -25,10 +25,16 @@ function renderDashboard() {
  * (badge de la sidebar) — dès le premier rendu (état "loading" inclus), donc
  * AVANT même l'effet de `useMaCandidature`. Le mock doit donc router par URL,
  * pas par ordre d'appel (`mockResolvedValueOnce` serait consommé par le badge).
+ *
+ * `/campagne-ouverte` (ADR-42) répond `true` par défaut ici — les tests qui
+ * ne portent pas spécifiquement sur ce signal gardent le comportement déjà
+ * vérifié (CTA « Commencer » affiché). Le cas « fermée » a son propre test,
+ * avec son propre mock dédié.
  */
 function mockCandidatureResponse(fabriqueReponse) {
   apiClient.get.mockImplementation((path) => {
     if (path === '/candidature') return fabriqueReponse()
+    if (path === '/campagne-ouverte') return Promise.resolve({ data: { campagne_ouverte: true } })
     return Promise.resolve({ data: { non_lues: 0 } })
   })
 }
@@ -82,6 +88,18 @@ describe('CandidatDashboard', () => {
     expect(liens[0]).toHaveAttribute('href', '/candidat/ma-candidature')
     // le dashboard ne rend PAS la décision elle-même — juste l'invitation à la consulter
     expect(screen.queryByText(/félicitations|retenue/i)).toBeNull()
+  })
+
+  it('aucune campagne ouverte + pas de dossier -> « Candidatures closes », pas de CTA qui échouerait', async () => {
+    apiClient.get.mockImplementation((path) => {
+      if (path === '/candidature') return Promise.reject(new ApiError('http', { status: 404 }))
+      if (path === '/campagne-ouverte') return Promise.resolve({ data: { campagne_ouverte: false } })
+      return Promise.resolve({ data: { non_lues: 0 } })
+    })
+    renderDashboard()
+
+    expect(await screen.findByText('Candidatures closes')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Commencer' })).toBeNull()
   })
 
   it('erreur serveur -> message d\'erreur, pas de crash', async () => {

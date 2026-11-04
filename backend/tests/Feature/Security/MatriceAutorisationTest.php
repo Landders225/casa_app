@@ -144,6 +144,7 @@ class MatriceAutorisationTest extends TestCase
     {
         $this->postJson('/api/logout')->assertStatus(401);
         $this->getJson('/api/me')->assertStatus(401);
+        $this->getJson('/api/campagne-ouverte')->assertStatus(401);
     }
 
     /**

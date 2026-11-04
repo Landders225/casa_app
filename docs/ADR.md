@@ -821,6 +821,25 @@ Découvert en écrivant l'E2E : `Entretien.jsx` ne proposait **aucune UI** pour 
 
 ---
 
+## ADR-42 — Fiabiliser le signal de clôture de campagne côté candidat
+
+**Contexte.** Audit de ce que fait réellement « Clôturer la campagne » (bouton admin) : seule la création d'une NOUVELLE candidature est bloquée (`POST /api/candidatures` → 409 « Aucune campagne ouverte », Lot 6a, inchangé) — rien d'autre côté candidat ne vérifie `campagne.statut`. Deux trous trouvés en code, pas en théorie :
+1. `CandidatureWizard.jsx` avalait ce 409 en silence (`goNext`'s catch supposait, à tort, que le hook avait déjà basculé en `'submitted'` — ce n'est vrai QUE pour le 409 de `submit()`, jamais pour celui de `createCandidature()`) : un candidat arrivant à l'étape « filière » après la clôture se heurtait à un écran figé sans aucun message.
+2. `CandidatDashboard.jsx` affichait inconditionnellement un bouton « Commencer ma candidature » dès qu'aucune candidature n'existait — y compris quand aucune campagne n'était ouverte, menant ce candidat tout droit vers le même échec. Aucune route candidat n'exposait jusqu'ici le moindre signal sur l'état d'une campagne (les seules routes `campagne` de toute l'API sont `administrateur`-strictes).
+
+**Décision :**
+- **`GET /api/campagne-ouverte`** (nouveau, `CampagneStatutController`) — authentifié, **AUCUNE restriction de rôle** (cette information n'est sensible pour personne), liste blanche d'**un seul booléen** (`campagne_ouverte`, via `Campagne::ouverte()->exists()`) — jamais l'id, le nom ni les dates d'une campagne (réservés à l'admin, `CampagneResource`, ADR-23). Un hook `useCampagneOuverte` l'interroge une fois et reste **fail-open** (`null` pendant le chargement ou en cas d'échec réseau traité comme « ouverte ») : ce n'est qu'un confort d'affichage, `POST /api/candidatures` reste et restera la SEULE vraie barrière.
+- `CandidatDashboard.jsx` : quand `status === 'none'` (aucun dossier) ET `campagne_ouverte === false`, le bloc « Prochaine étape » affiche *« Candidatures closes »* sans bouton, au lieu du CTA qui échouerait à coup sûr. Un candidat qui a DÉJÀ un dossier n'est jamais concerné par ce changement (comportement tolérant sur les brouillons après clôture, inchangé — cf. `docs/POINTS-OUVERTS.md`).
+- `useCandidatureForm.js` : `createCandidature` attrape désormais SON PROPRE 409 (symétrique au traitement déjà existant de `submit()`), bascule `status` à `'campagne_fermee'`, et retourne `null` plutôt que de relancer l'erreur. `CandidatureWizard.jsx` affiche alors un écran dédié (*« Les candidatures sont closes »*, retour au tableau de bord) ; `commitStep` s'arrête proprement si `createCandidature` renvoie `null`. Le repli générique de `goNext` sur un 409 est conservé (dossier verrouillé par un autre onglet, scénario distinct) mais son commentaire corrigé pour ne plus affirmer une causalité fausse.
+
+**Tests.** Backend : `CampagneStatutTest` (401 sans session ; `true` pour les 3 rôles si une campagne est ouverte ; `false` si aucune ou seulement `brouillon` ; liste blanche stricte, aucune fuite d'id/nom/date dans la réponse brute) ; `MatriceAutorisationTest` étendu (`/api/campagne-ouverte` 401 sans session). Frontend : `useCampagneOuverte.test.js` (chargement → `null` ; `true`/`false` ; échec réseau → reste `null`) ; `CandidatDashboard.test.jsx` (nouveau cas : campagne fermée + aucun dossier → message dédié, pas de lien « Commencer ») ; `CandidatureWizard.test.jsx` (nouveau cas : 409 à la création → écran dédié, aucune tentative de confirmer la filière).
+
+**Documentation.** `docs/POINTS-OUVERTS.md` (3 lignes : date de clôture purement informative, brouillon tolérant après clôture — les deux déjà vrais avant ce lot, simplement documentés ici ; bouton sans vérification — traité par ce lot).
+
+**Divergences maquette.** Aucune (la maquette ne modélisait pas cet état).
+
+---
+
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)
 
 > **Inventaire vivant à jour : [`docs/POINTS-OUVERTS.md`](POINTS-OUVERTS.md)** (Lot 9c, ADR-28).

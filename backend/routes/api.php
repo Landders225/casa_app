@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\Admin\RapportController;
 use App\Http\Controllers\Api\Admin\RemplacementController;
 use App\Http\Controllers\Api\Auth\MotDePasseController as AuthMotDePasseController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CampagneStatutController;
 use App\Http\Controllers\Api\Candidat\CandidatureController;
 use App\Http\Controllers\Api\Candidat\ClassementController;
 use App\Http\Controllers\Api\Candidat\ExperienceController;
@@ -83,6 +84,12 @@ Route::post('/mot-de-passe/reinitialiser', [AuthMotDePasseController::class, 're
 Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+
+    // Signal minimal pour l'espace candidat (ADR-42) — AUCUNE restriction de
+    // rôle (tout compte authentifié) : juste un booléen, jamais l'id/nom/
+    // dates de la campagne. `POST /candidatures` reste la seule vraie
+    // barrière (Lot 6a) — ce point de lecture n'en est qu'un reflet.
+    Route::get('/campagne-ouverte', [CampagneStatutController::class, 'ouverte']);
 
     // --- Démonstration du filtrage par rôle (Lot 2, pas de métier) ---
     Route::get('/ping-candidat', PingController::class)

@@ -187,11 +187,22 @@ export function useCandidatureForm() {
   // --- Candidature / filière ---
   const createCandidature = useCallback(async (filiereId) => {
     if (candidature) return candidature
-    const res = await apiClient.post('/candidatures', { filiere_id: filiereId })
-    setCandidature(res.data)
-    setClassement(classementFromResource(res.data, filieres))
-    setReponses(reponsesFromResource(res.data))
-    return res.data
+    try {
+      const res = await apiClient.post('/candidatures', { filiere_id: filiereId })
+      setCandidature(res.data)
+      setClassement(classementFromResource(res.data, filieres))
+      setReponses(reponsesFromResource(res.data))
+      return res.data
+    } catch (err) {
+      // Aucune campagne ouverte (Lot 6a, ADR-42) — distinct de l'« already
+      // submitted » de submit() ci-dessous : traité ICI, jamais relancé, pour
+      // que l'écran affiche un message dédié plutôt que de l'avaler en silence.
+      if (err instanceof ApiError && err.status === 409) {
+        setStatus('campagne_fermee')
+        return null
+      }
+      throw err
+    }
   }, [candidature, filieres])
 
   const confirmFiliere = useCallback(async (cand) => {

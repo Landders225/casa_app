@@ -5,6 +5,7 @@ import { Spinner } from '../../components/ui/Spinner.jsx'
 import { useAuth } from '../../auth/useAuth.js'
 import { paths } from '../../routing/routes.js'
 import { useMaCandidature } from './useMaCandidature.js'
+import { useCampagneOuverte } from './useCampagneOuverte.js'
 import { SUIVI_ETAPES, suiviEtapeCourante } from './resultatMessages.js'
 
 const STATUT_BADGE = {
@@ -16,9 +17,24 @@ const STATUT_BADGE = {
 /**
  * Bloc « Prochaine étape » — dérivé UNIQUEMENT de `statut_public` (ou de
  * l'absence de candidature). Aucun état interne, aucune notion d'éligibilité.
+ *
+ * `campagneOuverte` (ADR-42) n'intervient QUE si `status === 'none'` : un
+ * candidat qui a déjà un dossier n'est jamais concerné (le comportement
+ * tolérant sur les brouillons après clôture est volontaire, cf.
+ * docs/POINTS-OUVERTS.md). `false` strictement masque le CTA ; `null`
+ * (chargement/échec) ou `true` l'affichent — fail-open, ce n'est qu'un
+ * confort d'affichage, jamais la vraie barrière (toujours serveur).
  */
-function prochaineEtape(status, statutPublic) {
+function prochaineEtape(status, statutPublic, campagneOuverte) {
   if (status === 'none') {
+    if (campagneOuverte === false) {
+      return {
+        titre: 'Candidatures closes',
+        desc: 'La campagne en cours est terminée. Aucune nouvelle candidature ne peut être déposée pour le moment.',
+        to: null,
+        cta: null,
+      }
+    }
     return {
       titre: 'Compléter mon dossier',
       desc: 'Formulaire guidé : filière, profil, expériences, justificatifs, puis soumission.',
@@ -61,6 +77,7 @@ function prochaineEtape(status, statutPublic) {
 export function CandidatDashboard() {
   const { user } = useAuth()
   const s = useMaCandidature()
+  const campagneOuverte = useCampagneOuverte()
 
   const prenom = user?.profil?.prenom || ''
 
@@ -83,7 +100,7 @@ export function CandidatDashboard() {
   }
 
   const aucuneCandidature = s.status === 'none'
-  const next = prochaineEtape(s.status, s.statutPublic)
+  const next = prochaineEtape(s.status, s.statutPublic, campagneOuverte)
   const badge = aucuneCandidature ? null : STATUT_BADGE[s.statutPublic] ?? { label: s.statutPublic, badge: 'badge-neutral' }
   const etapeCourante = aucuneCandidature ? 1 : suiviEtapeCourante(s.statutPublic)
 
@@ -123,9 +140,11 @@ export function CandidatDashboard() {
               <div className="fw-semibold body-lg">{next.titre}</div>
               <div className="text-muted body-sm">{next.desc}</div>
             </div>
-            <Link to={next.to} className="btn btn-primary">
-              {next.cta}
-            </Link>
+            {next.cta ? (
+              <Link to={next.to} className="btn btn-primary">
+                {next.cta}
+              </Link>
+            ) : null}
           </div>
 
           <h4 style={{ margin: 'var(--space-8) 0 var(--space-4)' }}>Mon parcours de candidature</h4>

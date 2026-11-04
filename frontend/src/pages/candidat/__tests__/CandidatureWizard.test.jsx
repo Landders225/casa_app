@@ -152,6 +152,31 @@ describe('CandidatureWizard', () => {
     await waitFor(() => expect(screen.getByText('Étape 3 / 10')).toBeInTheDocument())
   })
 
+  it('étape 2 : campagne fermée (409 à la création) -> écran dédié, rien avalé en silence', async () => {
+    apiClient.patch.mockResolvedValue({ data: PROFIL })
+    apiClient.post.mockImplementation((path) => {
+      if (path === '/candidatures') {
+        return Promise.reject(new ApiError('http', { status: 409, message: 'Aucune campagne ouverte pour candidater.' }))
+      }
+      return Promise.resolve({ data: {} })
+    })
+    renderWizard()
+    await screen.findByRole('heading', { name: /vos informations personnelles/i })
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: /suivant/i }))
+    await screen.findByText('Étape 2 / 10')
+
+    await user.click(screen.getByRole('button', { name: /agent de cuisine/i }))
+    await user.click(screen.getByLabelText(/je confirme/i))
+    await user.click(screen.getByRole('button', { name: /suivant/i }))
+
+    expect(await screen.findByText('Les candidatures sont closes')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /retour au tableau de bord/i })).toBeInTheDocument()
+    // Pas de confirmation de filière tentée : la création a déjà échoué.
+    expect(apiClient.post).not.toHaveBeenCalledWith(expect.stringContaining('confirmer-filiere'))
+  })
+
   it('étape 2 : sans confirmation cochée, « Suivant » est bloqué', async () => {
     apiClient.patch.mockResolvedValue({ data: PROFIL })
     apiClient.post.mockResolvedValue({ data: candidatureResource() })

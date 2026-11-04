@@ -41,6 +41,21 @@ function AlreadySubmitted() {
   )
 }
 
+function CampagneFermee() {
+  return (
+    <AppShell title="Formulaire de candidature">
+      <div className="empty-state card" style={{ maxWidth: 520, margin: '0 auto' }}>
+        <div className="empty-icon">
+          <i className="fa-solid fa-calendar-xmark" aria-hidden="true" />
+        </div>
+        <h3>Les candidatures sont closes</h3>
+        <p>Il n'est plus possible de déposer une nouvelle candidature pour le moment.</p>
+        <Link className="btn btn-primary" to={paths.candidat}>Retour au tableau de bord</Link>
+      </div>
+    </AppShell>
+  )
+}
+
 function SuccessModal({ numero }) {
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Candidature soumise">
@@ -104,6 +119,7 @@ export function CandidatureWizard() {
 
   if (form.status === 'loading') return <FullPageSpinner />
   if (form.status === 'submitted') return <AlreadySubmitted />
+  if (form.status === 'campagne_fermee') return <CampagneFermee />
   if (form.status === 'error') {
     return (
       <AppShell title="Formulaire de candidature">
@@ -131,6 +147,9 @@ export function CandidatureWizard() {
       }
       case 'filiere': {
         const cand = form.candidature ?? (await form.createCandidature(picked))
+        // `cand === null` : campagne fermée (form.status === 'campagne_fermee',
+        // déjà géré au rendu ci-dessus) — rien de plus à confirmer.
+        if (!cand) return
         await form.confirmFiliere(cand)
         return
       }
@@ -176,7 +195,11 @@ export function CandidatureWizard() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        return // le hook a basculé en 'submitted'
+        // Repli générique pour un 409 qui ne viendrait PAS de la création de
+        // candidature (celle-ci est désormais traitée localement par
+        // form.createCandidature -> status 'campagne_fermee', jamais relancée
+        // ici) — ex. dossier verrouillé entre-temps par un autre onglet.
+        return
       }
       setFlash(
         err instanceof ApiError && err.kind === 'validation'
