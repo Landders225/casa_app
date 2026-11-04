@@ -18,9 +18,13 @@ use Illuminate\Validation\ValidationException;
  *   POST /api/admin/affectations  { evaluateur_id, candidature_ids: [1..n] }
  *
  * Règles :
- *  - cible = `membre_equipe` de rôle `evaluateur` (l'admin supervise, il n'est
- *    pas dans le pool d'affectation) ;
- *  - candidatures affectables : `statut_interne ∈ {soumis, en_instruction}` ;
+ *  - cible = `membre_equipe` de rôle `evaluateur` dont le compte est ACTIF
+ *    (`utilisateur.actif`) — l'admin supervise, il n'est pas dans le pool
+ *    d'affectation ; un compte désactivé n'en fait plus partie non plus ;
+ *  - candidatures affectables : `statut_interne ∈ {soumis, en_instruction}`
+ *    ET `statut_eligibilite_interne ≠ non_eligible` (une élimination laisse
+ *    `statut_interne` inchangé — sans ce second critère, un dossier éliminé
+ *    resterait affectable) ;
  *  - ATOMIQUE : si une seule candidature n'est pas affectable → 422 avec la
  *    liste, rien n'est écrit ;
  *  - `soumis` → `en_instruction` + `evaluateur_id` (convention Lot 4a) ;
@@ -41,22 +45,37 @@ class AffectationController extends Controller
             422,
             "La cible d'une affectation doit être un membre d'équipe de rôle « évaluateur ».",
         );
+        abort_unless(
+            $membre->utilisateur->actif,
+            422,
+            "Le compte de cet évaluateur est désactivé : il ne peut pas recevoir d'affectation.",
+        );
 
         $candidatures = Candidature::query()
             ->with('evaluateur')
             ->whereIn('id', $request->validated('candidature_ids'))
             ->get();
 
-        $refusees = $candidatures->reject(
+        $refuseesStatut = $candidatures->reject(
             fn (Candidature $c) => in_array($c->statut_interne, ['soumis', 'en_instruction'], true),
         );
+        $refuseesEligibilite = $candidatures->diff($refuseesStatut)->filter(
+            fn (Candidature $c) => $c->statut_eligibilite_interne === 'non_eligible',
+        );
 
-        if ($refusees->isNotEmpty()) {
+        if ($refuseesStatut->isNotEmpty() || $refuseesEligibilite->isNotEmpty()) {
+            $motifs = [];
+            if ($refuseesStatut->isNotEmpty()) {
+                $motifs[] = 'Non affectable(s) (doit être « soumise » ou « en instruction ») : '
+                    .$refuseesStatut->pluck('numero_dossier')->join(', ').'.';
+            }
+            if ($refuseesEligibilite->isNotEmpty()) {
+                $motifs[] = 'Non affectable(s) (dossier non éligible) : '
+                    .$refuseesEligibilite->pluck('numero_dossier')->join(', ').'.';
+            }
+
             throw ValidationException::withMessages([
-                'candidature_ids' => [
-                    'Non affectable(s) (doit être « soumise » ou « en instruction ») : '
-                    .$refusees->pluck('numero_dossier')->join(', ').'. Aucune affectation effectuée.',
-                ],
+                'candidature_ids' => [implode(' ', $motifs).' Aucune affectation effectuée.'],
             ]);
         }
 

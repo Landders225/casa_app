@@ -43,6 +43,18 @@ class EvaluateursListeTest extends TestCase
         );
     }
 
+    public function test_un_evaluateur_desactive_n_est_plus_propose(): void
+    {
+        $actif = $this->creerEvaluateur('eval-actif@casa-demo.ci');
+        $inactif = $this->creerEvaluateur('eval-inactif@casa-demo.ci');
+        $inactif->forceFill(['actif' => false])->save();
+
+        $ids = collect($this->actingAs($this->admin)->getJson('/api/admin/evaluateurs')->assertOk()->json('data'))
+            ->pluck('id')->all();
+
+        $this->assertSame([$actif->membreEquipe->id], $ids);
+    }
+
     public function test_liste_blanche_stricte_aucun_email_aucune_donnee_de_compte(): void
     {
         $this->creerEvaluateur(email: 'secret-email@casa-demo.ci');

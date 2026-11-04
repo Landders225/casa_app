@@ -130,6 +130,57 @@ class AffectationTest extends TestCase
         $this->affecter([$c->id], $autreAdmin->membreEquipe->id)->assertStatus(422);
     }
 
+    public function test_un_evaluateur_desactive_ne_peut_pas_recevoir_d_affectation_422(): void
+    {
+        $c = $this->candidatureSoumise();
+        $this->evaluateur->forceFill(['actif' => false])->save();
+
+        $this->affecter([$c->id])->assertStatus(422);
+
+        // Rien n'a été écrit.
+        $this->assertNull($c->fresh()->evaluateur_id);
+        $this->assertSame('soumis', $c->fresh()->statut_interne);
+        $this->assertSame(0, JournalAudit::where('action', 'Affectation évaluateur')->count());
+    }
+
+    public function test_un_dossier_non_eligible_n_est_pas_affectable_et_bloque_tout_le_lot_422(): void
+    {
+        $ok = $this->candidatureSoumise();
+        $eliminee = $this->candidatureSoumise();
+
+        // Élimination par le VRAI endpoint : `statut_interne` reste `soumis`,
+        // seule l'éligibilité bascule — c'est précisément le trou comblé ici.
+        $this->actingAs($this->admin)
+            ->postJson("/api/admin/candidatures/{$eliminee->id}/elimination", ['motif' => 'Motif de test'])
+            ->assertOk();
+        $this->assertSame('soumis', $eliminee->fresh()->statut_interne);
+
+        $reponse = $this->affecter([$ok->id, $eliminee->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('candidature_ids');
+        $this->assertStringContainsString('non éligible', $reponse->json('errors.candidature_ids.0'));
+        $this->assertStringContainsString($eliminee->numero_dossier, $reponse->json('errors.candidature_ids.0'));
+        $this->assertStringNotContainsString($ok->numero_dossier, $reponse->json('errors.candidature_ids.0'));
+
+        $this->assertNull($ok->fresh()->evaluateur_id);
+        $this->assertNull($eliminee->fresh()->evaluateur_id);
+        $this->assertSame(0, JournalAudit::where('action', 'Affectation évaluateur')->count());
+    }
+
+    public function test_reaffectation_refusee_si_le_dossier_en_instruction_est_devenu_non_eligible_422(): void
+    {
+        $c = $this->candidatureSoumise();
+        $this->affecter([$c->id])->assertOk();
+        $this->actingAs($this->admin)
+            ->postJson("/api/admin/candidatures/{$c->id}/elimination", ['motif' => 'Motif de test'])
+            ->assertOk();
+
+        $eval2 = $this->creerEvaluateur('eval2@casa-demo.ci');
+        $this->affecter([$c->id], $eval2->membreEquipe->id)->assertStatus(422);
+
+        $this->assertSame($this->evaluateur->membreEquipe->id, $c->fresh()->evaluateur_id);
+    }
+
     public function test_le_4a_fonctionne_via_le_vrai_endpoint_d_affectation(): void
     {
         $c = $this->candidatureSoumise();

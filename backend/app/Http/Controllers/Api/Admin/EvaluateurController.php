@@ -17,6 +17,10 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  * ADR-39) — aucun des deux n'avait de point de lecture pour peupler un choix
  * côté client.
  *
+ * Évaluateurs ACTIFS seulement (`utilisateur.actif`) : un compte désactivé ne
+ * peut plus recevoir d'affectation (refus 422 côté `AffectationController`),
+ * il ne doit donc plus être proposé.
+ *
  * Non paginé (équipe de taille réduite, cf. `GET /api/filieres`). Liste
  * BLANCHE stricte via `EvaluateurResource` : jamais l'e-mail ni une donnée de
  * compte `utilisateur`.
@@ -26,7 +30,7 @@ class EvaluateurController extends Controller
     public function index(): AnonymousResourceCollection
     {
         $evaluateurs = MembreEquipe::query()
-            ->whereHas('utilisateur', fn ($q) => $q->where('role', 'evaluateur'))
+            ->whereHas('utilisateur', fn ($q) => $q->where('role', 'evaluateur')->where('actif', true))
             ->orderBy('prenom')
             ->get();
 
