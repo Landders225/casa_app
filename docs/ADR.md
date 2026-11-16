@@ -948,6 +948,42 @@ L'exception implémente **`ShouldntReport`** : un refus est une réponse métier
 
 **Divergences maquette.** La maquette ne modélisait qu'un lien de téléchargement direct ; l'aperçu en ligne est un ajout.
 
+## ADR-47 — Réattribution de dossiers déjà affectés, et garde « campagne publiée » partagée (Lot 20)
+
+**Contexte.** `AffectationController` (Lot 6a) ne gère que deux cas : première affectation d'un dossier `soumis` ou `en_instruction`, et ré-affectation d'un dossier `en_instruction` encore non verrouillé. Dès qu'un dossier a son volet /65 verrouillé (`statut_interne = 'evalue'`), il devient PERMANENTIMENT non affectable via cet endpoint — y compris quand seul l'entretien reste à conduire et que l'évaluateur initial devient indisponible, un cas réel. Il manquait aussi une voie de retour au lot non affecté, et le garde-fou « campagne déjà publiée » que l'affectation automatique (ADR-45) possède déjà. Deux commits séparés règlent ces trois manques.
+
+**Commit 1 — garde « campagne publiée » partagée (`7bd649c`).** `AffectationController` ne vérifiait jamais qu'une campagne concernée n'était pas déjà publiée (ADR-08), contrairement à `ServiceAffectationAutomatique::verifierCampagnesNonPubliees`. Plutôt que dupliquer une seconde fois la requête `Publication::whereIn('campagne_id', …)->exists()`, extraction dans `App\Domain\Affectation\GardeCampagnePubliee::estPubliee()` (simple fonction booléenne, PAS une exception : chaque appelant garde sa propre forme de refus) — réutilisée par `ServiceAffectationAutomatique` (inchangée dans son contrat public, toujours 409 `campagne_publiee` via `AffectationAutomatiqueRefusee`), `AffectationController` (nouveau : 409 générique) et `ReattributionController` (commit 2).
+
+**Commit 2 — `ReattributionController` (`POST /api/admin/reattributions`).** Distinct de l'affectation : opère uniquement sur des dossiers DÉJÀ affectés (`evaluateur_id` non nul), accepte `evaluateur_id` NULLABLE (`null` = lot non affecté). Une règle par état de l'évaluation :
+
+| État | Réattribution | Retour au pool non affecté |
+|---|---|---|
+| Absente | Libre | Libre |
+| Commencée (note MO.04/commentaire sur dossier non verrouillé, ou entretien `planifie`/`realise`) | Autorisée, **brouillon de l'ancien évaluateur réinitialisé** | Autorisée, même réinitialisation |
+| Dossier /65 verrouillé, entretien pas encore `valide` | Autorisée — seul l'entretien change de main, le score /65 reste figé (ADR-04) | **Refusée** |
+| Totalement validée (dossier + entretien) | Refusée | Refusée |
+| Campagne concernée publiée | Refusée (409), quel que soit l'état ci-dessus | Refusée (409) |
+
+Le refus « retour au pool interdit sur dossier verrouillé » est une décision délibérée : un dossier dont le /65 est figé ne doit JAMAIS se retrouver sans aucun évaluateur (l'entretien reste à conduire par quelqu'un) — seule une réattribution VERS UN AUTRE évaluateur reste ouverte dans ce cas, jamais une remise à zéro de l'affectation.
+
+**Réinitialisation du brouillon — tracée, jamais copiée.** `mo04_note_etoiles` et `commentaire_evaluateur` sont remis à `null` par écriture directe (`DB::table`, même patron que `EvaluationController::update` — ces colonnes ne sont pas `fillable`) ; un entretien `planifie`/`realise` (jamais `valide`) est supprimé avec ses sous-notes AVANT la ligne `entretien` (FK `note_sous_critere_entretien.entretien_id` sans cascade). La ligne `journal_audit` correspondante porte un `motif` qui DÉCRIT l'effacement (« Évaluation commencée : brouillon non validé de l'ancien évaluateur réinitialisé. ») mais ne contient JAMAIS la note, le commentaire ou les sous-notes effacées — ni dans `ancienne_valeur`, ni dans `nouvelle_valeur`, ni dans `motif`.
+
+**Confirmation explicite côté UI.** `ReattributionModal.jsx` affiche un avertissement permanent sur le risque de réinitialisation (le client ne peut pas savoir à l'avance si un brouillon existe réellement — aucun endpoint ne l'expose, et ça n'a pas été ajouté pour ce lot) et exige une case « J'ai compris » cochée avant d'activer le bouton de confirmation — jamais une case pré-cochée, jamais un clic unique sans ce passage.
+
+**Atomicité et verrouillage.** Les dossiers ciblés sont rechargés avec `lockForUpdate()` au tout début de la transaction — même patron que `ServiceAffectationAutomatique::executer` (ADR-45) : une affectation/réattribution concurrente sur les mêmes lignes attend le verrou puis les relit à jour. Si UN SEUL dossier du lot est refusé (quel qu'en soit le motif), RIEN n'est écrit — motifs agrégés dans un seul message, même forme qu'`AffectationController`. Plafond de sécurité par opération : 500 dossiers (`ReattributionController::PLAFOND_DOSSIERS`, même esprit que `ServiceAffectationAutomatique::PLAFOND_DOSSIERS`).
+
+**Filtre évaluateur de la supervision.** `GET /api/admin/evaluateurs` garde son comportement par défaut (actifs seulement — alimente TOUS les sélecteurs cibles : affectation, réattribution, affectation automatique). `?tous=1` ajoute les désactivés avec `actif` exposé par `EvaluateurResource` — utilisé UNIQUEMENT par le filtre de `CandidaturesSupervision.jsx` (mention « (désactivé) » dans l'option), jamais par un sélecteur cible.
+
+**Journal.** 1 ligne `journal_audit` PAR dossier (`ancienne_valeur`/`nouvelle_valeur` = noms des évaluateurs, comme `AffectationController`), avec `motif` décrivant le cas particulier (entretien seul concerné, ou brouillon réinitialisé) quand applicable.
+
+**Tests.** `AffectationTest` (+3, commit 1) : campagne publiée refuse l'affectation ET la ré-affectation, campagne clôturée reste autorisée. `ReattributionTest` (nouveau, commit 2) : une méthode par état du tableau ci-dessus, retour au pool interdit si verrouillé, atomicité (un seul refus bloque tout le lot), idempotence (rejouer la même réattribution laisse le même état final), plafond, cible désactivée/inconnue refusée, admin strict, 1 ligne d'audit par dossier avec ancien et nouvel évaluateur, contenu du brouillon jamais copié dans l'audit. `CandidaturesSupervision.test.jsx` (+4) : mention « désactivé » dans le filtre, bouton bloqué jusqu'à la case cochée, retour au pool envoie `evaluateur_id: null`, message atomique affiché verbatim sans fermer le modal.
+
+**Déploiement.** Aucune migration (aucune colonne nouvelle — réutilise `evaluateur_id`/`statut_interne`/`dossier_verrouille`/`entretien.statut` existants). Déploiement applicatif standard.
+
+**Points ouverts** (`docs/POINTS-OUVERTS.md`) : le verrouillage concurrent (`lockForUpdate`) n'est pas démontré par un test de course réelle (limitation connue de PHPUnit mono-connexion, même limite que pour ADR-45) ; aucun endpoint n'expose à l'avance si un dossier a un brouillon en cours, l'avertissement de `ReattributionModal` reste donc permanent plutôt que conditionnel.
+
+**Divergences maquette.** La maquette ne modélisait pas de réattribution après affectation initiale ; c'est un ajout.
+
 ---
 
 ## Points laissés ouverts pour un lot ultérieur (non traités ici)

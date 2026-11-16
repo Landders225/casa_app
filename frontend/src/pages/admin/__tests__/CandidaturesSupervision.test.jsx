@@ -11,8 +11,13 @@ vi.mock('../../../lib/apiClient.js', () => ({ apiClient: { get: vi.fn(), patch: 
 vi.mock('../../../auth/useAuth.js', () => ({ useAuth: vi.fn() }))
 
 const EVALUATEURS = [
-  { id: 'eval-1', prenom: 'Yann', nom: 'Kacou', poste: "Chargé d'évaluation" },
-  { id: 'eval-2', prenom: 'Aya', nom: 'Bamba', poste: "Chargée d'évaluation" },
+  { id: 'eval-1', prenom: 'Yann', nom: 'Kacou', poste: "Chargé d'évaluation", actif: true },
+  { id: 'eval-2', prenom: 'Aya', nom: 'Bamba', poste: "Chargée d'évaluation", actif: true },
+]
+// `?tous=1` (Lot 20b) : inclut un évaluateur désactivé, jamais dans `EVALUATEURS` (actifs seuls).
+const EVALUATEURS_TOUS = [
+  ...EVALUATEURS,
+  { id: 'eval-3', prenom: 'Koffi', nom: 'Désactivé', poste: "Chargé d'évaluation", actif: false },
 ]
 const CAMPAGNES = [{ id: 'camp-1', nom: 'Cohorte 1 — 2026', statut: 'ouverte', date_ouverture: '2026-05-01', date_cloture: '2026-06-30', places_totales: 120 }]
 const FILIERES = [{ id: 'f1', code: 'cuisine', nom: 'Agent de cuisine', description: '', actif: true }]
@@ -50,6 +55,7 @@ function mockCandidatures({ candidatures = [candidature()], meta = { current_pag
   })
   apiClient.get.mockImplementation((path) => {
     if (path === '/admin/evaluateurs') return Promise.resolve({ data: EVALUATEURS })
+    if (path === '/admin/evaluateurs?tous=1') return Promise.resolve({ data: EVALUATEURS_TOUS })
     if (path === '/admin/campagnes') return Promise.resolve({ data: CAMPAGNES })
     if (path === '/filieres') return Promise.resolve({ data: FILIERES })
     return Promise.resolve({ data: [] })
@@ -170,6 +176,89 @@ describe('CandidaturesSupervision — affectation en masse (atomique)', () => {
     expect(alerte).toHaveTextContent(/CASA-2026-000001/)
     // Le modal reste ouvert, la sélection n'est PAS vidée : la case reste cochée.
     expect(screen.getByRole('dialog', { name: 'Affecter à un évaluateur' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i })).toBeChecked()
+  })
+})
+
+describe('CandidaturesSupervision — réattribution de dossiers déjà affectés (Lot 20b)', () => {
+  it('le filtre évaluateur affiche aussi les désactivés, avec la mention « désactivé »', async () => {
+    mockCandidatures()
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    const filtre = await screen.findByDisplayValue('Tous les évaluateurs')
+    expect(within(filtre).getByText('Koffi Désactivé (désactivé)')).toBeInTheDocument()
+    expect(within(filtre).getByText('Yann Kacou')).toBeInTheDocument()
+  })
+
+  it('sélection -> réattribuer -> bouton bloqué jusqu’à la case cochée -> POST correct, sélection vidée', async () => {
+    mockCandidatures()
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    apiClient.post.mockResolvedValueOnce({ data: { reattribuees: 1, evaluateur: { id: 'eval-2', prenom: 'Aya', nom: 'Bamba' } } })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i }))
+    await user.click(screen.getByRole('button', { name: /réattribuer \(1\)/i }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Réattribuer' })
+    const confirmBtn = within(dialog).getByRole('button', { name: 'Réattribuer' })
+    expect(confirmBtn).toBeDisabled()
+
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: /nouvelle affectation/i }), 'eval-2')
+    await user.click(within(dialog).getByRole('checkbox', { name: /j'ai compris/i }))
+    expect(confirmBtn).toBeEnabled()
+    await user.click(confirmBtn)
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/reattributions', { evaluateur_id: 'eval-2', candidature_ids: ['c-1'] }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /réattribuer \(/i })).not.toBeInTheDocument()
+  })
+
+  it('« remettre dans le lot non affecté » envoie evaluateur_id: null', async () => {
+    mockCandidatures()
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    apiClient.post.mockResolvedValueOnce({ data: { reattribuees: 1, evaluateur: null } })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i }))
+    await user.click(screen.getByRole('button', { name: /réattribuer \(1\)/i }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Réattribuer' })
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: /nouvelle affectation/i }), 'Remettre dans le lot non affecté')
+    await user.click(within(dialog).getByRole('checkbox', { name: /j'ai compris/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Réattribuer' }))
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/reattributions', { evaluateur_id: null, candidature_ids: ['c-1'] }))
+  })
+
+  it('422 atomique (dossier déjà verrouillé) -> message VERBATIM affiché, le modal reste ouvert', async () => {
+    mockCandidatures()
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    apiClient.post.mockRejectedValueOnce(
+      new ApiError('validation', {
+        status: 422,
+        errors: { candidature_ids: ["Dossier déjà verrouillé — impossible de remettre dans le lot non affecté, seule une réattribution vers un autre évaluateur est permise : CASA-2026-000001. Aucune réattribution effectuée."] },
+      }),
+    )
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i }))
+    await user.click(screen.getByRole('button', { name: /réattribuer \(1\)/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Réattribuer' })
+    await user.click(within(dialog).getByRole('checkbox', { name: /j'ai compris/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Réattribuer' }))
+
+    // Deux `role="alert"` coexistent dans ce modal (l'avertissement permanent
+    // + l'erreur serveur) : on cible l'erreur par son texte, pas par le rôle.
+    const alerte = await screen.findByText(/aucune réattribution effectuée/i)
+    expect(alerte).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Réattribuer' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i })).toBeChecked()
   })
 })

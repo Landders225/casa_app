@@ -10,11 +10,13 @@ import { AffectationAutomatiqueModal } from './AffectationAutomatiqueModal.jsx'
 import { AssignModal } from './AssignModal.jsx'
 import { MotifConfirmDialog } from './MotifConfirmDialog.jsx'
 import { DECISION_FILTRE_OPTIONS, DECISION_LABELS, ELIGIBILITE_LABELS, STATUT_INTERNE_LABELS } from './optionLabels.js'
+import { ReattributionModal } from './ReattributionModal.jsx'
 import { useAffectation } from './useAffectation.js'
 import { useCampagnes } from './useCampagnes.js'
 import { criteresSupervision, useCandidaturesAdmin } from './useCandidaturesAdmin.js'
 import { useElimination } from './useElimination.js'
 import { useEvaluateurs } from './useEvaluateurs.js'
+import { useReattribution } from './useReattribution.js'
 
 const STATUTS = ['soumis', 'en_instruction', 'evalue', 'non_eligible']
 const ELIGIBILITES = ['non_verifie', 'eligible', 'non_eligible']
@@ -53,6 +55,7 @@ export function CandidaturesSupervision() {
   const [filieres, setFilieres] = useState([])
   const [selected, setSelected] = useState(() => new Set())
   const [showAssign, setShowAssign] = useState(false)
+  const [showReattribution, setShowReattribution] = useState(false)
   // Mode « tous les N résultats » : `{ criteres, nombre }` figés au clic, ou null.
   const [selectionTous, setSelectionTous] = useState(null)
   const [showAuto, setShowAuto] = useState(false)
@@ -73,8 +76,13 @@ export function CandidaturesSupervision() {
     page,
   })
   const { items: evaluateurs } = useEvaluateurs()
+  // `tous: true` UNIQUEMENT pour le filtre ci-dessous : il doit aussi
+  // proposer les évaluateurs désactivés (mention « désactivé »), jamais les
+  // sélecteurs cibles (`evaluateurs` ci-dessus reste actifs seulement).
+  const { items: evaluateursFiltre } = useEvaluateurs({ tous: true })
   const { items: campagnes } = useCampagnes()
   const { assign, assigning, error: assignError, resetError } = useAffectation()
+  const { reattribuer, reattributing, error: reattributionError, resetError: resetReattributionError } = useReattribution()
   const { eliminer, eliminating, error: eliminationError, resetError: resetEliminationError } = useElimination()
 
   useEffect(() => {
@@ -201,6 +209,20 @@ export function CandidaturesSupervision() {
     }
   }
 
+  const confirmReattribution = async (evaluateurId) => {
+    try {
+      const res = await reattribuer(evaluateurId, [...selected])
+      setShowReattribution(false)
+      setSelected(new Set())
+      reload()
+      return res
+    } catch {
+      // Même logique qu'`confirmAssign` : message atomique affiché tel
+      // quel, sélection conservée pour ajuster.
+      return null
+    }
+  }
+
   const confirmElimination = async (motif) => {
     try {
       await eliminer(eliminationCible.id, motif)
@@ -248,6 +270,9 @@ export function CandidaturesSupervision() {
             <button type="button" className="btn btn-outline btn-sm" onClick={() => { resetError(); setShowAssign(true) }}>
               <i className="fa-solid fa-user-plus" aria-hidden="true" /> Affecter ({selected.size})
             </button>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => { resetReattributionError(); setShowReattribution(true) }}>
+              <i className="fa-solid fa-right-left" aria-hidden="true" /> Réattribuer ({selected.size})
+            </button>
           </div>
         ) : null}
       </div>
@@ -290,8 +315,8 @@ export function CandidaturesSupervision() {
         <select className="select" style={{ maxWidth: 220 }} value={evaluateurFiltre} onChange={(e) => { setEvaluateurFiltre(e.target.value); resetPage() }}>
           <option value="">Tous les évaluateurs</option>
           <option value="non_affecte">Non affecté</option>
-          {evaluateurs.map((e) => (
-            <option key={e.id} value={e.id}>{e.prenom} {e.nom}</option>
+          {evaluateursFiltre.map((e) => (
+            <option key={e.id} value={e.id}>{e.prenom} {e.nom}{e.actif ? '' : ' (désactivé)'}</option>
           ))}
         </select>
         <select className="select" style={{ maxWidth: 220 }} value={campagneFiltre} onChange={(e) => { setCampagneFiltre(e.target.value); resetPage() }}>
@@ -462,6 +487,17 @@ export function CandidaturesSupervision() {
           error={assignError}
           onCancel={() => setShowAssign(false)}
           onConfirm={confirmAssign}
+        />
+      ) : null}
+
+      {showReattribution ? (
+        <ReattributionModal
+          count={selected.size}
+          evaluateurs={evaluateurs}
+          reattributing={reattributing}
+          error={reattributionError}
+          onCancel={() => setShowReattribution(false)}
+          onConfirm={confirmReattribution}
         />
       ) : null}
 

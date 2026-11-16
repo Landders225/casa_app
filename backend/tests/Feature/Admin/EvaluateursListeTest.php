@@ -62,7 +62,7 @@ class EvaluateursListeTest extends TestCase
         $reponse = $this->actingAs($this->admin)->getJson('/api/admin/evaluateurs')->assertOk();
 
         foreach ($reponse->json('data') as $ligne) {
-            $this->assertSame(['id', 'prenom', 'nom', 'poste'], array_keys($ligne));
+            $this->assertSame(['id', 'prenom', 'nom', 'poste', 'actif'], array_keys($ligne));
         }
 
         // Aucune trace de l'e-mail, ni de l'id `utilisateur`, ni de timestamps.
@@ -76,6 +76,33 @@ class EvaluateursListeTest extends TestCase
     {
         foreach ([$this->creerEvaluateur('e@casa-demo.ci'), $this->creerCandidat('c@casa-demo.ci')] as $intrus) {
             $this->actingAs($intrus)->getJson('/api/admin/evaluateurs')->assertStatus(403);
+        }
+    }
+
+    // --- Lot 20b — `?tous=1` : alimente UNIQUEMENT le filtre de supervision. ---
+
+    public function test_tous_inclut_les_desactives_avec_actif_expose(): void
+    {
+        $actif = $this->creerEvaluateur('eval-actif2@casa-demo.ci');
+        $inactif = $this->creerEvaluateur('eval-inactif2@casa-demo.ci');
+        $inactif->forceFill(['actif' => false])->save();
+
+        $reponse = $this->actingAs($this->admin)->getJson('/api/admin/evaluateurs?tous=1')->assertOk();
+
+        $parId = collect($reponse->json('data'))->keyBy('id');
+        $this->assertCount(2, $parId);
+        $this->assertTrue($parId[$actif->membreEquipe->id]['actif']);
+        $this->assertFalse($parId[$inactif->membreEquipe->id]['actif']);
+    }
+
+    public function test_sans_tous_actif_est_toujours_vrai(): void
+    {
+        $this->creerEvaluateur('eval-actif3@casa-demo.ci');
+
+        $reponse = $this->actingAs($this->admin)->getJson('/api/admin/evaluateurs')->assertOk();
+
+        foreach ($reponse->json('data') as $ligne) {
+            $this->assertTrue($ligne['actif']);
         }
     }
 }

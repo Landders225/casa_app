@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Admin\FiliereController as AdminFiliereController;
 use App\Http\Controllers\Api\Admin\MembreController;
 use App\Http\Controllers\Api\Admin\PublicationController;
 use App\Http\Controllers\Api\Admin\RapportController;
+use App\Http\Controllers\Api\Admin\ReattributionController;
 use App\Http\Controllers\Api\Admin\RemplacementController;
 use App\Http\Controllers\Api\Auth\MotDePasseController as AuthMotDePasseController;
 use App\Http\Controllers\Api\AuthController;
@@ -136,6 +137,9 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
         // sélection par filtres (jamais par liste d'identifiants), POST (ADR-39).
         Route::post('/affectations/automatique/apercu', [AffectationAutomatiqueController::class, 'apercu']);
         Route::post('/affectations/automatique', [AffectationAutomatiqueController::class, 'store']);
+        // Réattribution de dossiers DÉJÀ AFFECTÉS, vers un autre évaluateur ou
+        // vers le lot non affecté (Lot 20b, ADR-47).
+        Route::post('/reattributions', [ReattributionController::class, 'store']);
         // Vue de supervision transverse + recherche serveur (ADR-39 : POST pour ne
         // pas archiver les noms de candidats recherchés dans les access log).
         Route::post('/candidatures', [CandidatureSupervisionController::class, 'rechercher']);
