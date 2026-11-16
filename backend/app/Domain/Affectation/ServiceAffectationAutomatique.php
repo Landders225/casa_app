@@ -7,7 +7,6 @@ use App\Exceptions\AffectationAutomatiqueRefusee;
 use App\Models\Candidature;
 use App\Models\JournalAudit;
 use App\Models\MembreEquipe;
-use App\Models\Publication;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -231,7 +230,7 @@ final class ServiceAffectationAutomatique
     {
         $campagnes = $dossiers->pluck('campagne_id')->unique()->values();
 
-        if ($campagnes->isNotEmpty() && Publication::query()->whereIn('campagne_id', $campagnes)->exists()) {
+        if (GardeCampagnePubliee::estPubliee($campagnes)) {
             throw AffectationAutomatiqueRefusee::campagnePubliee();
         }
     }

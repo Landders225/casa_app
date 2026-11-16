@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Models\Candidature;
 use App\Models\JournalAudit;
+use App\Models\Publication;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -226,6 +227,52 @@ class AffectationTest extends TestCase
         foreach (['evaluateur', 'Eval Test', 'en_instruction', 'statut_interne'] as $interdit) {
             $this->assertStringNotContainsString($interdit, $apres->getContent());
         }
+    }
+
+    // --- Correctif de revue (commit séparé) — garde « campagne publiée », ---
+    // --- partagée avec l'affectation automatique (ADR-45, GardeCampagnePubliee). ---
+
+    public function test_campagne_publiee_409_rien_n_est_ecrit(): void
+    {
+        $c = $this->candidatureSoumise();
+        Publication::create([
+            'campagne_id' => $c->campagne_id,
+            'publiee_le' => now(),
+            'publiee_par' => $this->admin->membreEquipe->id,
+        ]);
+
+        $this->affecter([$c->id])->assertStatus(409);
+
+        $this->assertNull($c->fresh()->evaluateur_id);
+        $this->assertSame('soumis', $c->fresh()->statut_interne);
+        $this->assertSame(0, JournalAudit::where('action', 'Affectation évaluateur')->count());
+    }
+
+    public function test_campagne_cloturee_reste_autorisee(): void
+    {
+        $c = $this->candidatureSoumise();
+        $c->campagne->forceFill(['statut' => 'cloturee'])->save();
+
+        $this->affecter([$c->id])->assertOk();
+
+        $this->assertSame($this->evaluateur->membreEquipe->id, $c->fresh()->evaluateur_id);
+    }
+
+    public function test_reaffectation_refusee_si_la_campagne_a_ete_publiee_entre_temps(): void
+    {
+        $c = $this->candidatureSoumise();
+        $this->affecter([$c->id])->assertOk();
+
+        Publication::create([
+            'campagne_id' => $c->campagne_id,
+            'publiee_le' => now(),
+            'publiee_par' => $this->admin->membreEquipe->id,
+        ]);
+
+        $eval2 = $this->creerEvaluateur('eval2@casa-demo.ci');
+        $this->affecter([$c->id], $eval2->membreEquipe->id)->assertStatus(409);
+
+        $this->assertSame($this->evaluateur->membreEquipe->id, $c->fresh()->evaluateur_id);
     }
 
     public function test_affectation_admin_only(): void

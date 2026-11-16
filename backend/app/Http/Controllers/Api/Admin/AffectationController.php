@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Domain\Affectation\GardeCampagnePubliee;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AffecterEvaluateurRequest;
 use App\Models\Candidature;
@@ -55,6 +56,18 @@ class AffectationController extends Controller
             ->with('evaluateur')
             ->whereIn('id', $request->validated('candidature_ids'))
             ->get();
+
+        // Correctif de revue : une campagne dont les résultats sont déjà
+        // publiés (ADR-08) ne doit plus voir ses dossiers changer d'évaluateur
+        // — ce garde-fou existait déjà pour l'affectation AUTOMATIQUE
+        // (ADR-45) mais manquait ici. 409 (conflit d'état), pas 422 (les
+        // refus 422 ci-dessous visent un dossier précis ; celui-ci vise la
+        // campagne entière, même sémantique que `AffectationAutomatiqueRefusee::campagnePubliee`).
+        abort_if(
+            GardeCampagnePubliee::estPubliee($candidatures->pluck('campagne_id')->unique()->values()),
+            409,
+            "Les résultats d'une campagne concernée sont déjà publiés : aucune affectation n'est possible sur ces dossiers.",
+        );
 
         $refuseesStatut = $candidatures->reject(
             fn (Candidature $c) => in_array($c->statut_interne, ['soumis', 'en_instruction'], true),
