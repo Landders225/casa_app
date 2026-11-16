@@ -20,15 +20,18 @@ class PieceEvaluateurController extends Controller
      *
      * Journalisée au même titre que l'aperçu (Lot 19) : sans ça, le
      * téléchargement direct contournerait silencieusement la traçabilité des
-     * consultations.
+     * consultations. Journalisée APRÈS la vérification d'existence du fichier
+     * (correctif de revue) : un 404 « fichier introuvable » n'est pas une
+     * consultation réelle, il ne doit jamais produire de ligne d'audit.
      */
     public function download(Request $request, PieceJustificative $piece): StreamedResponse
     {
         $this->authorize('downloadCommeEvaluateur', $piece);
-        JournalisationConsultationPiece::enregistrerSiNouvelle($request->user(), $piece);
 
         $disque = Storage::disk('documents');
         abort_unless($disque->exists($piece->chemin_stockage), 404, 'Fichier introuvable.');
+
+        JournalisationConsultationPiece::enregistrerSiNouvelle($request->user(), $piece);
 
         return $disque->download($piece->chemin_stockage, $piece->nom_original, [
             'Content-Type' => $piece->type_mime,
@@ -49,14 +52,18 @@ class PieceEvaluateurController extends Controller
      *    du flux `fetch` + aperçu applicatif), le navigateur la rend dans un
      *    contexte sans origine, sans script, sans plugin — même si le contenu
      *    n'était pas le PDF/image attendu.
+     *
+     * Journalisée APRÈS la vérification d'existence (correctif de revue) :
+     * même raison que `download` ci-dessus.
      */
     public function apercu(Request $request, PieceJustificative $piece): StreamedResponse
     {
         $this->authorize('downloadCommeEvaluateur', $piece);
-        JournalisationConsultationPiece::enregistrerSiNouvelle($request->user(), $piece);
 
         $disque = Storage::disk('documents');
         abort_unless($disque->exists($piece->chemin_stockage), 404, 'Fichier introuvable.');
+
+        JournalisationConsultationPiece::enregistrerSiNouvelle($request->user(), $piece);
 
         return $disque->response($piece->chemin_stockage, $piece->nom_original, [
             'Content-Type' => $piece->type_mime,

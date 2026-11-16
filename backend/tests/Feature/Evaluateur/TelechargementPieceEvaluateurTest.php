@@ -126,6 +126,23 @@ class TelechargementPieceEvaluateurTest extends TestCase
             ->assertJsonPath('message', 'Fichier introuvable.');
     }
 
+    /**
+     * Correctif de revue : un 404 « fichier introuvable » n'est pas une
+     * consultation réelle — aucune ligne d'audit, sur l'aperçu NI sur le
+     * téléchargement direct.
+     */
+    public function test_fichier_absent_du_disque_ne_cree_aucune_ligne_d_audit(): void
+    {
+        Storage::disk('documents')->delete(PieceJustificative::find($this->pieceId)->chemin_stockage);
+
+        $this->actingAs($this->evaluateur)->getJson("/api/evaluateur/pieces/{$this->pieceId}/apercu")
+            ->assertStatus(404);
+        $this->actingAs($this->evaluateur)->getJson("/api/evaluateur/pieces/{$this->pieceId}/download")
+            ->assertStatus(404);
+
+        $this->assertSame(0, JournalAudit::where('action', 'Consultation pièce')->count());
+    }
+
     // --- Lot 19 — journalisation dédupliquée (aperçu ET téléchargement direct). ---
 
     public function test_l_apercu_cree_une_ligne_d_audit_minimale(): void

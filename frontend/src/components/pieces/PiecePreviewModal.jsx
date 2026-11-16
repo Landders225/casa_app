@@ -15,6 +15,11 @@ import './PiecePreviewModal.css'
  * téléchargement (même policy), et journalise la consultation côté
  * évaluateur/admin (jamais côté candidat, qui ne consulte que sa propre pièce).
  *
+ * `piece.url_apercu` est un chemin ABSOLU côté API (`/api/pieces/{id}/apercu`,
+ * même convention que `piece.url` utilisé en `href` direct) — `apiClient`
+ * préfixe lui-même `/api` (`BASE`), donc on retire ce préfixe avant de l'y
+ * passer (correctif de revue : sans ça, `/api/api/pieces/...` -> 404).
+ *
  * Ce que l'aperçu NE protège PAS (affiché explicitement en bas de la modale) :
  * une capture d'écran, un enregistrement d'écran ou une impression du contenu
  * affiché restent toujours possibles. Ce n'est pas un DRM — seulement un moyen
@@ -29,7 +34,7 @@ export function PiecePreviewModal({ piece, label, onClose }) {
     let vivant = true
 
     apiClient
-      .getBlob(piece.url_apercu)
+      .getBlob(piece.url_apercu.replace(/^\/api/, ''))
       .then(async ({ blob }) => {
         if (!vivant) return
 
@@ -77,6 +82,15 @@ export function PiecePreviewModal({ piece, label, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [piece.url_apercu])
 
+  // Échap ferme la modale (correctif de revue) — même geste que le bouton Fermer.
+  useEffect(() => {
+    function surTouche(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', surTouche)
+    return () => document.removeEventListener('keydown', surTouche)
+  }, [onClose])
+
   return (
     <div className="modal-overlay piece-preview-overlay" role="dialog" aria-modal="true" aria-label={`Aperçu — ${label}`}>
       <div className="piece-preview-modal">
@@ -111,7 +125,7 @@ export function PiecePreviewModal({ piece, label, onClose }) {
               Aperçu impossible pour ce fichier. Vous pouvez le télécharger avec le bouton ci-dessus.
             </div>
           ) : etat.statut === 'image' ? (
-            <ImageApercu url={etat.url} alt={label} />
+            <ImageApercu url={etat.url} alt={label} onError={() => setEtat({ statut: 'illisible' })} />
           ) : etat.statut === 'pdf' ? (
             <PdfApercu pdf={etat.pdf} nombrePages={etat.nombrePages} />
           ) : null}
@@ -126,7 +140,7 @@ export function PiecePreviewModal({ piece, label, onClose }) {
   )
 }
 
-function ImageApercu({ url, alt }) {
+function ImageApercu({ url, alt, onError }) {
   const [zoom, setZoom] = useState(1)
 
   return (
@@ -141,7 +155,7 @@ function ImageApercu({ url, alt }) {
       </div>
       <div className="piece-preview-image-scroll">
         {/* eslint-disable-next-line jsx-a11y/alt-text -- couvert par `alt` */}
-        <img src={url} alt={alt} style={{ transform: `scale(${zoom})` }} />
+        <img src={url} alt={alt} style={{ transform: `scale(${zoom})` }} onError={onError} />
       </div>
     </div>
   )
@@ -169,6 +183,7 @@ function PdfPage({ pdf, numero }) {
   const wrapRef = useRef(null)
   const [rendue, setRendue] = useState(false)
   const [hauteur, setHauteur] = useState(null)
+  const [erreur, setErreur] = useState(false)
 
   useEffect(() => {
     const noeud = wrapRef.current
@@ -202,30 +217,44 @@ function PdfPage({ pdf, numero }) {
   useEffect(() => {
     if (!rendue) return
     let vivant = true
+    let tache = null
 
-    pdf.getPage(numero).then((page) => {
-      if (!vivant || !canvasRef.current) return
+    pdf.getPage(numero)
+      .then((page) => {
+        if (!vivant || !canvasRef.current) return
 
-      const largeurCible = Math.min(760, window.innerWidth - 32)
-      const viewportBase = page.getViewport({ scale: 1 })
-      const echelle = largeurCible / viewportBase.width
-      const viewport = page.getViewport({ scale: echelle })
-      setHauteur(viewport.height)
+        const largeurCible = Math.min(760, window.innerWidth - 32)
+        const viewportBase = page.getViewport({ scale: 1 })
+        const echelle = largeurCible / viewportBase.width
+        const viewport = page.getViewport({ scale: echelle })
+        setHauteur(viewport.height)
 
-      const canvas = canvasRef.current
-      canvas.width = viewport.width
-      canvas.height = viewport.height
-      page.render({ canvasContext: canvas.getContext('2d'), viewport })
-    })
+        const canvas = canvasRef.current
+        canvas.width = viewport.width
+        canvas.height = viewport.height
+        tache = page.render({ canvasContext: canvas.getContext('2d'), viewport })
+        return tache.promise
+      })
+      .catch((err) => {
+        // Rendu annulé volontairement au démontage (tache.cancel() ci-dessous) :
+        // ce n'est pas une erreur à afficher.
+        if (!vivant || err?.name === 'RenderingCancelledException') return
+        setErreur(true)
+      })
 
     return () => {
       vivant = false
+      if (tache) tache.cancel()
     }
   }, [pdf, numero, rendue])
 
   return (
     <div ref={wrapRef} className="piece-preview-pdf-page" style={hauteur ? { minHeight: hauteur } : undefined}>
-      {rendue ? <canvas ref={canvasRef} /> : null}
+      {erreur ? (
+        <div className="piece-preview-pdf-page-erreur caption">Page illisible.</div>
+      ) : rendue ? (
+        <canvas ref={canvasRef} />
+      ) : null}
       <span className="caption piece-preview-pdf-page-numero">Page {numero}</span>
     </div>
   )

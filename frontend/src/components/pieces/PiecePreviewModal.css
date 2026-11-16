@@ -76,6 +76,15 @@
   gap: var(--space-4);
 }
 
+.piece-preview-pdf-page-erreur {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 300px;
+  height: 120px;
+  color: var(--casa-text-secondary);
+}
+
 .piece-preview-pdf-page {
   position: relative;
   background: #fff;

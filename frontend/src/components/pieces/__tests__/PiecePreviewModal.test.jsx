@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '../../../lib/apiClient.js'
@@ -40,6 +40,16 @@ describe('PiecePreviewModal', () => {
 
     await waitFor(() => expect(screen.getByRole('img', { name: 'CNI' })).toBeInTheDocument())
     expect(screen.getByRole('img', { name: 'CNI' })).toHaveAttribute('src', 'blob:mock-preview')
+  })
+
+  it('appelle getBlob sans le préfixe /api (correctif de revue — url_apercu est un chemin absolu, apiClient préfixe déjà /api)', async () => {
+    const blob = { type: 'image/png', arrayBuffer: vi.fn() }
+    apiClient.getBlob.mockResolvedValue({ blob })
+
+    render(<PiecePreviewModal piece={piece({ url_apercu: '/api/pieces/p-1/apercu' })} label="CNI" onClose={() => {}} />)
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument())
+
+    expect(apiClient.getBlob).toHaveBeenCalledWith('/pieces/p-1/apercu')
   })
 
   it('révoque l’URL blob à la fermeture (démontage)', async () => {
@@ -86,7 +96,7 @@ describe('PiecePreviewModal', () => {
     const { getDocument } = await import('pdfjs-dist/build/pdf.mjs')
     const fakePage = {
       getViewport: () => ({ width: 100, height: 140 }),
-      render: () => {},
+      render: () => ({ promise: Promise.resolve(), cancel: vi.fn() }),
     }
     const fakePdf = { numPages: 2, getPage: vi.fn().mockResolvedValue(fakePage), destroy: vi.fn() }
     getDocument.mockReturnValue({ promise: Promise.resolve(fakePdf) })
@@ -97,6 +107,69 @@ describe('PiecePreviewModal', () => {
 
     await waitFor(() => expect(screen.getByText('Page 1')).toBeInTheDocument())
     expect(screen.getByText('Page 2')).toBeInTheDocument()
+  })
+
+  it('une image qui ne décode pas (onError) -> message "aperçu impossible"', async () => {
+    const blob = { type: 'image/png', arrayBuffer: vi.fn() }
+    apiClient.getBlob.mockResolvedValue({ blob })
+
+    render(<PiecePreviewModal piece={piece()} label="CNI" onClose={() => {}} />)
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument())
+
+    fireEvent.error(screen.getByRole('img'))
+
+    await waitFor(() => expect(screen.getByText(/aperçu impossible pour ce fichier/i)).toBeInTheDocument())
+  })
+
+  it('la touche Échap ferme la modale', async () => {
+    const blob = { type: 'image/png', arrayBuffer: vi.fn() }
+    apiClient.getBlob.mockResolvedValue({ blob })
+    const onClose = vi.fn()
+
+    render(<PiecePreviewModal piece={piece()} label="CNI" onClose={onClose} />)
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument())
+
+    await userEvent.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('page PDF dont le rendu échoue -> "Page illisible.", sans casser les autres pages', async () => {
+    const { getDocument } = await import('pdfjs-dist/build/pdf.mjs')
+    const fakePage = {
+      getViewport: () => ({ width: 100, height: 140 }),
+      render: () => ({ promise: Promise.reject(new Error('render failed')), cancel: vi.fn() }),
+    }
+    const fakePdf = { numPages: 1, getPage: vi.fn().mockResolvedValue(fakePage), destroy: vi.fn() }
+    getDocument.mockReturnValue({ promise: Promise.resolve(fakePdf) })
+    const blob = { type: 'application/pdf', arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(0)) }
+    apiClient.getBlob.mockResolvedValue({ blob })
+
+    render(<PiecePreviewModal piece={piece()} label="CNI" onClose={() => {}} />)
+
+    await waitFor(() => expect(screen.getByText('Page illisible.')).toBeInTheDocument())
+    expect(screen.getByText('Page 1')).toBeInTheDocument()
+  })
+
+  it('démontage pendant un rendu PDF en cours -> annule la tâche de rendu (tache.cancel)', async () => {
+    const { getDocument } = await import('pdfjs-dist/build/pdf.mjs')
+    const annuler = vi.fn()
+    const fakePage = {
+      getViewport: () => ({ width: 100, height: 140 }),
+      render: () => ({ promise: new Promise(() => {}), cancel: annuler }),
+    }
+    const fakePdf = { numPages: 1, getPage: vi.fn().mockResolvedValue(fakePage), destroy: vi.fn() }
+    getDocument.mockReturnValue({ promise: Promise.resolve(fakePdf) })
+    const blob = { type: 'application/pdf', arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(0)) }
+    apiClient.getBlob.mockResolvedValue({ blob })
+
+    const { unmount } = render(<PiecePreviewModal piece={piece()} label="CNI" onClose={() => {}} />)
+    await waitFor(() => expect(screen.getByText('Page 1')).toBeInTheDocument())
+    // Laisse le temps à l'effet de rendu de poser `tache` avant de démonter.
+    await new Promise((r) => setTimeout(r, 0))
+
+    unmount()
+
+    expect(annuler).toHaveBeenCalledTimes(1)
   })
 
   it('le bouton Fermer appelle onClose', async () => {
