@@ -66,9 +66,10 @@ export const ROLE_LABELS = {
 /**
  * Modules du journal d'audit (Lot 8d-1) — les libellés `module` en dur dans
  * chaque contrôleur qui écrit une ligne d'audit (Candidatures, Compte,
- * Entretien, Évaluation, Campagnes, Classement, Résultats, Filières). Noms de
- * CATÉGORIE de workflow, pas du contenu confidentiel — servent uniquement à
- * peupler le filtre `<select>` de l'écran Audit.
+ * Entretien, Évaluation, Campagnes, Classement, Résultats, Filières,
+ * Documents depuis le Lot 19). Noms de CATÉGORIE de workflow, pas du contenu
+ * confidentiel — servent uniquement à peupler le filtre `<select>` de
+ * l'écran Audit.
  */
 export const AUDIT_MODULES = [
   'Candidatures',
@@ -80,4 +81,5 @@ export const AUDIT_MODULES = [
   'Classement',
   'Résultats',
   'Filières',
+  'Documents',
 ]

@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppShell } from '../../components/layout/AppShell.jsx'
 import { Alert } from '../../components/ui/Alert.jsx'
+import { PiecePreviewModal } from '../../components/pieces/PiecePreviewModal.jsx'
 import { FullPageSpinner } from '../../components/ui/Spinner.jsx'
 import { paths } from '../../routing/routes.js'
 import { useDocuments } from './useDocuments.js'
@@ -23,6 +25,10 @@ import { EXPERIENCE_DOMAINES, EXPERIENCE_DUREES, PIECES_DOSSIER, PIECES_DOSSIER_
  * Téléchargement : lien direct `<a href={piece.url} target="_blank">`,
  * patron déjà en prod côté évaluateur (`FicheCandidat.jsx`, Lot 4a) — jamais
  * d'id/URL construit côté client, toujours celui renvoyé par le serveur.
+ *
+ * Aperçu en ligne (Lot 19) : bouton dédié, ouvre `PiecePreviewModal` — même
+ * composant partagé que `FicheCandidat.jsx`, pas de consultation journalisée
+ * ici (un candidat qui consulte sa propre pièce n'audite rien).
  */
 function humanSize(bytes) {
   if (bytes < 1024) return `${bytes} o`
@@ -38,20 +44,9 @@ function labelDuree(code) {
   return EXPERIENCE_DUREES.find((d) => d.value === code)?.label ?? code
 }
 
-function LigneDeposee({ label, piece }) {
+function LigneDeposee({ label, piece, onApercu }) {
   return (
-    <a
-      className="file-row"
-      style={{ marginBottom: 'var(--space-3)', textDecoration: 'none' }}
-      href={piece.url}
-      target="_blank"
-      // `noopener` SEUL (pas `noreferrer`) : Sanctum a besoin de l'en-tête
-      // `Referer` pour reconnaître cette navigation same-origin comme une
-      // requête « frontend » — sans lui, 401 (piège attrapé par l'E2E,
-      // cf. FicheCandidat.jsx où le même bug existait). `noopener` protège
-      // déjà contre le reverse-tabnabbing, seul risque réel d'un `_blank`.
-      rel="noopener"
-    >
+    <div className="file-row" style={{ marginBottom: 'var(--space-3)' }}>
       <div className="file-icon">
         <i className="fa-solid fa-file-lines" aria-hidden="true" />
       </div>
@@ -59,10 +54,27 @@ function LigneDeposee({ label, piece }) {
         <div className="fw-medium body-sm" style={{ color: 'var(--casa-text-primary)' }}>{label}</div>
         <div className="caption truncate">{piece.nom_original} · {humanSize(piece.taille_octets)}</div>
       </div>
-      <span className="badge badge-success">
-        <i className="fa-solid fa-download" aria-hidden="true" /> Télécharger
-      </span>
-    </a>
+      <div className="flex gap-2">
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => onApercu({ piece, label })}>
+          <i className="fa-solid fa-eye" aria-hidden="true" /> Aperçu
+        </button>
+        {/* `noopener` SEUL (pas `noreferrer`) : Sanctum a besoin de l'en-tête
+            `Referer` pour reconnaître cette navigation same-origin comme une
+            requête « frontend » — sans lui, 401 (piège attrapé par l'E2E,
+            cf. FicheCandidat.jsx où le même bug existait). `noopener` protège
+            déjà contre le reverse-tabnabbing, seul risque réel d'un `_blank`. */}
+        <a
+          className="badge badge-success"
+          style={{ textDecoration: 'none' }}
+          href={piece.url}
+          target="_blank"
+          rel="noopener"
+          aria-label={`Télécharger ${piece.nom_original}`}
+        >
+          <i className="fa-solid fa-download" aria-hidden="true" /> Télécharger
+        </a>
+      </div>
+    </div>
   )
 }
 
@@ -109,6 +121,7 @@ function EcranAtterrissage({ jamaisSoumis }) {
 
 export function Documents() {
   const s = useDocuments()
+  const [apercu, setApercu] = useState(null)
 
   if (s.status === 'loading') return <FullPageSpinner />
 
@@ -153,7 +166,7 @@ export function Documents() {
         {PIECES_DOSSIER.map((type) => {
           const piece = piecesParCode[type.code]
           return piece
-            ? <LigneDeposee key={type.code} label={type.label} piece={piece} />
+            ? <LigneDeposee key={type.code} label={type.label} piece={piece} onApercu={setApercu} />
             : <LigneManquante key={type.code} label={type.label} />
         })}
       </div>
@@ -167,7 +180,7 @@ export function Documents() {
             Ces pièces ne sont plus obligatoires, mais restent accessibles ici.
           </p>
           {piecesRetireesPresentes.map((type) => (
-            <LigneDeposee key={type.code} label={type.label} piece={piecesParCode[type.code]} />
+            <LigneDeposee key={type.code} label={type.label} piece={piecesParCode[type.code]} onApercu={setApercu} />
           ))}
         </div>
       ) : null}
@@ -180,10 +193,14 @@ export function Documents() {
           {s.experiences.map((exp) => {
             const label = `${labelDomaine(exp.domaine)} · ${labelDuree(exp.duree_categorie)}`
             return exp.justificatif
-              ? <LigneDeposee key={exp.id} label={label} piece={exp.justificatif} />
+              ? <LigneDeposee key={exp.id} label={label} piece={exp.justificatif} onApercu={setApercu} />
               : <LigneManquante key={exp.id} label={label} />
           })}
         </div>
+      ) : null}
+
+      {apercu ? (
+        <PiecePreviewModal piece={apercu.piece} label={apercu.label} onClose={() => setApercu(null)} />
       ) : null}
     </AppShell>
   )

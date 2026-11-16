@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Candidat;
 
+use App\Models\JournalAudit;
 use App\Models\PieceJustificative;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -69,6 +70,47 @@ class TelechargementPieceTest extends TestCase
     {
         $this->actingAs($this->user)
             ->getJson('/api/pieces/'.Str::uuid().'/download')
+            ->assertStatus(404);
+    }
+
+    // --- Lot 19 — aperçu : EXACTEMENT la même autorisation que /download, mais
+    // jamais journalisé côté candidat (il ne consulte que sa propre pièce). ---
+
+    public function test_le_proprietaire_previsualise_sa_piece(): void
+    {
+        $this->actingAs($this->user)->post(
+            "/api/candidatures/{$this->candidatureId}/pieces/cni",
+            ['fichier' => $this->fichierPdf('ma_cni.pdf')],
+        );
+        $piece = PieceJustificative::first();
+
+        $response = $this->actingAs($this->user)->get("/api/pieces/{$piece->id}/apercu");
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $response->assertHeader('x-content-type-options', 'nosniff');
+        $response->assertHeader('content-security-policy', "sandbox; default-src 'none'");
+        $this->assertStringContainsString('no-store', $response->headers->get('cache-control'));
+        $this->assertStringContainsString('inline', $response->headers->get('content-disposition'));
+        $this->assertSame(0, JournalAudit::count());
+    }
+
+    public function test_apercu_sans_authentification_401(): void
+    {
+        $this->actingAs($this->user)->post(
+            "/api/candidatures/{$this->candidatureId}/pieces/cni",
+            ['fichier' => $this->fichierPdf()],
+        );
+        $pieceId = PieceJustificative::first()->id;
+
+        $this->app['auth']->forgetGuards();
+        $this->getJson("/api/pieces/{$pieceId}/apercu")->assertStatus(401);
+    }
+
+    public function test_apercu_d_un_id_inexistant_404(): void
+    {
+        $this->actingAs($this->user)
+            ->getJson('/api/pieces/'.Str::uuid().'/apercu')
             ->assertStatus(404);
     }
 }

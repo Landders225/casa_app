@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth.js'
 import { AppShell } from '../../components/layout/AppShell.jsx'
 import { Alert } from '../../components/ui/Alert.jsx'
+import { PiecePreviewModal } from '../../components/pieces/PiecePreviewModal.jsx'
 import { FullPageSpinner } from '../../components/ui/Spinner.jsx'
 import { formatDateFr } from '../../lib/formatDate.js'
 import { evaluateurEntretienPath, evaluateurEvaluationPath, retourListeLabel, retourListePath } from '../../routing/routes.js'
@@ -78,8 +79,12 @@ function humanSize(bytes) {
  * téléchargement échouait en 401 (E2E `documents.spec.js` a attrapé le même
  * bug sur `Documents.jsx`, patron copié d'ici). `noopener` seul protège déjà
  * contre le reverse-tabnabbing (le vrai risque d'un `target="_blank"`).
+ *
+ * Bouton « Aperçu » (Lot 19) EN PLUS du téléchargement direct existant, qui
+ * reste inchangé — `onApercu` ouvre `PiecePreviewModal` dans le composant
+ * parent (état partagé entre tous les onglets de la fiche).
  */
-function PieceLink({ label, piece }) {
+function PieceLink({ label, piece, onApercu }) {
   if (!piece) {
     return (
       <div className="file-row file-row-empty" style={{ borderStyle: 'dashed', marginBottom: 'var(--space-3)' }}>
@@ -95,13 +100,7 @@ function PieceLink({ label, piece }) {
     )
   }
   return (
-    <a
-      className="file-row"
-      style={{ marginBottom: 'var(--space-3)', textDecoration: 'none' }}
-      href={piece.url}
-      target="_blank"
-      rel="noopener"
-    >
+    <div className="file-row" style={{ marginBottom: 'var(--space-3)' }}>
       <div className="file-icon">
         <i className="fa-solid fa-file-lines" aria-hidden="true" />
       </div>
@@ -111,10 +110,22 @@ function PieceLink({ label, piece }) {
           {piece.nom_original} · {humanSize(piece.taille_octets)}
         </div>
       </div>
-      <span className="badge badge-success">
-        <i className="fa-solid fa-download" aria-hidden="true" /> Télécharger
-      </span>
-    </a>
+      <div className="flex gap-2">
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => onApercu({ piece, label })}>
+          <i className="fa-solid fa-eye" aria-hidden="true" /> Aperçu
+        </button>
+        <a
+          className="badge badge-success"
+          style={{ textDecoration: 'none' }}
+          href={piece.url}
+          target="_blank"
+          rel="noopener"
+          aria-label={`Télécharger ${piece.nom_original}`}
+        >
+          <i className="fa-solid fa-download" aria-hidden="true" /> Télécharger
+        </a>
+      </div>
+    </div>
   )
 }
 
@@ -123,6 +134,7 @@ export function FicheCandidat() {
   const { role } = useAuth()
   const { status, dossier, saving, verifError, updateVerification, reload } = useFicheCandidat(id)
   const [tab, setTab] = useState('profil')
+  const [apercu, setApercu] = useState(null)
   const [eliminating, setEliminating] = useState(false)
   const { eliminer, eliminating: savingElimination, error: eliminationError, resetError: resetEliminationError } = useElimination()
   const retour = retourListePath(role)
@@ -291,7 +303,7 @@ export function FicheCandidat() {
                       q={`Expérience ${i + 1}`}
                       a={`${optionLabel(EXPERIENCE_DOMAINES, e.domaine)} · ${optionLabel(EXPERIENCE_DUREES, e.duree_categorie)}`}
                     />
-                    <PieceLink label={`Justificatif — expérience ${i + 1}`} piece={e.justificatif} />
+                    <PieceLink label={`Justificatif — expérience ${i + 1}`} piece={e.justificatif} onApercu={setApercu} />
                   </div>
                 ))
               )}
@@ -339,7 +351,7 @@ export function FicheCandidat() {
           {tab === 'documents' ? (
             <div>
               {PIECES_DOSSIER.map((t) => (
-                <PieceLink key={t.code} label={t.label} piece={piecesParType[t.code]} />
+                <PieceLink key={t.code} label={t.label} piece={piecesParType[t.code]} onApercu={setApercu} />
               ))}
               {/* Lot D — pièces retirées de l'obligation : affichées SEULEMENT
                   si ce dossier en a réellement une déjà déposée (jamais une
@@ -350,7 +362,7 @@ export function FicheCandidat() {
                     Pièces conservées (plus obligatoires)
                   </p>
                   {PIECES_DOSSIER_RETIREES.filter((t) => piecesParType[t.code]).map((t) => (
-                    <PieceLink key={t.code} label={t.label} piece={piecesParType[t.code]} />
+                    <PieceLink key={t.code} label={t.label} piece={piecesParType[t.code]} onApercu={setApercu} />
                   ))}
                 </>
               ) : null}
@@ -370,6 +382,10 @@ export function FicheCandidat() {
 
         <EligibilitePanel dossier={dossier} />
       </div>
+
+      {apercu ? (
+        <PiecePreviewModal piece={apercu.piece} label={apercu.label} onClose={() => setApercu(null)} />
+      ) : null}
 
       {eliminating ? (
         <MotifConfirmDialog

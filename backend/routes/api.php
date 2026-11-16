@@ -236,6 +236,8 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
         // Route à plat : l'id de pièce est global, la propriété est vérifiée par
         // PieceJustificativePolicy (-> 404 si pas propriétaire).
         Route::get('/pieces/{piece}/download', [PieceController::class, 'download']);
+        // Lot 19 — aperçu en ligne, même autorisation que /download.
+        Route::get('/pieces/{piece}/apercu', [PieceController::class, 'apercu']);
 
         Route::prefix('candidatures/{candidature}')->scopeBindings()->group(function () {
             // --- Lecture (toujours ouverte au propriétaire) ---
@@ -305,6 +307,8 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
     Route::middleware('role:evaluateur,administrateur')->prefix('evaluateur')->group(function () {
         Route::get('/candidatures', [DossierController::class, 'index']);
         Route::get('/pieces/{piece}/download', [PieceEvaluateurController::class, 'download']);
+        // Lot 19 — aperçu en ligne, même autorisation que /download.
+        Route::get('/pieces/{piece}/apercu', [PieceEvaluateurController::class, 'apercu']);
 
         Route::prefix('candidatures/{candidature}')->scopeBindings()->group(function () {
             Route::get('/', [DossierController::class, 'show']);

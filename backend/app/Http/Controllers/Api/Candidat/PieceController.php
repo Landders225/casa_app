@@ -53,4 +53,27 @@ class PieceController extends Controller
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }
+
+    /**
+     * GET /api/pieces/{piece}/apercu — EXACTEMENT la même autorisation que
+     * `download` (Lot 19), affichage en ligne plutôt qu'enregistrement. Pas de
+     * journalisation ici : un candidat qui consulte sa propre pièce n'audite
+     * rien (ce n'est pas la donnée d'un tiers), contrairement à
+     * `PieceEvaluateurController::apercu`.
+     */
+    public function apercu(PieceJustificative $piece): StreamedResponse
+    {
+        $this->authorize('download', $piece);
+
+        $disque = Storage::disk('documents');
+        abort_unless($disque->exists($piece->chemin_stockage), 404, 'Fichier introuvable.');
+
+        return $disque->response($piece->chemin_stockage, $piece->nom_original, [
+            'Content-Type' => $piece->type_mime,
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Content-Security-Policy' => "sandbox; default-src 'none'",
+        ]);
+    }
 }

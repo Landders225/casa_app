@@ -31,6 +31,8 @@ class PieceJustificativeResource extends JsonResource
             'taille_octets' => $this->taille_octets,
             'depose_le' => $this->depose_le?->toIso8601String(),
             'url' => "/api/pieces/{$this->id}/download",
+            // Lot 19 — aperçu en ligne (lecture seule, sans enregistrer le fichier).
+            'url_apercu' => "/api/pieces/{$this->id}/apercu",
         ];
     }
 }

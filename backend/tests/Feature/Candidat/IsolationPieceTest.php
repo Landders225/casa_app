@@ -71,6 +71,20 @@ class IsolationPieceTest extends TestCase
             ->assertStatus(404);
     }
 
+    // Lot 19 — même garde pour l'aperçu en ligne (même policy que /download).
+
+    public function test_A_ne_previsualise_pas_la_piece_dossier_de_B(): void
+    {
+        $this->actingAs($this->a)->getJson("/api/pieces/{$this->pieceDossierB}/apercu")
+            ->assertStatus(404);
+    }
+
+    public function test_A_ne_previsualise_pas_le_justificatif_experience_de_B(): void
+    {
+        $this->actingAs($this->a)->getJson("/api/pieces/{$this->pieceExpB}/apercu")
+            ->assertStatus(404);
+    }
+
     public function test_A_ne_remplace_pas_une_piece_de_B(): void
     {
         $this->actingAs($this->a)->post(

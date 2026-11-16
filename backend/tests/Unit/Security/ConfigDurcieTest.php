@@ -119,4 +119,22 @@ class ConfigDurcieTest extends TestCase
         $this->assertStringNotContainsString("'unsafe-eval'", $conf);
         $this->assertMatchesRegularExpression("/script-src 'self'/", $conf);
     }
+
+    /**
+     * Lot 19 — aperçu en ligne des pièces (image via `blob:`, PDF via pdf.js en
+     * `<canvas>`) : les TROIS fichiers nginx (prod, derrière Apache, test local)
+     * portent la même CSP. `frame-src`/`object-src` restent `'none'` partout —
+     * aucun affaiblissement, l'aperçu n'utilise jamais `<iframe>`/`<embed>`.
+     */
+    public function test_csp_autorise_le_blob_image_et_le_worker_pdf_partout(): void
+    {
+        foreach (['docker/nginx/casa.prod.conf', 'docker/nginx/casa.apache.conf', 'docker/nginx/casa.test.conf'] as $conf) {
+            $contenu = $this->lireDepot($conf);
+
+            $this->assertMatchesRegularExpression("/img-src 'self' data: blob:/", $contenu, "{$conf} : img-src sans blob:");
+            $this->assertMatchesRegularExpression("/worker-src 'self'/", $contenu, "{$conf} : worker-src manquant");
+            $this->assertMatchesRegularExpression("/frame-src 'none'/", $contenu, "{$conf} : frame-src affaibli");
+            $this->assertMatchesRegularExpression("/object-src 'none'/", $contenu, "{$conf} : object-src affaibli");
+        }
+    }
 }
