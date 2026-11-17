@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\Evaluateur;
 
+use App\Http\Controllers\Api\Evaluateur\EvaluationController;
 use App\Models\Candidature;
 use App\Models\Grille;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 /**
@@ -104,6 +107,41 @@ class VerrouillageEvaluationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.grille.version', 2)
             ->assertJsonPath('data.source', 'apercu');
+    }
+
+    /**
+     * Correctif de revue (Lot 20b) : la relecture sous verrou d'`evaluateur_id`
+     * dans `EvaluationController::valider` doit refuser une validation dont
+     * l'autorisation a été décidée sur un snapshot PÉRIMÉ — exactement ce
+     * qu'une réattribution concurrente (`ReattributionController`) produirait
+     * entre l'autorisation et l'écriture. Appel direct du contrôleur (pas de
+     * vraie concurrence possible en PHPUnit synchrone) : `$stale` porte un
+     * `evaluateur_id`/relations figés AVANT la réattribution simulée, comme le
+     * ferait une requête HTTP déjà en vol au moment où l'autre commite.
+     */
+    public function test_validation_refusee_si_le_dossier_a_ete_reattribue_sous_le_verrou(): void
+    {
+        $this->actingAs($this->evaluateur)->putJson($this->url(), ['mo04_note_etoiles' => 4])->assertOk();
+
+        $stale = $this->candidature->fresh()->load('reponseFormulaire', 'verification', 'evaluationDossier');
+
+        $autreEvaluateur = $this->creerEvaluateur('eval2@casa-demo.ci');
+        DB::table('candidature')->where('id', $this->candidature->id)
+            ->update(['evaluateur_id' => $autreEvaluateur->membreEquipe->id]);
+
+        $this->actingAs($this->evaluateur);
+        $request = Request::create('/', 'POST');
+        $request->setUserResolver(fn () => $this->evaluateur);
+
+        try {
+            app(EvaluationController::class)->valider($request, $stale);
+            $this->fail('La validation aurait dû être refusée (403) : le dossier appartient maintenant à un autre évaluateur.');
+        } catch (HttpException $e) {
+            $this->assertSame(403, $e->getStatusCode());
+        }
+
+        $this->assertNull($this->candidature->fresh()->evaluationDossier);
+        $this->assertFalse((bool) $this->candidature->fresh()->dossier_verrouille);
     }
 
     /**

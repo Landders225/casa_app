@@ -177,6 +177,18 @@ class EntretienController extends Controller
         $membreEquipeId = $request->user()->membreEquipe?->id ?? $candidature->evaluateur_id;
 
         DB::transaction(function () use ($request, $candidature, $entretien, $grille, $membreEquipeId) {
+            // Correctif de revue (même motif que `EvaluationController::valider`) :
+            // relecture sous verrou de `evaluateur_id`, au cas où une
+            // réattribution concurrente aurait commité entre l'autorisation
+            // (faite sur l'instance chargée avant cette transaction) et cette
+            // validation définitive.
+            $verrou = Candidature::whereKey($candidature->id)->lockForUpdate()->first();
+            abort_unless(
+                $request->user()->isAdministrateur() || $verrou?->evaluateur_id === $membreEquipeId,
+                403,
+                'Ce dossier a été réattribué à un autre évaluateur entre-temps : rechargez la page.',
+            );
+
             $sousCriteres = $this->sousCriteresParCode($grille);
 
             // Fige les 12 lignes : sous-note existante ou 0 (absente / candidat absent).

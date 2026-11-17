@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\Evaluateur;
 
+use App\Http\Controllers\Api\Evaluateur\EntretienController;
 use App\Models\Candidature;
 use App\Models\Grille;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 /**
@@ -67,6 +70,38 @@ class VerrouillageEntretienTest extends TestCase
             ->assertStatus(409);
         $this->actingAs($this->evaluateur)->postJson($this->url('/validation'))
             ->assertStatus(409);
+    }
+
+    /**
+     * Correctif de revue (Lot 20b), miroir de la même preuve côté dossier /65
+     * (`VerrouillageEvaluationTest`) — relecture sous verrou d'`evaluateur_id`
+     * dans `EntretienController::valider`.
+     */
+    public function test_validation_entretien_refusee_si_le_dossier_a_ete_reattribue_sous_le_verrou(): void
+    {
+        $this->actingAs($this->evaluateur)->putJson($this->url(), [
+            'date' => '2026-07-06', 'heure' => '09:00', 'lieu' => 'Le Plateau',
+            'presence' => 'present', 'notes' => $this->notesFort,
+        ])->assertOk();
+
+        $stale = $this->candidature->fresh()->load('entretien.notes');
+
+        $autreEvaluateur = $this->creerEvaluateur('eval2@casa-demo.ci');
+        DB::table('candidature')->where('id', $this->candidature->id)
+            ->update(['evaluateur_id' => $autreEvaluateur->membreEquipe->id]);
+
+        $this->actingAs($this->evaluateur);
+        $request = Request::create('/', 'POST');
+        $request->setUserResolver(fn () => $this->evaluateur);
+
+        try {
+            app(EntretienController::class)->valider($request, $stale);
+            $this->fail('La validation aurait dû être refusée (403) : le dossier appartient maintenant à un autre évaluateur.');
+        } catch (HttpException $e) {
+            $this->assertSame(403, $e->getStatusCode());
+        }
+
+        $this->assertDatabaseMissing('entretien', ['candidature_id' => $this->candidature->id, 'statut' => 'valide']);
     }
 
     public function test_apres_validation_le_GET_renvoie_le_snapshot_fige(): void

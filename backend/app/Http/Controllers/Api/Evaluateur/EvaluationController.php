@@ -113,6 +113,19 @@ class EvaluationController extends Controller
         $grille = Grille::active();
 
         $evaluation = DB::transaction(function () use ($request, $candidature, $grille, $membreEquipeId) {
+            // Correctif de revue : `$candidature` et `$membreEquipeId` ont été
+            // lus/autorisés AVANT cette transaction — une réattribution
+            // concurrente (`ReattributionController`) a pu commiter entre les
+            // deux. Relecture sous verrou de la seule colonne qui compte ici :
+            // si le dossier ne pointe plus vers CET évaluateur (ou un admin),
+            // on refuse plutôt que de valider au nom de l'ancien évaluateur.
+            $verrou = Candidature::whereKey($candidature->id)->lockForUpdate()->first();
+            abort_unless(
+                $request->user()->isAdministrateur() || $verrou?->evaluateur_id === $membreEquipeId,
+                403,
+                'Ce dossier a été réattribué à un autre évaluateur entre-temps : rechargez la page.',
+            );
+
             $score = $this->scoring->calculer($candidature, $grille);
 
             $evaluation = EvaluationDossier::create([
