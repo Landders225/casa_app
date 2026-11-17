@@ -163,6 +163,13 @@ export function CandidaturesSupervision() {
     ))
   }
   const pageEntiereCochee = items.length > 0 && selected.size === items.length
+  // Affecter et Réattribuer ciblent des sélections mutuellement exclusives
+  // (dossier libre vs dossier déjà affecté) — correctif de revue : avant,
+  // les deux boutons restaient actifs quel que soit l'état des dossiers
+  // cochés, et seule la réponse 422 du serveur révélait l'erreur.
+  const selectionItems = items.filter((c) => selected.has(c.id))
+  const selectionContientDejaAffecte = selectionItems.some((c) => c.evaluateur)
+  const selectionContientNonAffecte = selectionItems.some((c) => !c.evaluateur)
   const selectionnerTous = () => {
     setMessageSucces(null)
     setSelectionTous({
@@ -267,10 +274,22 @@ export function CandidaturesSupervision() {
           </div>
         ) : selected.size > 0 ? (
           <div className="flex gap-2">
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => { resetError(); setShowAssign(true) }}>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              disabled={selectionContientDejaAffecte}
+              title={selectionContientDejaAffecte ? 'Au moins un dossier sélectionné est déjà affecté — utilisez Réattribuer.' : undefined}
+              onClick={() => { resetError(); setShowAssign(true) }}
+            >
               <i className="fa-solid fa-user-plus" aria-hidden="true" /> Affecter ({selected.size})
             </button>
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => { resetReattributionError(); setShowReattribution(true) }}>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              disabled={selectionContientNonAffecte}
+              title={selectionContientNonAffecte ? "Au moins un dossier sélectionné n'est pas encore affecté — utilisez Affecter." : undefined}
+              onClick={() => { resetReattributionError(); setShowReattribution(true) }}
+            >
               <i className="fa-solid fa-right-left" aria-hidden="true" /> Réattribuer ({selected.size})
             </button>
           </div>

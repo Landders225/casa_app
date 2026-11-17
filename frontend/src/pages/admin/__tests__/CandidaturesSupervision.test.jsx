@@ -180,6 +180,32 @@ describe('CandidaturesSupervision — affectation en masse (atomique)', () => {
   })
 })
 
+describe('CandidaturesSupervision — Affecter/Réattribuer mutuellement exclusifs (correctif de revue)', () => {
+  it('dossier NON affecté sélectionné -> Affecter actif, Réattribuer désactivé', async () => {
+    mockCandidatures({ candidatures: [candidature({ evaluateur: null })] })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i }))
+
+    expect(screen.getByRole('button', { name: /affecter \(1\)/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /réattribuer \(1\)/i })).toBeDisabled()
+  })
+
+  it('dossier DÉJÀ affecté sélectionné -> Réattribuer actif, Affecter désactivé', async () => {
+    mockCandidatures({ candidatures: [candidature({ evaluateur: { id: 'eval-1', prenom: 'Yann', nom: 'Kacou' } })] })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i }))
+
+    expect(screen.getByRole('button', { name: /réattribuer \(1\)/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /affecter \(1\)/i })).toBeDisabled()
+  })
+})
+
 describe('CandidaturesSupervision — réattribution de dossiers déjà affectés (Lot 20b)', () => {
   it('le filtre évaluateur affiche aussi les désactivés, avec la mention « désactivé »', async () => {
     mockCandidatures()
@@ -192,7 +218,7 @@ describe('CandidaturesSupervision — réattribution de dossiers déjà affecté
   })
 
   it('sélection -> réattribuer -> bouton bloqué jusqu’à la case cochée -> POST correct, sélection vidée', async () => {
-    mockCandidatures()
+    mockCandidatures({ candidatures: [candidature({ evaluateur: { id: 'eval-1', prenom: 'Yann', nom: 'Kacou' } })] })
     renderScreen()
     await screen.findByText('CASA-2026-000001')
 
@@ -217,7 +243,7 @@ describe('CandidaturesSupervision — réattribution de dossiers déjà affecté
   })
 
   it('« remettre dans le lot non affecté » envoie evaluateur_id: null', async () => {
-    mockCandidatures()
+    mockCandidatures({ candidatures: [candidature({ evaluateur: { id: 'eval-1', prenom: 'Yann', nom: 'Kacou' } })] })
     renderScreen()
     await screen.findByText('CASA-2026-000001')
 
@@ -236,7 +262,7 @@ describe('CandidaturesSupervision — réattribution de dossiers déjà affecté
   })
 
   it('422 atomique (dossier déjà verrouillé) -> message VERBATIM affiché, le modal reste ouvert', async () => {
-    mockCandidatures()
+    mockCandidatures({ candidatures: [candidature({ evaluateur: { id: 'eval-1', prenom: 'Yann', nom: 'Kacou' } })] })
     renderScreen()
     await screen.findByText('CASA-2026-000001')
 
