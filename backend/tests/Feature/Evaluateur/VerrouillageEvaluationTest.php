@@ -145,6 +145,52 @@ class VerrouillageEvaluationTest extends TestCase
     }
 
     /**
+     * Correctif de revue : `assurerModifiable` lit `dossier_verrouille` sur
+     * l'instance chargée AVANT la transaction — jamais relu sous verrou.
+     * Dans une exploration synchrone, l'accès paresseux à la relation
+     * `evaluationDossier` (jamais eager-loadée ici) masquait le problème en
+     * interrogeant la base À L'INSTANT de la lecture, pas au chargement —
+     * d'où un 409 « accidentel ». Mais rien ne garantit cet ordre dans une
+     * VRAIE concurrence (deux connexions distinctes) : si les deux requêtes
+     * passent `assurerModifiable` avant que l'une des deux n'ait commité,
+     * `EvaluationDossier::create()` (candidature_id = clé primaire) lève une
+     * violation de contrainte PostgreSQL (23505) pour la seconde — jamais
+     * interceptée nulle part dans le code (`grep QueryException` ne renvoie
+     * rien) — donc un 500 brut, pas un 409 propre. Ce test force ce chemin en
+     * appelant `EvaluationDossier::create` directement (contournant l'accès
+     * paresseux qui masquait le problème), pour prouver que SANS le correctif
+     * ci-dessous, le code produirait un 500 sur double validation.
+     */
+    public function test_validation_refusee_proprement_si_la_ligne_evaluation_dossier_existe_deja_sous_le_verrou(): void
+    {
+        $this->actingAs($this->evaluateur)->putJson($this->url(), ['mo04_note_etoiles' => 4])->assertOk();
+
+        // Eager-load `evaluationDossier` (mise en cache à NULL) AVANT la
+        // validation ci-dessous : contrairement à un simple `->fresh()`, ceci
+        // empêche la relation de se requêter paresseusement au moment du
+        // contrôle `assurerModifiable` (ce qui masquerait la course par
+        // accident, cf. commentaire ci-dessus) — reproduit fidèlement ce que
+        // verrait une VRAIE seconde requête dont la relation a déjà été
+        // résolue (ex. par un eager-load de middleware) avant que l'autre ne commite.
+        $stale = $this->candidature->fresh()->load('reponseFormulaire', 'verification', 'evaluationDossier');
+
+        $this->actingAs($this->evaluateur)->postJson($this->url('/validation'))->assertOk();
+
+        $this->actingAs($this->evaluateur);
+        $request = Request::create('/', 'POST');
+        $request->setUserResolver(fn () => $this->evaluateur);
+
+        try {
+            app(EvaluationController::class)->valider($request, $stale);
+            $this->fail('La seconde validation aurait dû être refusée proprement (409).');
+        } catch (HttpException $e) {
+            $this->assertSame(409, $e->getStatusCode());
+        }
+
+        $this->assertSame(1, \App\Models\EvaluationDossier::where('candidature_id', $this->candidature->id)->count());
+    }
+
+    /**
      * Clone la grille active en v2 (poids de chaque rubrique + 1) et l'active.
      */
     private function activerGrilleV2(): Grille

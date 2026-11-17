@@ -125,6 +125,19 @@ class EvaluationController extends Controller
                 403,
                 'Ce dossier a été réattribué à un autre évaluateur entre-temps : rechargez la page.',
             );
+            // Correctif de revue : `assurerModifiable()` a lu `dossier_verrouille`
+            // sur l'instance chargée AVANT cette transaction — deux validations
+            // simultanées du même dossier (même évaluateur, double clic ou deux
+            // onglets) passeraient toutes les deux ce contrôle non protégé, et
+            // la seconde heurterait la clé primaire d'`evaluation_dossier`
+            // (candidature_id) avec une `UniqueConstraintViolationException`
+            // non interceptée (500 brut), au lieu d'un 409 propre. Relu ici sous
+            // le même verrou, sur la même ligne déjà chargée ci-dessus.
+            abort_if(
+                $verrou?->dossier_verrouille,
+                409,
+                'Évaluation déjà validée et verrouillée. Seule une correction exceptionnelle (administrateur) peut la rouvrir.',
+            );
 
             $score = $this->scoring->calculer($candidature, $grille);
 
