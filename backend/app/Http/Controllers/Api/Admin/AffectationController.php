@@ -22,14 +22,18 @@ use Illuminate\Validation\ValidationException;
  *  - cible = `membre_equipe` de rôle `evaluateur` dont le compte est ACTIF
  *    (`utilisateur.actif`) — l'admin supervise, il n'est pas dans le pool
  *    d'affectation ; un compte désactivé n'en fait plus partie non plus ;
- *  - candidatures affectables : `statut_interne ∈ {soumis, en_instruction}`
- *    ET `statut_eligibilite_interne ≠ non_eligible` (une élimination laisse
- *    `statut_interne` inchangé — sans ce second critère, un dossier éliminé
- *    resterait affectable) ;
+ *  - candidatures affectables : `statut_interne ∈ {soumis, en_instruction}`,
+ *    `evaluateur_id` encore NUL (jamais affectée) ET `statut_eligibilite_interne
+ *    ≠ non_eligible` (une élimination laisse `statut_interne` inchangé — sans
+ *    ce second critère, un dossier éliminé resterait affectable) ;
+ *  - un dossier DÉJÀ affecté (`evaluateur_id` non nul) est refusé ici, avec un
+ *    message explicite : changer d'évaluateur passe par la réattribution
+ *    (`ReattributionController`, Lot 20b, ADR-47), jamais par cet endpoint —
+ *    cela garantit que toute bascule entre évaluateurs reçoit la sémantique
+ *    dédiée (brouillon réinitialisé, garde « campagne publiée », etc.) ;
  *  - ATOMIQUE : si une seule candidature n'est pas affectable → 422 avec la
  *    liste, rien n'est écrit ;
  *  - `soumis` → `en_instruction` + `evaluateur_id` (convention Lot 4a) ;
- *    `en_instruction` → ré-affectation (evaluateur changé, statut inchangé) ;
  *  - 1 ligne `journal_audit` PAR candidature (audit exploitable, D-6a-1 —
  *    la maquette fait 1 ligne globale « N dossiers »).
  *
@@ -72,15 +76,28 @@ class AffectationController extends Controller
         $refuseesStatut = $candidatures->reject(
             fn (Candidature $c) => in_array($c->statut_interne, ['soumis', 'en_instruction'], true),
         );
-        $refuseesEligibilite = $candidatures->diff($refuseesStatut)->filter(
+        $restantes = $candidatures->diff($refuseesStatut);
+        // Correctif de revue : un dossier déjà affecté (`evaluateur_id` non
+        // nul) ne doit plus pouvoir changer de main via CET endpoint — seule
+        // la réattribution (`ReattributionController`) porte la sémantique
+        // dédiée (brouillon réinitialisé, garde « campagne publiée », audit
+        // ancien/nouveau). Avant ce correctif, un dossier `en_instruction`
+        // était « ré-affectable » ici, en silence, sans aucune des garanties
+        // de la réattribution.
+        $refuseesDejaAffectees = $restantes->filter(fn (Candidature $c) => $c->evaluateur_id !== null);
+        $refuseesEligibilite = $restantes->diff($refuseesDejaAffectees)->filter(
             fn (Candidature $c) => $c->statut_eligibilite_interne === 'non_eligible',
         );
 
-        if ($refuseesStatut->isNotEmpty() || $refuseesEligibilite->isNotEmpty()) {
+        if ($refuseesStatut->isNotEmpty() || $refuseesDejaAffectees->isNotEmpty() || $refuseesEligibilite->isNotEmpty()) {
             $motifs = [];
             if ($refuseesStatut->isNotEmpty()) {
                 $motifs[] = 'Non affectable(s) (doit être « soumise » ou « en instruction ») : '
                     .$refuseesStatut->pluck('numero_dossier')->join(', ').'.';
+            }
+            if ($refuseesDejaAffectees->isNotEmpty()) {
+                $motifs[] = 'Déjà affecté(s) à un évaluateur — utilisez « Réattribuer » pour changer d\'évaluateur : '
+                    .$refuseesDejaAffectees->pluck('numero_dossier')->join(', ').'.';
             }
             if ($refuseesEligibilite->isNotEmpty()) {
                 $motifs[] = 'Non affectable(s) (dossier non éligible) : '
@@ -96,15 +113,11 @@ class AffectationController extends Controller
             $nouvelEvaluateur = $membre->prenom.' '.$membre->nom;
 
             foreach ($candidatures as $candidature) {
-                $ancien = $candidature->evaluateur
-                    ? $candidature->evaluateur->prenom.' '.$candidature->evaluateur->nom
-                    : null;
-
+                // Toute candidature qui arrive jusqu'ici est forcément NON
+                // affectée (filtrée ci-dessus) : jamais d'« ancien » évaluateur.
                 $candidature->forceFill([
                     'evaluateur_id' => $membre->id,
-                    'statut_interne' => $candidature->statut_interne === 'soumis'
-                        ? 'en_instruction'
-                        : $candidature->statut_interne,
+                    'statut_interne' => 'en_instruction',
                 ])->saveQuietly();
 
                 JournalAudit::create([
@@ -113,7 +126,7 @@ class AffectationController extends Controller
                     'action' => 'Affectation évaluateur',
                     'module' => 'Candidatures',
                     'objet' => $candidature->numero_dossier,
-                    'ancienne_valeur' => $ancien,
+                    'ancienne_valeur' => null,
                     'nouvelle_valeur' => $nouvelEvaluateur,
                     'resultat' => 'Succès',
                 ]);

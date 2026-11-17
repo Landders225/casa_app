@@ -109,7 +109,10 @@ class AffectationTest extends TestCase
         $this->assertSame(0, JournalAudit::where('action', 'Affectation évaluateur')->count());
     }
 
-    public function test_reaffectation_possible_tant_que_en_instruction(): void
+    // --- Correctif de revue — un dossier déjà affecté ne se réaffecte plus ---
+    // --- ici : seule la réattribution (`ReattributionController`) le permet. ---
+
+    public function test_reaffectation_refusee_utiliser_la_reattribution(): void
     {
         $c = $this->candidatureSoumise();
         $eval2 = $this->creerEvaluateur('eval2@casa-demo.ci');
@@ -117,10 +120,15 @@ class AffectationTest extends TestCase
         $this->affecter([$c->id])->assertOk();
         $this->assertSame($this->evaluateur->membreEquipe->id, $c->fresh()->evaluateur_id);
 
-        // Ré-affectation.
-        $this->affecter([$c->id], $eval2->membreEquipe->id)->assertOk();
-        $this->assertSame($eval2->membreEquipe->id, $c->fresh()->evaluateur_id);
+        $reponse = $this->affecter([$c->id], $eval2->membreEquipe->id)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('candidature_ids');
+        $this->assertStringContainsString('Réattribuer', $reponse->json('errors.candidature_ids.0'));
+
+        // Rien n'a changé : toujours affecté au premier évaluateur.
+        $this->assertSame($this->evaluateur->membreEquipe->id, $c->fresh()->evaluateur_id);
         $this->assertSame('en_instruction', $c->fresh()->statut_interne);
+        $this->assertSame(1, JournalAudit::where('action', 'Affectation évaluateur')->count());
     }
 
     public function test_la_cible_doit_etre_un_evaluateur_pas_un_admin_422(): void
