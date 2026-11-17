@@ -153,9 +153,10 @@ describe('PiecePreviewModal', () => {
   it('démontage pendant un rendu PDF en cours -> annule la tâche de rendu (tache.cancel)', async () => {
     const { getDocument } = await import('pdfjs-dist/build/pdf.mjs')
     const annuler = vi.fn()
+    const rendre = vi.fn(() => ({ promise: new Promise(() => {}), cancel: annuler }))
     const fakePage = {
       getViewport: () => ({ width: 100, height: 140 }),
-      render: () => ({ promise: new Promise(() => {}), cancel: annuler }),
+      render: rendre,
     }
     const fakePdf = { numPages: 1, getPage: vi.fn().mockResolvedValue(fakePage), destroy: vi.fn() }
     getDocument.mockReturnValue({ promise: Promise.resolve(fakePdf) })
@@ -164,8 +165,10 @@ describe('PiecePreviewModal', () => {
 
     const { unmount } = render(<PiecePreviewModal piece={piece()} label="CNI" onClose={() => {}} />)
     await waitFor(() => expect(screen.getByText('Page 1')).toBeInTheDocument())
-    // Laisse le temps à l'effet de rendu de poser `tache` avant de démonter.
-    await new Promise((r) => setTimeout(r, 0))
+    // Attend que `page.render` ait RÉELLEMENT été invoqué (pas seulement que la
+    // page soit affichée : `rendue` bascule avant la résolution de `getPage`)
+    // avant de démonter — déterministe, sans délai arbitraire (correctif de revue).
+    await waitFor(() => expect(rendre).toHaveBeenCalledTimes(1))
 
     unmount()
 
