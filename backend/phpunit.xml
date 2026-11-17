@@ -18,6 +18,10 @@
         </include>
     </source>
     <php>
+        <!-- 128M (défaut CLI) est intermittent sur la suite complète (pic mesuré
+             à 115,5 Mo) : relevé à 512M pour que `php artisan test` soit fiable
+             sans dépendre d'un `-d memory_limit=...` passé à la main. -->
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
