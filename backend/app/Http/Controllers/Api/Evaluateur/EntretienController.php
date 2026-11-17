@@ -188,6 +188,19 @@ class EntretienController extends Controller
                 403,
                 'Ce dossier a été réattribué à un autre évaluateur entre-temps : rechargez la page.',
             );
+            // Correctif de revue : `$entretien->statut` ci-dessus a été lu AVANT
+            // cette transaction — deux validations simultanées du même entretien
+            // (même évaluateur, double clic ou deux onglets) passaient toutes
+            // les deux ce contrôle non protégé. `entretien.candidature_id` n'est
+            // PAS une clé primaire ici au sens d'un risque d'INSERT en double
+            // (c'est une mise à jour, `->save()` plus bas) : pas de 500, mais
+            // une SECONDE ligne `journal_audit` était écrite (vérifié : 1 -> 2
+            // sans ce correctif) et `valide_le`/`valide_par` réécrits sans
+            // raison. Le verrou déjà pris sur `Candidature` ci-dessus suffit à
+            // sérialiser les deux appels : relecture simple (pas un second
+            // verrou) de `entretien.statut`, désormais à jour pour la seconde requête.
+            $entretienActuel = Entretien::whereKey($candidature->id)->first();
+            abort_if($entretienActuel?->statut === 'valide', 409, 'Entretien déjà validé et verrouillé.');
 
             $sousCriteres = $this->sousCriteresParCode($grille);
 

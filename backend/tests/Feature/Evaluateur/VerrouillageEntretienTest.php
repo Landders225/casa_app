@@ -104,6 +104,45 @@ class VerrouillageEntretienTest extends TestCase
         $this->assertDatabaseMissing('entretien', ['candidature_id' => $this->candidature->id, 'statut' => 'valide']);
     }
 
+    /**
+     * Correctif de revue : `$entretien->statut` (ligne 169 du contrôleur) est
+     * lu AVANT la transaction, jamais relu sous verrou — contrairement à
+     * `evaluateur_id` (commit 107e4c1). `entretien.candidature_id` n'étant
+     * PAS une clé primaire exposée à un risque d'INSERT en double (le
+     * contrôleur fait une mise à jour, `->save()`), une double validation
+     * simultanée ne plante pas (contrairement au cas `EvaluationController`,
+     * commit 2d239c5) — mais SANS ce correctif, elle écrit une SECONDE ligne
+     * `journal_audit` « Validation d'entretien » et réécrit `valide_le`/
+     * `valide_par` sans raison (vérifié empiriquement : 1 -> 2 lignes).
+     * `$stale` eager-charge `entretien.notes` AVANT la première validation
+     * pour forcer la course (sinon l'accès paresseux de `$candidature->entretien`
+     * masquerait le problème en interrogeant la base à l'instant de l'appel).
+     */
+    public function test_entretien_refuse_proprement_une_double_validation_simultanee(): void
+    {
+        $this->actingAs($this->evaluateur)->putJson($this->url(), [
+            'date' => '2026-07-06', 'heure' => '09:00', 'lieu' => 'Le Plateau',
+            'presence' => 'present', 'notes' => $this->notesFort,
+        ])->assertOk();
+
+        $stale = $this->candidature->fresh()->load('entretien.notes');
+
+        $this->actingAs($this->evaluateur)->postJson($this->url('/validation'))->assertOk();
+
+        $this->actingAs($this->evaluateur);
+        $request = Request::create('/', 'POST');
+        $request->setUserResolver(fn () => $this->evaluateur);
+
+        try {
+            app(EntretienController::class)->valider($request, $stale);
+            $this->fail('La seconde validation aurait dû être refusée proprement (409).');
+        } catch (HttpException $e) {
+            $this->assertSame(409, $e->getStatusCode());
+        }
+
+        $this->assertSame(1, \App\Models\JournalAudit::where('action', "Validation d'entretien")->count());
+    }
+
     public function test_apres_validation_le_GET_renvoie_le_snapshot_fige(): void
     {
         $this->valider();
