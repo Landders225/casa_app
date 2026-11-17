@@ -23,6 +23,11 @@ use Illuminate\Validation\ValidationException;
  *   POST /api/admin/reattributions  { evaluateur_id: uuid|null, candidature_ids: [1..n] }
  *
  * Règles par état de l'évaluation (une par cas, ADR-47) :
+ *  - CIBLE IDENTIQUE à l'évaluateur déjà en place → refusée (422), AVANT tout
+ *    examen du brouillon : aucune réinitialisation, aucune ligne d'audit ;
+ *  - DOSSIER NON ÉLIGIBLE (`statut_eligibilite_interne = non_eligible`) →
+ *    refusée : la réattribution ne porte que sur des dossiers éligibles, et
+ *    ne doit jamais, par effet de bord, repousser un statut vers `soumis` ;
  *  - ABSENTE (pas de brouillon, pas d'entretien) → libre ;
  *  - COMMENCÉE (note MO.04 et/ou commentaire évaluateur posés sur un dossier
  *    NON verrouillé, OU entretien `planifie`/`realise` non `valide`) →
@@ -81,9 +86,8 @@ class ReattributionController extends Controller
 
             $this->verifierAffectable($candidatures, $nouvelEvaluateur);
 
-            $noms = [];
             foreach ($candidatures as $candidature) {
-                $noms[$candidature->id] = $this->reattribuerUne($request->user(), $candidature, $nouvelEvaluateur);
+                $this->reattribuerUne($request->user(), $candidature, $nouvelEvaluateur);
             }
 
             return response()->json([
@@ -137,20 +141,42 @@ class ReattributionController extends Controller
             "Les résultats d'une campagne concernée sont déjà publiés : aucune réattribution n'est possible sur ces dossiers.",
         );
 
+        // Correctif de revue : cible = évaluateur déjà en place → refus AVANT
+        // tout examen du brouillon (ni réinitialisation, ni audit). Vérifié
+        // séparément des autres motifs, qui portent sur l'ÉTAT du dossier.
+        $cibleIdentique = $nouvelEvaluateur === null
+            ? collect()
+            : $candidatures->filter(fn (Candidature $c) => $c->evaluateur_id === $nouvelEvaluateur->id);
+
         $nonAffectes = $candidatures->filter(fn (Candidature $c) => $c->evaluateur_id === null);
+        // Correctif de revue : un dossier non éligible ne doit jamais être
+        // réattribué — entre autres parce que le retour au lot non affecté
+        // forcerait `statut_interne` vers `soumis`, effaçant silencieusement
+        // le résultat de l'élimination (`statut_eligibilite_interne` seul en
+        // porte la trace, cf. `AffectationController`).
+        $nonEligibles = $candidatures->filter(fn (Candidature $c) => $c->statut_eligibilite_interne === 'non_eligible');
         $totalementValides = $candidatures->filter(fn (Candidature $c) => $this->estTotalementValide($c));
         $retourPoolInterdit = $nouvelEvaluateur === null
             ? $candidatures->diff($nonAffectes)->diff($totalementValides)->filter(fn (Candidature $c) => (bool) $c->dossier_verrouille)
             : collect();
 
-        if ($nonAffectes->isEmpty() && $totalementValides->isEmpty() && $retourPoolInterdit->isEmpty()) {
+        if ($cibleIdentique->isEmpty() && $nonAffectes->isEmpty() && $nonEligibles->isEmpty()
+            && $totalementValides->isEmpty() && $retourPoolInterdit->isEmpty()) {
             return;
         }
 
         $motifs = [];
+        if ($cibleIdentique->isNotEmpty()) {
+            $motifs[] = "Déjà affecté(s) à cet évaluateur — aucune réattribution n'est nécessaire : "
+                .$cibleIdentique->pluck('numero_dossier')->join(', ').'.';
+        }
         if ($nonAffectes->isNotEmpty()) {
             $motifs[] = 'Non affecté(s) — utilisez l\'affectation initiale, pas la réattribution : '
                 .$nonAffectes->pluck('numero_dossier')->join(', ').'.';
+        }
+        if ($nonEligibles->isNotEmpty()) {
+            $motifs[] = 'Non éligible(s) — la réattribution ne porte que sur des dossiers éligibles : '
+                .$nonEligibles->pluck('numero_dossier')->join(', ').'.';
         }
         if ($totalementValides->isNotEmpty()) {
             $motifs[] = 'Entièrement évalué(s) (dossier et entretien déjà validés) — seule une correction exceptionnelle administrateur peut rouvrir ces dossiers : '
@@ -175,10 +201,9 @@ class ReattributionController extends Controller
 
     /**
      * Réattribue UN dossier (déjà validé affectable par `verifierAffectable`)
-     * et consigne l'audit. Retourne le nom de l'ancien évaluateur (inutilisé
-     * par l'appelant actuellement, gardé pour un futur résumé détaillé).
+     * et consigne l'audit.
      */
-    private function reattribuerUne(User $auteur, Candidature $candidature, ?MembreEquipe $nouvelEvaluateur): ?string
+    private function reattribuerUne(User $auteur, Candidature $candidature, ?MembreEquipe $nouvelEvaluateur): void
     {
         $ancien = $candidature->evaluateur;
         $ancienNom = $ancien ? $ancien->prenom.' '.$ancien->nom : null;
@@ -240,7 +265,5 @@ class ReattributionController extends Controller
             'motif' => $fragmentsMotif === [] ? null : implode(' ', $fragmentsMotif),
             'resultat' => 'Succès',
         ]);
-
-        return $ancienNom;
     }
 }

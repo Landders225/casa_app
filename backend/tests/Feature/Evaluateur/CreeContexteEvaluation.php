@@ -21,7 +21,13 @@ trait CreeContexteEvaluation
 {
     use CreeContexteCandidature;
 
-    protected function creerMembreEquipe(string $role, ?string $email = null): User
+    /**
+     * `$prenom`/`$nom` par défaut à `'Eval'`/`'Test'` (ou `'Admin'`/`'Test'`) —
+     * un test qui doit prouver le SENS d'un changement (ancien -> nouveau,
+     * cf. `ReattributionTest`) passe des noms distincts explicitement ; les
+     * autres tests n'ont rien à changer.
+     */
+    protected function creerMembreEquipe(string $role, ?string $email = null, ?string $prenom = null, ?string $nom = null): User
     {
         $user = User::factory()->create([
             'role' => $role,
@@ -30,22 +36,22 @@ trait CreeContexteEvaluation
 
         MembreEquipe::create([
             'utilisateur_id' => $user->id,
-            'prenom' => $role === 'administrateur' ? 'Admin' : 'Eval',
-            'nom' => 'Test',
+            'prenom' => $prenom ?? ($role === 'administrateur' ? 'Admin' : 'Eval'),
+            'nom' => $nom ?? 'Test',
             'poste' => $role === 'administrateur' ? 'Coordination CASA' : "Chargé d'évaluation",
         ]);
 
         return $user->fresh();
     }
 
-    protected function creerEvaluateur(?string $email = null): User
+    protected function creerEvaluateur(?string $email = null, ?string $prenom = null, ?string $nom = null): User
     {
-        return $this->creerMembreEquipe('evaluateur', $email);
+        return $this->creerMembreEquipe('evaluateur', $email, $prenom, $nom);
     }
 
-    protected function creerAdmin(?string $email = null): User
+    protected function creerAdmin(?string $email = null, ?string $prenom = null, ?string $nom = null): User
     {
-        return $this->creerMembreEquipe('administrateur', $email);
+        return $this->creerMembreEquipe('administrateur', $email, $prenom, $nom);
     }
 
     /** Barème complet en base (grille v1 active) — requis pour le scoring (Lot 4b). */

@@ -46,7 +46,11 @@ class ReattributionTest extends TestCase
         $this->seedBareme();
         $this->admin = $this->creerAdmin('admin@casa-demo.ci');
         $this->evaluateur = $this->creerEvaluateur('eval@casa-demo.ci');
-        $this->evaluateur2 = $this->creerEvaluateur('eval2@casa-demo.ci');
+        // Correctif de revue : nom clairement DISTINCT (pas un générique
+        // « Eval Test » partagé) — prouve sans ambiguïté le SENS ancien ->
+        // nouveau dans les lignes d'audit, plutôt que de s'appuyer sur deux
+        // id identiques en apparence.
+        $this->evaluateur2 = $this->creerEvaluateur('eval2@casa-demo.ci', 'Fatou', 'Koné');
     }
 
     private function reattribuer(array $ids, ?string $evaluateurId): TestResponse
@@ -64,6 +68,66 @@ class ReattributionTest extends TestCase
         ])->assertOk();
     }
 
+    // --- Cible identique à l'évaluateur déjà en place : refusée AVANT tout ---
+    // --- examen du brouillon (correctif de revue). ---
+
+    public function test_cible_identique_a_l_evaluateur_actuel_refusee_sans_reinitialiser_le_brouillon(): void
+    {
+        $c = $this->candidatureAffectee($this->creerCandidat('a@casa-demo.ci'), $this->evaluateur);
+        $this->actingAs($this->evaluateur)->putJson("/api/evaluateur/candidatures/{$c->id}/evaluation", [
+            'mo04_note_etoiles' => 4,
+            'commentaire_evaluateur' => 'Brouillon qui doit survivre intact',
+        ])->assertOk();
+
+        $reponse = $this->reattribuer([$c->id], $this->evaluateur->membreEquipe->id)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('candidature_ids');
+        $this->assertStringContainsString('Déjà affecté', $reponse->json('errors.candidature_ids.0'));
+
+        // Le brouillon n'a PAS été touché (le refus intervient avant toute réinitialisation).
+        $this->assertSame(4, (int) DB::table('reponse_formulaire')->where('candidature_id', $c->id)->value('mo04_note_etoiles'));
+        $this->assertSame('Brouillon qui doit survivre intact', $c->fresh()->commentaire_evaluateur);
+        $this->assertSame($this->evaluateur->membreEquipe->id, $c->fresh()->evaluateur_id);
+
+        // Aucune ligne d'audit.
+        $this->assertSame(0, JournalAudit::where('action', 'Réattribution évaluateur')->count());
+    }
+
+    // --- Dossier non éligible : refusée, jamais forcée vers « soumis ». ---
+
+    public function test_dossier_non_eligible_refuse_la_reattribution_et_ne_force_jamais_soumis(): void
+    {
+        $c = $this->candidatureAffectee($this->creerCandidat('a@casa-demo.ci'), $this->evaluateur);
+        $this->actingAs($this->admin)
+            ->postJson("/api/admin/candidatures/{$c->id}/elimination", ['motif' => 'Motif de test'])
+            ->assertOk();
+        $this->assertSame('non_eligible', $c->fresh()->statut_eligibilite_interne);
+        $this->assertSame('en_instruction', $c->fresh()->statut_interne);
+
+        $reponse = $this->reattribuer([$c->id], $this->evaluateur2->membreEquipe->id)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('candidature_ids');
+        $this->assertStringContainsString('éligible', $reponse->json('errors.candidature_ids.0'));
+
+        $this->assertSame($this->evaluateur->membreEquipe->id, $c->fresh()->evaluateur_id);
+        $this->assertSame('en_instruction', $c->fresh()->statut_interne);
+        $this->assertSame(0, JournalAudit::where('action', 'Réattribution évaluateur')->count());
+    }
+
+    public function test_dossier_non_eligible_refuse_meme_le_retour_au_pool_non_affecte(): void
+    {
+        $c = $this->candidatureAffectee($this->creerCandidat('a@casa-demo.ci'), $this->evaluateur);
+        $this->actingAs($this->admin)
+            ->postJson("/api/admin/candidatures/{$c->id}/elimination", ['motif' => 'Motif de test'])
+            ->assertOk();
+
+        $this->reattribuer([$c->id], null)->assertStatus(422);
+
+        // Jamais repoussé vers `soumis` : le résultat de l'élimination n'est pas effacé.
+        $this->assertSame($this->evaluateur->membreEquipe->id, $c->fresh()->evaluateur_id);
+        $this->assertNotSame('soumis', $c->fresh()->statut_interne);
+    }
+
     // --- Absente : réattribution libre. ---
 
     public function test_dossier_sans_brouillon_se_reattribue_sans_effet_de_bord(): void
@@ -79,7 +143,7 @@ class ReattributionTest extends TestCase
         $ligne = JournalAudit::where('action', 'Réattribution évaluateur')->first();
         $this->assertNotNull($ligne);
         $this->assertSame('Eval Test', $ligne->ancienne_valeur);
-        $this->assertSame('Eval Test', $ligne->nouvelle_valeur); // même prénom/nom générique du trait, mais id différent
+        $this->assertSame('Fatou Koné', $ligne->nouvelle_valeur);
         $this->assertNull($ligne->motif);
     }
 
@@ -144,6 +208,45 @@ class ReattributionTest extends TestCase
 
         $this->assertSame(0, DB::table('note_sous_critere_entretien')->where('entretien_id', $c->id)->count());
         $this->assertDatabaseMissing('entretien', ['candidature_id' => $c->id]);
+    }
+
+    /**
+     * Correctif de revue : preuve de réinitialisation COMPLÈTE, pas
+     * seulement MO.04 et le commentaire — remplit un sous-ensemble
+     * représentatif de TOUT ce qu'un évaluateur peut écrire (brouillon
+     * dossier /65 : les deux seuls champs qui existent côté évaluateur,
+     * `EnregistrerEvaluationRequest` ; entretien : date/heure/lieu, présence,
+     * observation ET les 12 sous-notes), et vérifie qu'un évaluateur sortant
+     * ne laisse RIEN derrière lui — hormis ce qui est déjà VERROUILLÉ
+     * (score /65, jamais retouché, ADR-04).
+     */
+    public function test_reinitialisation_efface_integralement_tout_ce_que_l_evaluateur_sortant_a_ecrit(): void
+    {
+        $c = $this->candidatureAffectee($this->creerCandidat('a@casa-demo.ci'), $this->evaluateur);
+        DB::table('reponse_formulaire')->where('candidature_id', $c->id)->update(['mo04_note_etoiles' => 5]);
+        $c->forceFill(['commentaire_evaluateur' => 'Commentaire déjà verrouillé avec le dossier'])->saveQuietly();
+        $c = $this->verrouillerDossier($c->fresh(), '52.0');
+
+        $this->planifierEntretien($c, $this->evaluateur);
+        $this->actingAs($this->evaluateur)->putJson("/api/evaluateur/candidatures/{$c->id}/entretien", [
+            'presence' => 'present',
+            'observation' => 'Observation détaillée du premier évaluateur',
+            'notes' => $this->notesFort,
+        ])->assertOk()->assertJsonPath('data.entretien.statut', 'realise');
+        $this->assertSame(12, DB::table('note_sous_critere_entretien')->where('entretien_id', $c->id)->count());
+
+        $this->reattribuer([$c->id], $this->evaluateur2->membreEquipe->id)->assertOk();
+
+        // L'entretien a intégralement disparu : date, heure, lieu, présence,
+        // observation ET les 12 sous-notes — jamais seulement les sous-notes.
+        $this->assertDatabaseMissing('entretien', ['candidature_id' => $c->id]);
+        $this->assertSame(0, DB::table('note_sous_critere_entretien')->where('entretien_id', $c->id)->count());
+
+        // Le dossier /65, lui, reste intact : déjà verrouillé avant la
+        // réattribution, son score ne doit JAMAIS être retouché (ADR-04).
+        $this->assertSame(5, (int) DB::table('reponse_formulaire')->where('candidature_id', $c->id)->value('mo04_note_etoiles'));
+        $this->assertSame('Commentaire déjà verrouillé avec le dossier', $c->fresh()->commentaire_evaluateur);
+        $this->assertSame('52.0', $c->fresh()->evaluationDossier->score_total);
     }
 
     // --- Dossier /65 verrouillé, entretien pas encore validé : autorisée, score /65 inchangé. ---
@@ -246,14 +349,17 @@ class ReattributionTest extends TestCase
         $this->assertSame(0, JournalAudit::where('action', 'Réattribution évaluateur')->count());
     }
 
-    // --- Idempotence : rejouer la même réattribution laisse le même état final. ---
+    // --- Idempotence : rejouer la même réattribution laisse le même état ---
+    // --- final — depuis le correctif « cible identique » (point 1), le rejeu ---
+    // --- est désormais un refus EXPLICITE (422) plutôt qu'un succès silencieux, ---
+    // --- mais l'état final reste identique dans les deux cas. ---
 
-    public function test_rejouer_la_meme_reattribution_laisse_le_meme_etat_final(): void
+    public function test_rejouer_la_meme_reattribution_est_refusee_mais_laisse_le_meme_etat_final(): void
     {
         $c = $this->candidatureAffectee($this->creerCandidat('a@casa-demo.ci'), $this->evaluateur);
 
         $this->reattribuer([$c->id], $this->evaluateur2->membreEquipe->id)->assertOk();
-        $this->reattribuer([$c->id], $this->evaluateur2->membreEquipe->id)->assertOk();
+        $this->reattribuer([$c->id], $this->evaluateur2->membreEquipe->id)->assertStatus(422);
 
         $this->assertSame($this->evaluateur2->membreEquipe->id, $c->fresh()->evaluateur_id);
         $this->assertSame('en_instruction', $c->fresh()->statut_interne);
@@ -311,7 +417,7 @@ class ReattributionTest extends TestCase
             'module' => 'Candidatures',
             'objet' => $a->numero_dossier,
             'ancienne_valeur' => 'Eval Test',
-            'nouvelle_valeur' => 'Eval Test',
+            'nouvelle_valeur' => 'Fatou Koné',
         ]);
     }
 }
