@@ -56,60 +56,69 @@ class AffectationController extends Controller
             "Le compte de cet évaluateur est désactivé : il ne peut pas recevoir d'affectation.",
         );
 
-        $candidatures = Candidature::query()
-            ->with('evaluateur')
-            ->whereIn('id', $request->validated('candidature_ids'))
-            ->get();
+        // Correctif de revue : lecture, contrôles ET écriture dans UNE SEULE
+        // transaction avec `lockForUpdate` sur les lignes concernées — même
+        // patron que `ReattributionController`. Avant ce correctif, la
+        // lecture (et donc le contrôle « déjà affecté ») se faisait HORS
+        // transaction : le verrou d'un `SELECT ... FOR UPDATE` sans
+        // transaction explicite est relâché dès la fin de cette requête, donc
+        // une réattribution concurrente entre cette lecture et l'écriture
+        // plus bas pouvait écraser silencieusement ses changements.
+        return DB::transaction(function () use ($request, $membre) {
+            $candidatures = Candidature::query()
+                ->with('evaluateur')
+                ->whereIn('id', $request->validated('candidature_ids'))
+                ->lockForUpdate()
+                ->get();
 
-        // Correctif de revue : une campagne dont les résultats sont déjà
-        // publiés (ADR-08) ne doit plus voir ses dossiers changer d'évaluateur
-        // — ce garde-fou existait déjà pour l'affectation AUTOMATIQUE
-        // (ADR-45) mais manquait ici. 409 (conflit d'état), pas 422 (les
-        // refus 422 ci-dessous visent un dossier précis ; celui-ci vise la
-        // campagne entière, même sémantique que `AffectationAutomatiqueRefusee::campagnePubliee`).
-        abort_if(
-            GardeCampagnePubliee::estPubliee($candidatures->pluck('campagne_id')->unique()->values()),
-            409,
-            "Les résultats d'une campagne concernée sont déjà publiés : aucune affectation n'est possible sur ces dossiers.",
-        );
+            // Correctif de revue : une campagne dont les résultats sont déjà
+            // publiés (ADR-08) ne doit plus voir ses dossiers changer d'évaluateur
+            // — ce garde-fou existait déjà pour l'affectation AUTOMATIQUE
+            // (ADR-45) mais manquait ici. 409 (conflit d'état), pas 422 (les
+            // refus 422 ci-dessous visent un dossier précis ; celui-ci vise la
+            // campagne entière, même sémantique que `AffectationAutomatiqueRefusee::campagnePubliee`).
+            abort_if(
+                GardeCampagnePubliee::estPubliee($candidatures->pluck('campagne_id')->unique()->values()),
+                409,
+                "Les résultats d'une campagne concernée sont déjà publiés : aucune affectation n'est possible sur ces dossiers.",
+            );
 
-        $refuseesStatut = $candidatures->reject(
-            fn (Candidature $c) => in_array($c->statut_interne, ['soumis', 'en_instruction'], true),
-        );
-        $restantes = $candidatures->diff($refuseesStatut);
-        // Correctif de revue : un dossier déjà affecté (`evaluateur_id` non
-        // nul) ne doit plus pouvoir changer de main via CET endpoint — seule
-        // la réattribution (`ReattributionController`) porte la sémantique
-        // dédiée (brouillon réinitialisé, garde « campagne publiée », audit
-        // ancien/nouveau). Avant ce correctif, un dossier `en_instruction`
-        // était « ré-affectable » ici, en silence, sans aucune des garanties
-        // de la réattribution.
-        $refuseesDejaAffectees = $restantes->filter(fn (Candidature $c) => $c->evaluateur_id !== null);
-        $refuseesEligibilite = $restantes->diff($refuseesDejaAffectees)->filter(
-            fn (Candidature $c) => $c->statut_eligibilite_interne === 'non_eligible',
-        );
+            $refuseesStatut = $candidatures->reject(
+                fn (Candidature $c) => in_array($c->statut_interne, ['soumis', 'en_instruction'], true),
+            );
+            $restantes = $candidatures->diff($refuseesStatut);
+            // Correctif de revue : un dossier déjà affecté (`evaluateur_id` non
+            // nul) ne doit plus pouvoir changer de main via CET endpoint — seule
+            // la réattribution (`ReattributionController`) porte la sémantique
+            // dédiée (brouillon réinitialisé, garde « campagne publiée », audit
+            // ancien/nouveau). Avant ce correctif, un dossier `en_instruction`
+            // était « ré-affectable » ici, en silence, sans aucune des garanties
+            // de la réattribution.
+            $refuseesDejaAffectees = $restantes->filter(fn (Candidature $c) => $c->evaluateur_id !== null);
+            $refuseesEligibilite = $restantes->diff($refuseesDejaAffectees)->filter(
+                fn (Candidature $c) => $c->statut_eligibilite_interne === 'non_eligible',
+            );
 
-        if ($refuseesStatut->isNotEmpty() || $refuseesDejaAffectees->isNotEmpty() || $refuseesEligibilite->isNotEmpty()) {
-            $motifs = [];
-            if ($refuseesStatut->isNotEmpty()) {
-                $motifs[] = 'Non affectable(s) (doit être « soumise » ou « en instruction ») : '
-                    .$refuseesStatut->pluck('numero_dossier')->join(', ').'.';
+            if ($refuseesStatut->isNotEmpty() || $refuseesDejaAffectees->isNotEmpty() || $refuseesEligibilite->isNotEmpty()) {
+                $motifs = [];
+                if ($refuseesStatut->isNotEmpty()) {
+                    $motifs[] = 'Non affectable(s) (doit être « soumise » ou « en instruction ») : '
+                        .$refuseesStatut->pluck('numero_dossier')->join(', ').'.';
+                }
+                if ($refuseesDejaAffectees->isNotEmpty()) {
+                    $motifs[] = 'Déjà affecté(s) à un évaluateur — utilisez « Réattribuer » pour changer d\'évaluateur : '
+                        .$refuseesDejaAffectees->pluck('numero_dossier')->join(', ').'.';
+                }
+                if ($refuseesEligibilite->isNotEmpty()) {
+                    $motifs[] = 'Non affectable(s) (dossier non éligible) : '
+                        .$refuseesEligibilite->pluck('numero_dossier')->join(', ').'.';
+                }
+
+                throw ValidationException::withMessages([
+                    'candidature_ids' => [implode(' ', $motifs).' Aucune affectation effectuée.'],
+                ]);
             }
-            if ($refuseesDejaAffectees->isNotEmpty()) {
-                $motifs[] = 'Déjà affecté(s) à un évaluateur — utilisez « Réattribuer » pour changer d\'évaluateur : '
-                    .$refuseesDejaAffectees->pluck('numero_dossier')->join(', ').'.';
-            }
-            if ($refuseesEligibilite->isNotEmpty()) {
-                $motifs[] = 'Non affectable(s) (dossier non éligible) : '
-                    .$refuseesEligibilite->pluck('numero_dossier')->join(', ').'.';
-            }
 
-            throw ValidationException::withMessages([
-                'candidature_ids' => [implode(' ', $motifs).' Aucune affectation effectuée.'],
-            ]);
-        }
-
-        DB::transaction(function () use ($request, $candidatures, $membre) {
             $nouvelEvaluateur = $membre->prenom.' '.$membre->nom;
 
             foreach ($candidatures as $candidature) {
@@ -131,17 +140,17 @@ class AffectationController extends Controller
                     'resultat' => 'Succès',
                 ]);
             }
-        });
 
-        return response()->json([
-            'data' => [
-                'affectees' => $candidatures->count(),
-                'evaluateur' => [
-                    'id' => $membre->id,
-                    'prenom' => $membre->prenom,
-                    'nom' => $membre->nom,
+            return response()->json([
+                'data' => [
+                    'affectees' => $candidatures->count(),
+                    'evaluateur' => [
+                        'id' => $membre->id,
+                        'prenom' => $membre->prenom,
+                        'nom' => $membre->nom,
+                    ],
                 ],
-            ],
-        ]);
+            ]);
+        });
     }
 }
