@@ -30,6 +30,7 @@ class AffectationAutomatiqueController extends Controller
             $request->criteres(),
             $request->evaluateurIds(),
             (int) $request->validated('nombre_correspondants'),
+            $request->cibles(),
         );
 
         return response()->json(['data' => $plan->toArray()]);
@@ -43,6 +44,9 @@ class AffectationAutomatiqueController extends Controller
             (int) $request->validated('nombre_correspondants'),
             (int) $request->validated('nombre_affectables'),
             $request->user(),
+            $request->cibles(),
+            $request->repartitionAttendue(),
+            $request->nonAffectesAttendu(),
         );
 
         return response()->json(['data' => [...$plan->toArray(), 'affectees' => $plan->nombreAffectables]]);

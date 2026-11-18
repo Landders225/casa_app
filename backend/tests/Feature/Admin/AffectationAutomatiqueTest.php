@@ -104,6 +104,60 @@ class AffectationAutomatiqueTest extends TestCase
         return $this->executer([...$corps, 'nombre_affectables' => $m]);
     }
 
+    /**
+     * Lot 3 (ADR-48) : forme attendue par l'API pour `cibles`.
+     *
+     * @param  array<string, int>  $cibles  id évaluateur => nombre
+     * @return list<array{evaluateur_id: string, nombre: int}>
+     */
+    private function corpsCibles(array $cibles): array
+    {
+        return array_map(fn ($id, $n) => ['evaluateur_id' => $id, 'nombre' => $n], array_keys($cibles), array_values($cibles));
+    }
+
+    /**
+     * @param  array<string, mixed>  $criteres
+     * @param  array<string, int>  $cibles
+     * @param  list<string>|null  $evaluateurIds
+     */
+    private function apercuCibles(array $criteres, int $n, array $cibles, ?array $evaluateurIds = null): TestResponse
+    {
+        $corps = ['criteres' => $criteres, 'nombre_correspondants' => $n, 'cibles' => $this->corpsCibles($cibles)];
+        if ($evaluateurIds !== null) {
+            $corps['evaluateur_ids'] = $evaluateurIds;
+        }
+
+        return $this->apercu($corps);
+    }
+
+    /**
+     * Aperçu puis exécution AVEC cibles, en renvoyant exactement ce que
+     * l'aperçu a montré (`repartition_attendue`, `non_affectes_attendu`) —
+     * le parcours nominal attendu du front (Lot 3, ADR-48).
+     *
+     * @param  array<string, mixed>  $criteres
+     * @param  array<string, int>  $cibles
+     * @param  list<string>|null  $evaluateurIds
+     */
+    private function apercuPuisExecutionCibles(array $criteres, int $n, array $cibles, ?array $evaluateurIds = null): TestResponse
+    {
+        $corps = ['criteres' => $criteres, 'nombre_correspondants' => $n, 'cibles' => $this->corpsCibles($cibles)];
+        if ($evaluateurIds !== null) {
+            $corps['evaluateur_ids'] = $evaluateurIds;
+        }
+        $data = $this->apercu($corps)->assertOk()->json('data');
+
+        return $this->executer([
+            ...$corps,
+            'nombre_affectables' => $data['nombre_affectables'],
+            'repartition_attendue' => array_map(
+                fn (array $e) => ['evaluateur_id' => $e['id'], 'a_recevoir' => $e['a_recevoir']],
+                $data['evaluateurs'],
+            ),
+            'non_affectes_attendu' => $data['non_affectes'],
+        ]);
+    }
+
     private function nombreAffectations(): int
     {
         return JournalAudit::where('action', 'Affectation évaluateur')->count();
@@ -542,6 +596,239 @@ class AffectationAutomatiqueTest extends TestCase
         $this->assertLessThan(301 + 30, $requetes);
         $this->assertLessThan(30.0, $duree, "Durée : {$duree} s");
         fwrite(STDERR, sprintf("\n[volume] 300 dossiers / 4 évaluateurs : %.2f s, %d requêtes SQL\n", $duree, $requetes));
+    }
+
+    // --- Cibles par évaluateur (Lot 3, ADR-48) -----------------------------
+
+    public function test_cible_explicite_respectee_le_reste_va_aux_moins_charges_dabord(): void
+    {
+        $cible = $this->creerEvaluateur('cible@casa-demo.ci', nom: 'Alpha');
+        $libre = $this->creerEvaluateur('libre@casa-demo.ci', nom: 'Beta');
+        foreach (range(1, 10) as $_) {
+            $this->dossier();
+        }
+
+        $data = $this->apercuCibles([], 10, [$cible->membreEquipe->id => 3])->assertOk()->json('data');
+        $lignes = collect($data['evaluateurs'])->keyBy('nom');
+        $this->assertSame(3, $lignes['Alpha']['a_recevoir']);
+        $this->assertSame(7, $lignes['Beta']['a_recevoir']);
+        $this->assertSame(0, $data['non_affectes']);
+
+        $this->apercuPuisExecutionCibles([], 10, [$cible->membreEquipe->id => 3])->assertOk();
+        $recus = Candidature::pluck('evaluateur_id')->countBy();
+        $this->assertSame(3, $recus[$cible->membreEquipe->id]);
+        $this->assertSame(7, $recus[$libre->membreEquipe->id]);
+    }
+
+    public function test_toutes_les_cibles_a_zero_laisse_tout_non_affecte_sans_erreur(): void
+    {
+        $e1 = $this->creerEvaluateur('e1@casa-demo.ci');
+        $e2 = $this->creerEvaluateur('e2@casa-demo.ci');
+        foreach (range(1, 5) as $_) {
+            $this->dossier();
+        }
+
+        $data = $this->apercuCibles([], 5, [$e1->membreEquipe->id => 0, $e2->membreEquipe->id => 0])
+            ->assertOk()->json('data');
+        $this->assertSame([0, 0], array_column($data['evaluateurs'], 'a_recevoir'));
+        $this->assertSame(5, $data['non_affectes']);
+
+        $this->apercuPuisExecutionCibles([], 5, [$e1->membreEquipe->id => 0, $e2->membreEquipe->id => 0])->assertOk();
+
+        // Rien d'écrit : aucun dossier affecté, tous restent soumis/libres.
+        $this->assertSame(0, Candidature::whereNotNull('evaluateur_id')->count());
+        $this->assertSame(5, Candidature::where('statut_interne', 'soumis')->count());
+        $this->assertSame(0, $this->nombreAffectations());
+    }
+
+    public function test_cibles_explicites_couvrant_tout_le_monde_laisse_un_reliquat_non_affecte(): void
+    {
+        $e1 = $this->creerEvaluateur('e1@casa-demo.ci');
+        $e2 = $this->creerEvaluateur('e2@casa-demo.ci');
+        foreach (range(1, 5) as $_) {
+            $this->dossier();
+        }
+
+        $this->apercuPuisExecutionCibles([], 5, [$e1->membreEquipe->id => 1, $e2->membreEquipe->id => 1])->assertOk();
+
+        $this->assertSame(2, Candidature::whereNotNull('evaluateur_id')->count());
+        $this->assertSame(3, Candidature::where('statut_interne', 'soumis')->whereNull('evaluateur_id')->count());
+        $this->assertSame(2, $this->nombreAffectations());
+    }
+
+    public function test_somme_des_cibles_superieure_aux_affectables_est_refusee_422_rien_ecrit(): void
+    {
+        $e1 = $this->creerEvaluateur('e1@casa-demo.ci');
+        $e2 = $this->creerEvaluateur('e2@casa-demo.ci');
+        foreach (range(1, 5) as $_) {
+            $this->dossier();
+        }
+
+        $this->apercuCibles([], 5, [$e1->membreEquipe->id => 4, $e2->membreEquipe->id => 4])
+            ->assertStatus(422)
+            ->assertJsonPath('code', 'cibles_excessives');
+
+        $this->assertSame(0, Candidature::whereNotNull('evaluateur_id')->count());
+    }
+
+    public function test_cible_visant_un_evaluateur_hors_de_la_restriction_est_refusee_422_rien_ecrit(): void
+    {
+        $dansLOperation = $this->creerEvaluateur('dans@casa-demo.ci');
+        $horsOperation = $this->creerEvaluateur('hors@casa-demo.ci');
+        foreach (range(1, 3) as $_) {
+            $this->dossier();
+        }
+
+        // `$horsOperation` reçoit une cible mais est exclu par `evaluateur_ids`.
+        $this->apercuCibles([], 3, [$horsOperation->membreEquipe->id => 1], [$dansLOperation->membreEquipe->id])
+            ->assertStatus(422)
+            ->assertJsonPath('code', 'cible_evaluateur_invalide');
+
+        $this->assertSame(0, Candidature::whereNotNull('evaluateur_id')->count());
+    }
+
+    public function test_cible_visant_un_evaluateur_inconnu_est_refusee_422(): void
+    {
+        $this->creerEvaluateur('e1@casa-demo.ci');
+        $this->dossier();
+
+        $this->apercuCibles([], 1, [(string) Str::uuid() => 1])
+            ->assertStatus(422)
+            ->assertJsonPath('code', 'cible_evaluateur_invalide');
+    }
+
+    public function test_cibles_doublon_du_meme_evaluateur_est_refusee_par_validation(): void
+    {
+        $e = $this->creerEvaluateur('e@casa-demo.ci');
+        $this->dossier();
+
+        $this->apercu([
+            'criteres' => [], 'nombre_correspondants' => 1,
+            'cibles' => [
+                ['evaluateur_id' => $e->membreEquipe->id, 'nombre' => 1],
+                ['evaluateur_id' => $e->membreEquipe->id, 'nombre' => 2],
+            ],
+        ])->assertStatus(422)->assertJsonValidationErrors('cibles.0.evaluateur_id');
+    }
+
+    public function test_cible_hors_de_zero_a_mille_est_refusee_par_validation(): void
+    {
+        $e = $this->creerEvaluateur('e@casa-demo.ci');
+        $this->dossier();
+
+        foreach ([-1, 1001] as $nombre) {
+            $this->apercu([
+                'criteres' => [], 'nombre_correspondants' => 1,
+                'cibles' => [['evaluateur_id' => $e->membreEquipe->id, 'nombre' => $nombre]],
+            ])->assertStatus(422)->assertJsonValidationErrors('cibles.0.nombre');
+        }
+    }
+
+    public function test_execution_avec_cibles_sans_repartition_attendue_est_refusee_par_validation(): void
+    {
+        $e = $this->creerEvaluateur('e@casa-demo.ci');
+        $this->dossier();
+
+        $this->executer([
+            'criteres' => [], 'nombre_correspondants' => 1, 'nombre_affectables' => 1,
+            'cibles' => [['evaluateur_id' => $e->membreEquipe->id, 'nombre' => 1]],
+        ])->assertStatus(422)->assertJsonValidationErrors(['repartition_attendue', 'non_affectes_attendu']);
+    }
+
+    public function test_execution_refusee_si_un_dossier_de_loperation_a_ete_affecte_entre_apercu_et_confirmation(): void
+    {
+        $cible = $this->creerEvaluateur('cible@casa-demo.ci', nom: 'Alpha');
+        $libre = $this->creerEvaluateur('libre@casa-demo.ci', nom: 'Beta');
+        $dossiers = collect(range(1, 10))->map(fn () => $this->dossier());
+
+        $corps = ['criteres' => [], 'nombre_correspondants' => 10, 'cibles' => $this->corpsCibles([$cible->membreEquipe->id => 2])];
+        $data = $this->apercu($corps)->assertOk()->json('data');
+        // Beta (sans cible, seule) absorbe tout le reste (8) : vérifié avant la course.
+        $this->assertSame(8, collect($data['evaluateurs'])->firstWhere('nom', 'Beta')['a_recevoir']);
+
+        // Course : 3 dossiers de CETTE MÊME opération sont affectés entre-temps
+        // par la voie manuelle (`AffectationController`) — le client ignore
+        // encore ce changement et renvoie les nombres de l'aperçu, désormais périmés.
+        $this->actingAs($this->admin)->postJson('/api/admin/affectations', [
+            'evaluateur_id' => $libre->membreEquipe->id,
+            'candidature_ids' => $dossiers->take(3)->pluck('id')->all(),
+        ])->assertOk();
+        $dossiersRestants = $dossiers->skip(3)->pluck('id');
+
+        $reponse = $this->executer([
+            ...$corps,
+            'nombre_affectables' => $data['nombre_affectables'], // stale : 10, alors que 7 seulement restent affectables
+            'repartition_attendue' => array_map(
+                fn (array $e) => ['evaluateur_id' => $e['id'], 'a_recevoir' => $e['a_recevoir']],
+                $data['evaluateurs'],
+            ),
+            'non_affectes_attendu' => $data['non_affectes'],
+        ]);
+
+        // 10 affectables attendus mais 7 seulement désormais (3 déjà affectés
+        // entre-temps) : refus `liste_modifiee`, avant même de recalculer la répartition.
+        $reponse->assertStatus(409)->assertJsonPath('code', 'liste_modifiee');
+        $this->assertSame(0, Candidature::whereIn('id', $dossiersRestants)->whereNotNull('evaluateur_id')->count());
+    }
+
+    public function test_execution_refusee_si_la_repartition_du_reliquat_a_change_entre_apercu_et_confirmation(): void
+    {
+        $cible = $this->creerEvaluateur('cible@casa-demo.ci', nom: 'Alpha');
+        $libre1 = $this->creerEvaluateur('libre1@casa-demo.ci', nom: 'Beta');
+        $libre2 = $this->creerEvaluateur('libre2@casa-demo.ci', nom: 'Gamma');
+        // Filière distincte pour isoler la course : elle ne doit changer QUE
+        // la charge de Beta (via `en_instruction` dans la même campagne), pas
+        // `nombre_correspondants`/`nombre_affectables` de l'opération en cours.
+        foreach (range(1, 10) as $_) {
+            $this->dossier(filiere: 'cuisine');
+        }
+
+        // Cible 3 (reste 7, impair) : Beta et Gamma à égalité (charge 0),
+        // l'extra de l'arrondi va à Beta (premier dans l'ordre nom) → 4/3.
+        $corps = ['criteres' => ['filiere' => 'cuisine'], 'nombre_correspondants' => 10, 'cibles' => $this->corpsCibles([$cible->membreEquipe->id => 3])];
+        $data = $this->apercu($corps)->assertOk()->json('data');
+        $lignes = collect($data['evaluateurs'])->keyBy('nom');
+        $this->assertSame(0, $data['non_affectes']);
+        $this->assertSame(4, $lignes['Beta']['a_recevoir']);
+        $this->assertSame(3, $lignes['Gamma']['a_recevoir']);
+
+        // Course : Beta (sans cible) reçoit entre-temps un dossier EN
+        // INSTRUCTION d'une AUTRE filière, dans la MÊME campagne — sa charge
+        // passe à 1 sans toucher `nombre_correspondants`/`nombre_affectables`
+        // de cette opération (filtrée sur « cuisine »). Gamma devient le
+        // moins chargé : l'extra de l'arrondi doit désormais basculer vers lui.
+        $this->dossier(['statut_interne' => 'en_instruction', 'evaluateur_id' => $libre1->membreEquipe->id], filiere: 'restaurant-bar');
+
+        // Répartition PÉRIMÉE renvoyée par le client : celle vue à l'aperçu
+        // ci-dessus (Beta 4 / Gamma 3), AVANT la course.
+        $perimee = $lignes->map(fn (array $e) => ['evaluateur_id' => $e['id'], 'a_recevoir' => $e['a_recevoir']])->values()->all();
+
+        $reponse = $this->executer([
+            ...$corps,
+            'nombre_affectables' => $data['nombre_affectables'],
+            'repartition_attendue' => $perimee,
+            'non_affectes_attendu' => $data['non_affectes'],
+        ]);
+
+        $reponse->assertStatus(409)->assertJsonPath('code', 'liste_modifiee');
+        $this->assertSame(0, Candidature::where('filiere_id', $this->idFiliere('cuisine'))->whereNotNull('evaluateur_id')->count());
+    }
+
+    public function test_journal_avec_cibles_detaille_les_cibles_et_le_non_affecte(): void
+    {
+        $e1 = $this->creerEvaluateur('e1@casa-demo.ci', nom: 'Alpha');
+        $e2 = $this->creerEvaluateur('e2@casa-demo.ci', nom: 'Beta');
+        foreach (range(1, 5) as $_) {
+            $this->dossier();
+        }
+
+        $this->apercuPuisExecutionCibles([], 5, [$e1->membreEquipe->id => 1, $e2->membreEquipe->id => 1])->assertOk();
+
+        $globale = JournalAudit::where('action', 'Affectation automatique')->sole();
+        $this->assertSame(
+            '5 dossiers répartis entre 2 évaluateurs ; cibles : Eval Alpha=1, Eval Beta=1 ; non affectés : 3',
+            $globale->nouvelle_valeur,
+        );
     }
 
     /**

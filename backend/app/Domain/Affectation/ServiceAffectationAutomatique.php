@@ -44,6 +44,12 @@ use Illuminate\Support\Facades\DB;
  * Journal : 1 ligne globale (nombres uniquement) + 1 ligne PAR dossier
  * (numéro + évaluateur, même forme que l'affectation manuelle, D-6a-1 —
  * traçabilité en cas de litige). Rien dans les logs applicatifs.
+ *
+ * Cibles par évaluateur (Lot 3, ADR-48) : `$cibles` facultatif, résolu par
+ * `ResolutionCibles` puis réparti par `RepartitionCiblee` — remplace
+ * `RepartitionEquilibree` UNIQUEMENT quand fourni (sinon comportement
+ * ADR-45 inchangé). Peut laisser un reliquat de dossiers NON affectés
+ * (`PlanAffectation::$nonAffectes`), ce n'est pas une erreur.
  */
 final class ServiceAffectationAutomatique
 {
@@ -53,8 +59,9 @@ final class ServiceAffectationAutomatique
     /**
      * @param  array<string, mixed>  $criteres
      * @param  list<string>|null  $evaluateurIds
+     * @param  array<string, int>|null  $cibles  id évaluateur => nombre à recevoir (Lot 3, ADR-48) ; null = répartition égale classique
      */
-    public function apercu(array $criteres, ?array $evaluateurIds, int $nombreCorrespondants): PlanAffectation
+    public function apercu(array $criteres, ?array $evaluateurIds, int $nombreCorrespondants, ?array $cibles = null): PlanAffectation
     {
         $n = $this->verifierCorrespondants($criteres, $nombreCorrespondants);
         $evaluateurs = $this->evaluateurs($evaluateurIds);
@@ -65,12 +72,14 @@ final class ServiceAffectationAutomatique
 
         $this->verifierCampagnesNonPubliees($dossiers);
 
-        return $this->planifier($criteres, $n, $evaluateurs, $dossiers);
+        return $this->planifier($criteres, $n, $evaluateurs, $dossiers, $cibles);
     }
 
     /**
      * @param  array<string, mixed>  $criteres
      * @param  list<string>|null  $evaluateurIds
+     * @param  array<string, int>|null  $cibles  id évaluateur => nombre à recevoir (Lot 3, ADR-48) ; null = répartition égale classique
+     * @param  array<string, int>|null  $repartitionAttendue  id évaluateur => a_recevoir vu à l'aperçu (recontrôlé si `cibles` fourni)
      */
     public function executer(
         array $criteres,
@@ -78,8 +87,14 @@ final class ServiceAffectationAutomatique
         int $nombreCorrespondants,
         int $nombreAffectables,
         User $auteur,
+        ?array $cibles = null,
+        ?array $repartitionAttendue = null,
+        ?int $nonAffectesAttendu = null,
     ): PlanAffectation {
-        return DB::transaction(function () use ($criteres, $evaluateurIds, $nombreCorrespondants, $nombreAffectables, $auteur) {
+        return DB::transaction(function () use (
+            $criteres, $evaluateurIds, $nombreCorrespondants, $nombreAffectables, $auteur,
+            $cibles, $repartitionAttendue, $nonAffectesAttendu,
+        ) {
             $n = $this->verifierCorrespondants($criteres, $nombreCorrespondants);
             $evaluateurs = $this->evaluateurs($evaluateurIds);
 
@@ -101,11 +116,35 @@ final class ServiceAffectationAutomatique
             }
             $this->verifierCampagnesNonPubliees($dossiers);
 
-            $plan = $this->planifier($criteres, $n, $evaluateurs, $dossiers);
-            $attribution = RepartitionEquilibree::repartir(
-                $this->charges($evaluateurs, $dossiers),
-                $dossiers->pluck('id')->all(),
-            );
+            $plan = $this->planifier($criteres, $n, $evaluateurs, $dossiers, $cibles);
+            $charges = $this->charges($evaluateurs, $dossiers);
+
+            if ($cibles !== null) {
+                // Lot 3 (ADR-48) : la charge de chaque évaluateur a pu changer
+                // depuis l'aperçu (une autre affectation concurrente dans la
+                // même campagne) — ce qui déplace l'arrondi du reliquat entre
+                // évaluateurs sans cible. Recalculée sous le même verrou que
+                // les dossiers ci-dessus, comparée à ce que l'aperçu a montré :
+                // tout écart → même refus que `nombre_affectables` (recalculer, reconfirmer).
+                $ciblesFinales = ResolutionCibles::resoudre($charges, $cibles, $dossiers->count());
+                $nonAffectes = $dossiers->count() - array_sum($ciblesFinales);
+
+                if ($repartitionAttendue !== null) {
+                    $attendu = $repartitionAttendue;
+                    ksort($attendu);
+                    $recalcule = $ciblesFinales;
+                    ksort($recalcule);
+                    if ($attendu !== $recalcule || $nonAffectesAttendu !== $nonAffectes) {
+                        throw AffectationAutomatiqueRefusee::listeModifiee(
+                            "La répartition prévue a changé (charge des évaluateurs modifiée entre-temps) : recalculez l'aperçu et reconfirmez.",
+                        );
+                    }
+                }
+
+                $attribution = RepartitionCiblee::repartir($ciblesFinales, $dossiers->pluck('id')->all());
+            } else {
+                $attribution = RepartitionEquilibree::repartir($charges, $dossiers->pluck('id')->all());
+            }
 
             $parEvaluateur = [];
             foreach ($attribution as $dossierId => $evaluateurId) {
@@ -125,7 +164,7 @@ final class ServiceAffectationAutomatique
                 }
             }
 
-            $this->journaliser($auteur, $evaluateurs, $dossiers, $attribution);
+            $this->journaliser($auteur, $evaluateurs, $dossiers, $attribution, $cibles, $plan->nonAffectes);
 
             return $plan;
         });
@@ -264,16 +303,24 @@ final class ServiceAffectationAutomatique
      * @param  array<string, mixed>  $criteres
      * @param  Collection<int, MembreEquipe>  $evaluateurs
      * @param  Collection<int, Candidature>  $dossiers
+     * @param  array<string, int>|null  $cibles
      */
-    private function planifier(array $criteres, int $n, Collection $evaluateurs, Collection $dossiers): PlanAffectation
+    private function planifier(array $criteres, int $n, Collection $evaluateurs, Collection $dossiers, ?array $cibles = null): PlanAffectation
     {
         if ($dossiers->isEmpty()) {
             throw AffectationAutomatiqueRefusee::rienAAffecter();
         }
 
         $charges = $this->charges($evaluateurs, $dossiers);
-        $attribution = RepartitionEquilibree::repartir($charges, $dossiers->pluck('id')->all());
-        $recus = array_count_values($attribution);
+
+        if ($cibles !== null) {
+            $recus = ResolutionCibles::resoudre($charges, $cibles, $dossiers->count());
+            $nonAffectes = $dossiers->count() - array_sum($recus);
+        } else {
+            $attribution = RepartitionEquilibree::repartir($charges, $dossiers->pluck('id')->all());
+            $recus = array_count_values($attribution);
+            $nonAffectes = 0;
+        }
 
         $dejaAffectes = $this->requeteCorrespondants($criteres)->whereNotNull('candidature.evaluateur_id')->count();
         $nonEligibles = $this->requeteCorrespondants($criteres)
@@ -296,18 +343,32 @@ final class ServiceAffectationAutomatique
                 'charge_actuelle' => $charges[$e->id],
                 'a_recevoir' => $recus[$e->id] ?? 0,
             ])->values()->all(),
+            nonAffectes: $nonAffectes,
         );
     }
 
     /**
      * @param  Collection<int, MembreEquipe>  $evaluateurs
      * @param  Collection<int, Candidature>  $dossiers
-     * @param  array<string, string>  $attribution
+     * @param  array<string, string>  $attribution  id dossier => id évaluateur ; un dossier absent = resté non affecté (Lot 3, ADR-48)
+     * @param  array<string, int>|null  $cibles  id évaluateur => cible demandée, uniquement pour enrichir la ligne globale (Lot 3)
      */
-    private function journaliser(User $auteur, Collection $evaluateurs, Collection $dossiers, array $attribution): void
+    private function journaliser(User $auteur, Collection $evaluateurs, Collection $dossiers, array $attribution, ?array $cibles, int $nonAffectes): void
     {
         $noms = $evaluateurs->mapWithKeys(fn (MembreEquipe $e) => [$e->id => $e->prenom.' '.$e->nom]);
         $nbEvaluateurs = count(array_unique($attribution));
+
+        $nouvelleValeur = $dossiers->count().' dossiers répartis entre '.$nbEvaluateurs.' évaluateurs';
+
+        if ($cibles !== null) {
+            // Lot 3 (ADR-48) : la ligne globale garde une trace des cibles
+            // demandées par évaluateur et du nombre de dossiers restés non
+            // affectés (reliquat volontairement non réparti) — en plus des
+            // lignes par dossier ci-dessous, inchangées.
+            $recus = array_count_values($attribution);
+            $detail = $evaluateurs->map(fn (MembreEquipe $e) => $noms[$e->id].'='.($recus[$e->id] ?? 0))->implode(', ');
+            $nouvelleValeur .= ' ; cibles : '.$detail.' ; non affectés : '.$nonAffectes;
+        }
 
         JournalAudit::create([
             'auteur_id' => $auteur->id,
@@ -316,11 +377,18 @@ final class ServiceAffectationAutomatique
             'module' => 'Candidatures',
             'objet' => $dossiers->count().' dossiers',
             'ancienne_valeur' => null,
-            'nouvelle_valeur' => $dossiers->count().' dossiers répartis entre '.$nbEvaluateurs.' évaluateurs',
+            'nouvelle_valeur' => $nouvelleValeur,
             'resultat' => 'Succès',
         ]);
 
         foreach ($dossiers as $dossier) {
+            // Lot 3 (ADR-48) : un dossier resté non affecté (reliquat sous
+            // cibles) n'a pas de ligne par-dossier — rien à auditer sur un
+            // dossier qu'aucune affectation n'a touché.
+            if (! array_key_exists($dossier->id, $attribution)) {
+                continue;
+            }
+
             JournalAudit::create([
                 'auteur_id' => $auteur->id,
                 'role' => $auteur->role,
