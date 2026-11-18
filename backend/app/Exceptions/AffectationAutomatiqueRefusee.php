@@ -80,6 +80,31 @@ class AffectationAutomatiqueRefusee extends Exception implements ShouldntReport
         );
     }
 
+    /**
+     * Lot 3 (ADR-48) : somme des cibles explicites > dossiers affectables.
+     */
+    public static function ciblesExcessives(int $somme, int $affectables): self
+    {
+        return new self(
+            "Les cibles saisies ({$somme} dossiers) dépassent les {$affectables} dossiers affectables : réduisez une ou plusieurs cibles.",
+            'cibles_excessives',
+            422,
+        );
+    }
+
+    /**
+     * Lot 3 (ADR-48) : une cible vise un évaluateur hors de l'ensemble résolu
+     * (restriction `evaluateur_ids`, désactivé, ou qui n'a pas le rôle évaluateur).
+     */
+    public static function cibleEvaluateurInvalide(): self
+    {
+        return new self(
+            'Une cible vise un évaluateur qui ne fait pas partie des évaluateurs concernés par cette opération.',
+            'cible_evaluateur_invalide',
+            422,
+        );
+    }
+
     public function render(Request $request): JsonResponse
     {
         return response()->json([
