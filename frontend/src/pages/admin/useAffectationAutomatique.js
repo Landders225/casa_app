@@ -8,15 +8,21 @@ function messageErreur(err, defaut) {
 }
 
 /**
- * Affectation automatique par critères (ADR-45) — aperçu puis exécution.
+ * Affectation automatique par critères (ADR-45, ADR-48) — aperçu puis exécution.
  *
- *   POST /admin/affectations/automatique/apercu  { criteres, evaluateur_ids?, nombre_correspondants }
- *   POST /admin/affectations/automatique         { …, nombre_affectables }
+ *   POST /admin/affectations/automatique/apercu  { criteres, evaluateur_ids?, nombre_correspondants, cibles? }
+ *   POST /admin/affectations/automatique         { …, nombre_affectables, repartition_attendue?, non_affectes_attendu? }
  *
  * Aucune liste d'identifiants : le serveur recalcule l'ensemble à partir des
  * critères et refuse (409 `liste_modifiee`) si ses nombres diffèrent de ceux
  * que l'administrateur a vus. Les messages du serveur sont affichés TELS
  * QUELS ; `code` (`err.payload.code`) est exposé pour adapter l'action proposée.
+ *
+ * `cibles` (Lot 3, ADR-48) : facultatif, `[{evaluateur_id, nombre}…]`. Si
+ * fourni à l'exécution, `repartition_attendue`/`non_affectes_attendu` (ce que
+ * l'aperçu a montré) sont renvoyés aussi : la charge des évaluateurs ayant pu
+ * changer entre-temps, le serveur refuse (409 `liste_modifiee`) si le reliquat
+ * ou les nombres par évaluateur ne retombent plus pareil.
  */
 export function useAffectationAutomatique() {
   const [apercu, setApercu] = useState(null)
@@ -24,13 +30,14 @@ export function useAffectationAutomatique() {
   const [execution, setExecution] = useState(false)
   const [erreur, setErreur] = useState(null)
 
-  const calculerApercu = useCallback(async ({ criteres, nombreCorrespondants, evaluateurIds }) => {
+  const calculerApercu = useCallback(async ({ criteres, nombreCorrespondants, evaluateurIds, cibles }) => {
     setChargement(true)
     setErreur(null)
     setApercu(null)
     try {
       const body = { criteres, nombre_correspondants: nombreCorrespondants }
       if (evaluateurIds) body.evaluateur_ids = evaluateurIds
+      if (cibles) body.cibles = cibles
       const res = await apiClient.post('/admin/affectations/automatique/apercu', body)
       setApercu(res.data)
       return res.data
@@ -42,12 +49,19 @@ export function useAffectationAutomatique() {
     }
   }, [])
 
-  const executer = useCallback(async ({ criteres, nombreCorrespondants, nombreAffectables, evaluateurIds }) => {
+  const executer = useCallback(async ({
+    criteres, nombreCorrespondants, nombreAffectables, evaluateurIds, cibles, repartitionAttendue, nonAffectesAttendu,
+  }) => {
     setExecution(true)
     setErreur(null)
     try {
       const body = { criteres, nombre_correspondants: nombreCorrespondants, nombre_affectables: nombreAffectables }
       if (evaluateurIds) body.evaluateur_ids = evaluateurIds
+      if (cibles) {
+        body.cibles = cibles
+        body.repartition_attendue = repartitionAttendue
+        body.non_affectes_attendu = nonAffectesAttendu
+      }
       const res = await apiClient.post('/admin/affectations/automatique', body)
       return res.data
     } catch (err) {

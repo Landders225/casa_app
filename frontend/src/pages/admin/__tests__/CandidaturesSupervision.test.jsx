@@ -527,3 +527,106 @@ describe('CandidaturesSupervision — sélection de tous les résultats (ADR-45)
     await waitFor(() => expect(appelsPost('/admin/candidatures').length).toBeGreaterThan(listeAvant))
   })
 })
+
+/**
+ * Cibles par évaluateur (Lot 3, ADR-48) — champ facultatif « nombre de
+ * dossiers à recevoir » POUR CETTE OPÉRATION. Aucun calcul de répartition
+ * côté client : seule la comparaison « somme saisie / affectables » (blocage
+ * de la confirmation) est locale.
+ */
+const APERCU_CIBLES = {
+  nombre_correspondants: 45,
+  nombre_affectables: 40,
+  ignores: { deja_affectes: 3, non_eligibles: 2, statut_non_affectable: 0 },
+  evaluateurs: [
+    { id: 'eval-2', prenom: 'Aya', nom: 'Bamba', charge_actuelle: 0, a_recevoir: 10, charge_finale: 10 },
+    { id: 'eval-1', prenom: 'Yann', nom: 'Kacou', charge_actuelle: 0, a_recevoir: 30, charge_finale: 30 },
+  ],
+  non_affectes: 0,
+}
+
+describe('CandidaturesSupervision — cibles par évaluateur (Lot 3, ADR-48)', () => {
+  it('saisir une cible relance l’aperçu avec `cibles`, puis la confirmation renvoie `repartition_attendue`/`non_affectes_attendu`', async () => {
+    mockListeLongue({ apercu: () => Promise.resolve({ data: APERCU_CIBLES }) })
+    renderScreen()
+    const user = userEvent.setup()
+    await passerEnModeTous(user)
+    await user.click(screen.getByRole('button', { name: /répartir automatiquement/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Répartir automatiquement' })
+    await within(dialog).findByText(/seront répartis/i)
+
+    await user.type(within(dialog).getByRole('spinbutton', { name: 'Cible pour Aya Bamba' }), '10')
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/affectations/automatique/apercu', {
+      criteres: {},
+      nombre_correspondants: 45,
+      cibles: [{ evaluateur_id: 'eval-2', nombre: 10 }],
+    }))
+    expect(await within(dialog).findByText(/10 dossiers? ciblés? sur 40 affectables?/i)).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Répartir 40 dossiers' }))
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/affectations/automatique', {
+      criteres: {},
+      nombre_correspondants: 45,
+      nombre_affectables: 40,
+      cibles: [{ evaluateur_id: 'eval-2', nombre: 10 }],
+      repartition_attendue: [
+        { evaluateur_id: 'eval-2', a_recevoir: 10 },
+        { evaluateur_id: 'eval-1', a_recevoir: 30 },
+      ],
+      non_affectes_attendu: 0,
+    }))
+  })
+
+  it('une somme de cibles dépassant les affectables bloque la confirmation, EN DIRECT, sans appel serveur supplémentaire', async () => {
+    mockListeLongue({ apercu: () => Promise.resolve({ data: APERCU_CIBLES }) })
+    renderScreen()
+    const user = userEvent.setup()
+    await passerEnModeTous(user)
+    await user.click(screen.getByRole('button', { name: /répartir automatiquement/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Répartir automatiquement' })
+    await within(dialog).findByText(/seront répartis/i)
+
+    await user.type(within(dialog).getByRole('spinbutton', { name: 'Cible pour Aya Bamba' }), '30')
+    await user.type(within(dialog).getByRole('spinbutton', { name: 'Cible pour Yann Kacou' }), '30')
+
+    expect(await within(dialog).findByText(/dépassement/i)).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /répartir/i })).toBeDisabled()
+  })
+
+  it('décocher un évaluateur cible retire sa cible et désactive son champ', async () => {
+    mockListeLongue({ apercu: () => Promise.resolve({ data: APERCU_CIBLES }) })
+    renderScreen()
+    const user = userEvent.setup()
+    await passerEnModeTous(user)
+    await user.click(screen.getByRole('button', { name: /répartir automatiquement/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Répartir automatiquement' })
+    await within(dialog).findByText(/seront répartis/i)
+
+    await user.type(within(dialog).getByRole('spinbutton', { name: 'Cible pour Aya Bamba' }), '10')
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/affectations/automatique/apercu', expect.objectContaining({ cibles: [{ evaluateur_id: 'eval-2', nombre: 10 }] })))
+
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Aya Bamba' }))
+
+    expect(within(dialog).getByRole('spinbutton', { name: 'Cible pour Aya Bamba' })).toBeDisabled()
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/admin/affectations/automatique/apercu', {
+      criteres: {},
+      nombre_correspondants: 45,
+      evaluateur_ids: ['eval-1'],
+    }))
+  })
+
+  it('un reliquat non affecté (cibles couvrant tout le monde) affiche un avertissement non bloquant', async () => {
+    mockListeLongue({ apercu: () => Promise.resolve({ data: { ...APERCU_CIBLES, non_affectes: 5 } }) })
+    renderScreen()
+    const user = userEvent.setup()
+    await passerEnModeTous(user)
+    await user.click(screen.getByRole('button', { name: /répartir automatiquement/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Répartir automatiquement' })
+    await within(dialog).findByText(/seront répartis/i)
+
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('5 dossiers affectables resteront NON affectés')
+    expect(within(dialog).getByRole('button', { name: 'Répartir 40 dossiers' })).toBeEnabled()
+  })
+})
