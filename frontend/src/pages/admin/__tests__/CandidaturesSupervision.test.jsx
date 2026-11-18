@@ -627,6 +627,19 @@ describe('CandidaturesSupervision — cibles par évaluateur (Lot 3, ADR-48)', (
     await within(dialog).findByText(/seront répartis/i)
 
     expect(within(dialog).getByRole('alert')).toHaveTextContent('5 dossiers affectables resteront NON affectés')
-    expect(within(dialog).getByRole('button', { name: 'Répartir 40 dossiers' })).toBeEnabled()
+    // Correctif de revue : le bouton affiche les dossiers RÉELLEMENT
+    // répartis (40 affectables − 5 non affectés), pas les 40 affectables.
+    expect(within(dialog).getByRole('button', { name: 'Répartir 35 dossiers' })).toBeEnabled()
+  })
+
+  it('un reliquat total (0 dossier réparti) désactive la confirmation', async () => {
+    mockListeLongue({ apercu: () => Promise.resolve({ data: { ...APERCU_CIBLES, non_affectes: 40 } }) })
+    renderScreen()
+    const user = userEvent.setup()
+    await passerEnModeTous(user)
+    await user.click(screen.getByRole('button', { name: /répartir automatiquement/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Répartir automatiquement' })
+
+    expect(await within(dialog).findByRole('button', { name: 'Répartir 0 dossier' })).toBeDisabled()
   })
 })

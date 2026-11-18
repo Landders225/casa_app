@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { apiClient } from '../../lib/apiClient.js'
 import { ApiError } from '../../lib/ApiError.js'
 
@@ -23,14 +23,22 @@ function messageErreur(err, defaut) {
  * l'aperçu a montré) sont renvoyés aussi : la charge des évaluateurs ayant pu
  * changer entre-temps, le serveur refuse (409 `liste_modifiee`) si le reliquat
  * ou les nombres par évaluateur ne retombent plus pareil.
+ *
+ * `calculerApercu` est relancé à chaque changement de sélection/cible
+ * (ADR-45/48) : un aperçu plus ANCIEN peut répondre APRÈS un plus récent
+ * (réseau). Un compteur de requête (correctif de revue) ignore toute réponse
+ * qui n'est plus la dernière lancée — jamais d'aperçu périmé affiché par-
+ * dessus le bon.
  */
 export function useAffectationAutomatique() {
   const [apercu, setApercu] = useState(null)
   const [chargement, setChargement] = useState(false)
   const [execution, setExecution] = useState(false)
   const [erreur, setErreur] = useState(null)
+  const derniereRequete = useRef(0)
 
   const calculerApercu = useCallback(async ({ criteres, nombreCorrespondants, evaluateurIds, cibles }) => {
+    const requete = ++derniereRequete.current
     setChargement(true)
     setErreur(null)
     setApercu(null)
@@ -39,13 +47,15 @@ export function useAffectationAutomatique() {
       if (evaluateurIds) body.evaluateur_ids = evaluateurIds
       if (cibles) body.cibles = cibles
       const res = await apiClient.post('/admin/affectations/automatique/apercu', body)
+      if (requete !== derniereRequete.current) return null
       setApercu(res.data)
       return res.data
     } catch (err) {
+      if (requete !== derniereRequete.current) return null
       setErreur({ message: messageErreur(err, "Le calcul de l'aperçu a échoué."), code: err?.payload?.code ?? null })
       return null
     } finally {
-      setChargement(false)
+      if (requete === derniereRequete.current) setChargement(false)
     }
   }, [])
 

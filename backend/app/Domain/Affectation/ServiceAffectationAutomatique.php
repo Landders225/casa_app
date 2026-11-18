@@ -356,18 +356,27 @@ final class ServiceAffectationAutomatique
     private function journaliser(User $auteur, Collection $evaluateurs, Collection $dossiers, array $attribution, ?array $cibles, int $nonAffectes): void
     {
         $noms = $evaluateurs->mapWithKeys(fn (MembreEquipe $e) => [$e->id => $e->prenom.' '.$e->nom]);
+        // Lot 3 (correctif de revue) : compte les dossiers RÉELLEMENT
+        // attribués (`$attribution`), pas `$dossiers->count()` — identique
+        // sans cibles (RepartitionEquilibree attribue tout), mais un
+        // reliquat avec cibles laisse `$attribution` plus petit que `$dossiers`.
+        $nbAffectes = count($attribution);
         $nbEvaluateurs = count(array_unique($attribution));
 
-        $nouvelleValeur = $dossiers->count().' dossiers répartis entre '.$nbEvaluateurs.' évaluateurs';
+        $nouvelleValeur = $nbAffectes.' dossiers répartis entre '.$nbEvaluateurs.' évaluateurs';
 
         if ($cibles !== null) {
-            // Lot 3 (ADR-48) : la ligne globale garde une trace des cibles
-            // demandées par évaluateur et du nombre de dossiers restés non
-            // affectés (reliquat volontairement non réparti) — en plus des
-            // lignes par dossier ci-dessous, inchangées.
+            // Lot 3 (ADR-48) : la ligne globale distingue les cibles SAISIES
+            // par l'administrateur (seulement les évaluateurs explicitement
+            // ciblés) des nombres REÇUS une fois le reliquat réparti (tous
+            // les évaluateurs) — en plus des lignes par dossier ci-dessous, inchangées.
             $recus = array_count_values($attribution);
-            $detail = $evaluateurs->map(fn (MembreEquipe $e) => $noms[$e->id].'='.($recus[$e->id] ?? 0))->implode(', ');
-            $nouvelleValeur .= ' ; cibles : '.$detail.' ; non affectés : '.$nonAffectes;
+            $saisies = $evaluateurs
+                ->filter(fn (MembreEquipe $e) => array_key_exists($e->id, $cibles))
+                ->map(fn (MembreEquipe $e) => $noms[$e->id].'='.$cibles[$e->id])
+                ->implode(', ');
+            $recusDetail = $evaluateurs->map(fn (MembreEquipe $e) => $noms[$e->id].'='.($recus[$e->id] ?? 0))->implode(', ');
+            $nouvelleValeur .= ' ; cibles saisies : '.$saisies.' ; reçus : '.$recusDetail.' ; non affectés : '.$nonAffectes;
         }
 
         JournalAudit::create([
@@ -375,7 +384,7 @@ final class ServiceAffectationAutomatique
             'role' => $auteur->role,
             'action' => 'Affectation automatique',
             'module' => 'Candidatures',
-            'objet' => $dossiers->count().' dossiers',
+            'objet' => $nbAffectes.' dossiers',
             'ancienne_valeur' => null,
             'nouvelle_valeur' => $nouvelleValeur,
             'resultat' => 'Succès',

@@ -826,9 +826,40 @@ class AffectationAutomatiqueTest extends TestCase
 
         $globale = JournalAudit::where('action', 'Affectation automatique')->sole();
         $this->assertSame(
-            '5 dossiers répartis entre 2 évaluateurs ; cibles : Eval Alpha=1, Eval Beta=1 ; non affectés : 3',
+            '2 dossiers répartis entre 2 évaluateurs ; cibles saisies : Eval Alpha=1, Eval Beta=1 ; reçus : Eval Alpha=1, Eval Beta=1 ; non affectés : 3',
             $globale->nouvelle_valeur,
         );
+    }
+
+    public function test_journal_avec_toutes_cibles_a_zero_affiche_zero_reparti(): void
+    {
+        $e1 = $this->creerEvaluateur('e1@casa-demo.ci', nom: 'Alpha');
+        $e2 = $this->creerEvaluateur('e2@casa-demo.ci', nom: 'Beta');
+        foreach (range(1, 5) as $_) {
+            $this->dossier();
+        }
+
+        $this->apercuPuisExecutionCibles([], 5, [$e1->membreEquipe->id => 0, $e2->membreEquipe->id => 0])->assertOk();
+
+        $globale = JournalAudit::where('action', 'Affectation automatique')->sole();
+        $this->assertSame(
+            '0 dossiers répartis entre 0 évaluateurs ; cibles saisies : Eval Alpha=0, Eval Beta=0 ; reçus : Eval Alpha=0, Eval Beta=0 ; non affectés : 5',
+            $globale->nouvelle_valeur,
+        );
+    }
+
+    public function test_affectees_compte_les_dossiers_reellement_attribues_avec_reliquat(): void
+    {
+        $e1 = $this->creerEvaluateur('e1@casa-demo.ci');
+        $e2 = $this->creerEvaluateur('e2@casa-demo.ci');
+        foreach (range(1, 5) as $_) {
+            $this->dossier();
+        }
+
+        $this->apercuPuisExecutionCibles([], 5, [$e1->membreEquipe->id => 1, $e2->membreEquipe->id => 1])
+            ->assertOk()
+            ->assertJsonPath('data.affectees', 2)
+            ->assertJsonPath('data.non_affectes', 3);
     }
 
     /**

@@ -49,6 +49,9 @@ class AffectationAutomatiqueController extends Controller
             $request->nonAffectesAttendu(),
         );
 
-        return response()->json(['data' => [...$plan->toArray(), 'affectees' => $plan->nombreAffectables]]);
+        // Lot 3 (correctif de revue) : dossiers RÉELLEMENT attribués — avec
+        // un reliquat sous cibles (ADR-48), `nombreAffectables` seul
+        // surcompte les dossiers restés volontairement non affectés.
+        return response()->json(['data' => [...$plan->toArray(), 'affectees' => $plan->nombreAffectables - $plan->nonAffectes]]);
     }
 }

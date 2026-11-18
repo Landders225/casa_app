@@ -109,6 +109,9 @@ export function AffectationAutomatiqueModal({ criteres, nombreCorrespondants, ev
   const recoivent = recus.filter((n) => n > 0).length
   const min = recus.length ? Math.min(...recus) : 0
   const max = recus.length ? Math.max(...recus) : 0
+  // Dossiers RÉELLEMENT répartis (correctif de revue) : `nombre_affectables`
+  // seul surcompte dès qu'un reliquat reste non affecté sous cibles (ADR-48).
+  const repartis = apercu ? apercu.nombre_affectables - (apercu.non_affectes ?? 0) : 0
   const ignores = apercu ? IGNORES_LIBELLES.filter(([cle]) => apercu.ignores[cle] > 0) : []
   const totalIgnores = apercu ? apercu.nombre_correspondants - apercu.nombre_affectables : 0
   const occupe = chargement || execution
@@ -185,7 +188,7 @@ export function AffectationAutomatiqueModal({ criteres, nombreCorrespondants, ev
           ) : apercu ? (
             <>
               <p className="body-sm fw-semibold" style={{ marginBottom: 'var(--space-2)' }}>
-                {apercu.nombre_affectables} dossier{apercu.nombre_affectables > 1 ? 's' : ''} {apercu.nombre_affectables > 1 ? 'seront répartis' : 'sera affecté'} entre {recoivent} évaluateur{recoivent > 1 ? 's' : ''} : {min === max ? `${max}` : `${min} à ${max}`} chacun.
+                {repartis} dossier{repartis > 1 ? 's' : ''} {repartis > 1 ? 'seront répartis' : 'sera affecté'} entre {recoivent} évaluateur{recoivent > 1 ? 's' : ''} : {min === max ? `${max}` : `${min} à ${max}`} chacun.
               </p>
               {totalIgnores > 0 ? (
                 <p className="caption text-muted" style={{ marginBottom: 'var(--space-3)' }}>
@@ -234,10 +237,10 @@ export function AffectationAutomatiqueModal({ criteres, nombreCorrespondants, ev
           <button
             type="button"
             className="btn btn-primary"
-            disabled={occupe || !apercu || Boolean(erreur) || choisis.size === 0 || depassementCibles}
+            disabled={occupe || !apercu || Boolean(erreur) || choisis.size === 0 || depassementCibles || repartis === 0}
             onClick={confirmer}
           >
-            {execution ? 'Répartition…' : apercu ? `Répartir ${apercu.nombre_affectables} dossier${apercu.nombre_affectables > 1 ? 's' : ''}` : 'Répartir'}
+            {execution ? 'Répartition…' : apercu ? `Répartir ${repartis} dossier${repartis > 1 ? 's' : ''}` : 'Répartir'}
           </button>
         </div>
       </div>
