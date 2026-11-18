@@ -1,0 +1,1143 @@
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Export\NormalisationVilleTest::test_classement_de_chaque_variante_reelle(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Export\NormalisationVilleTest::test_villes_interieur_etendues_sont_classees_interieur(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Security\CmuHorsScoringTest::test_aucune_mention_de_la_cmu_dans_le_calcul(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\Auth\InscriptionTest::test_mot_de_passe_faible_rejete(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\Auth\InscriptionTest::test_age_hors_tranche_refuse_sans_creer_de_compte(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   PASS  Tests\Unit\Affectation\RepartitionCibleeTest
+  ✓ chaque evaluateur recoit exactement sa cible                         0.29s  
+  ✓ cible a zero ne recoit rien                                          0.05s  
+  ✓ somme des cibles inferieure au nombre de dossiers laisse le reste n… 0.02s  
+  ✓ aucune cible ou aucun dossier
+  ✓ deterministe memes entrees meme resultat
+
+   PASS  Tests\Unit\Affectation\RepartitionEquilibreeTest
+  ✓ repartition egale a une unite pres                                   0.21s  
+  ✓ tourniquet dans l ordre recu egalite au premier
+  ✓ les ecarts de charge existants sont combles d abord
+  ✓ deterministe memes entrees meme resultat
+  ✓ aucun evaluateur ou aucun dossier
+
+   PASS  Tests\Unit\Affectation\ResolutionCiblesTest
+  ✓ sans aucune cible le reste est partage a parts egales moins charges… 0.02s  
+  ✓ reste non divisible va aux moins charges dabord
+  ✓ cibles explicites respectees le reste va aux evaluateurs sans cible
+  ✓ toutes les cibles a zero laisse tout non affecte sans erreur
+  ✓ cibles explicites couvrant tout le monde sans atteindre le total laisse un reliquat
+  ✓ somme des cibles superieure aux affectables est refusee              0.03s  
+  ✓ cible visant un evaluateur hors de lensemble resolu est refusee
+  ✓ resultat couvre tous les evaluateurs dans lordre recu
+  ✓ deterministe memes entrees meme resultat
+
+   PASS  Tests\Unit\ChampsFormulaireTest
+  ✓ enums alignes sur les options du bareme seede                       15.22s  
+  ✓ champs interdits couvrent la note evaluateur                         0.51s  
+
+   PASS  Tests\Unit\ExampleTest
+  ✓ that true is true                                                    0.03s  
+
+   PASS  Tests\Unit\Export\NormalisationVilleTest
+  ✓ classement de chaque variante reelle with data set #0                0.36s  
+  ✓ classement de chaque variante reelle with data set #1                0.49s  
+  ✓ classement de chaque variante reelle with data set #2                0.41s  
+  ✓ classement de chaque variante reelle with data set #3                0.47s  
+  ✓ classement de chaque variante reelle with data set #4                0.58s  
+  ✓ classement de chaque variante reelle with data set #5                0.45s  
+  ✓ classement de chaque variante reelle with data set #6                0.53s  
+  ✓ classement de chaque variante reelle with data set #7                0.66s  
+  ✓ classement de chaque variante reelle with data set #8                0.83s  
+  ✓ classement de chaque variante reelle with data set #9                0.72s  
+  ✓ classement de chaque variante reelle with data set #10               0.65s  
+  ✓ classement de chaque variante reelle with data set #11               0.80s  
+  ✓ classement de chaque variante reelle with data set #12               0.88s  
+  ✓ classement de chaque variante reelle with data set #13               0.66s  
+  ✓ classement de chaque variante reelle with data set #14               0.68s  
+  ✓ classement de chaque variante reelle with data set #15               0.64s  
+  ✓ classement de chaque variante reelle with data set #16               0.68s  
+  ✓ classement de chaque variante reelle with data set #17               0.68s  
+  ✓ classement de chaque variante reelle with data set #18               0.66s  
+  ✓ classement de chaque variante reelle with data set #19               0.56s  
+  ✓ classement de chaque variante reelle with data set #20               0.50s  
+  ✓ classement de chaque variante reelle with data set #21               0.59s  
+  ✓ classement de chaque variante reelle with data set #22               0.63s  
+  ✓ classement de chaque variante reelle with data set #23               0.56s  
+  ✓ classement de chaque variante reelle with data set #24               0.48s  
+  ✓ classement de chaque variante reelle with data set #25               0.55s  
+  ✓ classement de chaque variante reelle with data set #26               0.49s  
+  ✓ classement de chaque variante reelle with data set #27               0.63s  
+  ✓ classement de chaque variante reelle with data set #28               0.47s  
+  ✓ classement de chaque variante reelle with data set #29               0.55s  
+  ✓ classement de chaque variante reelle with data set #30               0.44s  
+  ✓ classement de chaque variante reelle with data set #31               0.47s  
+  ✓ classement de chaque variante reelle with data set #32               0.68s  
+  ✓ classement de chaque variante reelle with data set #33               0.57s  
+  ✓ classement de chaque variante reelle with data set #34               0.45s  
+  ✓ classement de chaque variante reelle with data set #35               0.48s  
+  ✓ classement de chaque variante reelle with data set #36               0.60s  
+  ✓ classement de chaque variante reelle with data set #37               0.44s  
+  ✓ classement de chaque variante reelle with data set #38               0.39s  
+  ✓ classement de chaque variante reelle with data set #39               0.40s  
+  ✓ classement de chaque variante reelle with data set #40               0.40s  
+  ✓ classement de chaque variante reelle with data set #41               0.57s  
+  ✓ classement de chaque variante reelle with data set #42               0.55s  
+  ✓ classement de chaque variante reelle with data set #43               0.40s  
+  ✓ classement de chaque variante reelle with data set #44               0.41s  
+  ✓ classement de chaque variante reelle with data set #45               0.37s  
+  ✓ classement de chaque variante reelle with data set #46               0.56s  
+  ✓ classement de chaque variante reelle with data set #47               0.47s  
+  ✓ classement de chaque variante reelle with data set #48               0.49s  
+  ✓ classement de chaque variante reelle with data set #49               0.46s  
+  ✓ classement de chaque variante reelle with data set #50               0.67s  
+  ✓ classement de chaque variante reelle with data set #51               0.48s  
+  ✓ classement de chaque variante reelle with data set #52               0.54s  
+  ✓ classement de chaque variante reelle with data set #53               0.49s  
+  ✓ classement de chaque variante reelle with data set #54               0.54s  
+  ✓ classement de chaque variante reelle with data set #55               0.45s  
+  ✓ classement de chaque variante reelle with data set #56               0.53s  
+  ✓ classement de chaque variante reelle with data set #57               0.38s  
+  ✓ classement de chaque variante reelle with data set #58               0.52s  
+  ✓ classement de chaque variante reelle with data set #59               0.47s  
+  ✓ classement de chaque variante reelle with data set #60               0.35s  
+  ✓ classement de chaque variante reelle with data set #61               0.59s  
+  ✓ classement de chaque variante reelle with data set #62               0.43s  
+  ✓ classement de chaque variante reelle with data set #63               0.42s  
+  ✓ classement de chaque variante reelle with data set #64               0.47s  
+  ✓ classement de chaque variante reelle with data set #65               0.39s  
+  ✓ classement de chaque variante reelle with data set #66               0.45s  
+  ✓ classement de chaque variante reelle with data set #67               0.63s  
+  ✓ classement de chaque variante reelle with data set #68               0.59s  
+  ✓ classement de chaque variante reelle with data set #69               0.40s  
+  ✓ classement de chaque variante reelle with data set #70               0.39s  
+  ✓ classement de chaque variante reelle with data set #71               0.43s  
+  ✓ classement de chaque variante reelle with data set #72               0.34s  
+  ✓ classement de chaque variante reelle with data set #73               0.51s  
+  ✓ classement de chaque variante reelle with data set #74               0.41s  
+  ✓ classement de chaque variante reelle with data set #75               0.44s  
+  ✓ classement de chaque variante reelle with data set #76               0.42s  
+  ✓ classement de chaque variante reelle with data set #77               0.49s  
+  ✓ classement de chaque variante reelle with data set #78               0.49s  
+  ✓ classement de chaque variante reelle with data set #79               0.36s  
+  ✓ classement de chaque variante reelle with data set #80               0.36s  
+  ✓ classement de chaque variante reelle with data set #81               0.46s  
+  ✓ aucune des 82 variantes reelles n est a classer                      0.33s  
+  ✓ somme des effectifs par categorie egale la somme d entree            0.32s  
+  ✓ valeur vide est a classer                                            0.55s  
+  ✓ valeur totalement inconnue est a classer                             0.43s  
+  ✓ insensible a la casse et aux separateurs                             0.46s  
+  ✓ aboisso est classee interieur                                        0.47s  
+  ✓ aboisso sans accent et en majuscules reste classee interieur         0.48s  
+  ✓ villes interieur etendues sont classees interieur with data set #0   0.58s  
+  ✓ villes interieur etendues sont classees interieur with data set #1   0.35s  
+  ✓ villes interieur etendues sont classees interieur with data set #2   0.41s  
+  ✓ villes interieur etendues sont classees interieur with data set #3   0.36s  
+  ✓ villes interieur etendues sont classees interieur with data set #4   0.35s  
+  ✓ villes interieur etendues sont classees interieur with data set #5   0.39s  
+  ✓ villes interieur etendues sont classees interieur with data set #6   0.46s  
+  ✓ villes interieur etendues sont classees interieur with data set #7   0.56s  
+  ✓ villes interieur etendues sont classees interieur with data set #8   0.60s  
+  ✓ villes interieur etendues sont classees interieur with data set #9   0.43s  
+  ✓ villes interieur etendues sont classees interieur with data set #10  0.39s  
+  ✓ villes interieur etendues sont classees interieur with data set #11  0.40s  
+  ✓ villes interieur etendues sont classees interieur with data set #12  0.54s  
+  ✓ villes interieur etendues sont classees interieur with data set #13  0.55s  
+  ✓ villes interieur etendues sont classees interieur with data set #14  0.47s  
+  ✓ villes interieur etendues sont classees interieur with data set #15  0.44s  
+  ✓ villes interieur etendues sont classees interieur with data set #16  0.41s  
+  ✓ villes interieur etendues sont classees interieur with data set #17  0.60s  
+  ✓ villes interieur etendues sont classees interieur with data set #18  0.54s  
+  ✓ villes interieur etendues sont classees interieur with data set #19  0.48s  
+  ✓ villes interieur etendues sont classees interieur with data set #20  0.42s  
+  ✓ villes interieur etendues sont classees interieur with data set #21  0.46s  
+  ✓ villes interieur etendues sont classees interieur with data set #22  0.54s  
+  ✓ villes interieur etendues sont classees interieur with data set #23  0.53s  
+  ✓ villes interieur etendues sont classees interieur with data set #24  0.40s  
+  ✓ villes interieur etendues sont classees interieur with data set #25  0.46s  
+  ✓ villes interieur etendues sont classees interieur with data set #26  0.58s  
+  ✓ villes interieur etendues sont classees interieur with data set #27  0.47s  
+  ✓ villes interieur etendues sont classees interieur with data set #28  0.49s  
+  ✓ villes interieur etendues sont classees interieur with data set #29  0.35s  
+  ✓ villes interieur etendues sont classees interieur with data set #30  0.44s  
+  ✓ villes interieur etendues sont classees interieur with data set #31  0.32s  
+  ✓ villes interieur etendues sont classees interieur with data set #32  0.37s  
+  ✓ villes interieur etendues sont classees interieur with data set #33  0.37s  
+  ✓ villes interieur etendues sont classees interieur with data set #34  0.42s  
+  ✓ une ville toujours inconnue reste a classer apres l ajout d aboisso  0.55s  
+
+   PASS  Tests\Unit\Export\PseudonymisationTest
+  ✓ meme candidature id donne toujours le meme id pseudonyme             0.63s  
+  ✓ deux candidatures differentes donnent des id pseudonymes differents  0.37s  
+  ✓ id pseudonyme est prefixe et ne contient pas l uuid source           0.43s  
+  ✓ id pseudonyme depend de la cle applicative                           0.50s  
+
+   PASS  Tests\Unit\Export\SuppressionSecondaireTest
+  ✓ aucun masquage si toutes les categories sont au dessus du seuil      0.43s  
+  ✓ categorie sous le seuil est masquee                                  0.51s  
+  ✓ une seule categorie masquee entraine la suppression secondaire       0.43s  
+  ✓ deux categories deja masquees ne declenchent pas de suppression sup… 0.43s  
+  ✓ total absent des qu une cellule est masquee                          0.55s  
+  ✓ aucune reconstruction possible du total affiche                      0.46s  
+
+   PASS  Tests\Unit\Models\CandidatNormalisationTest
+  ✓ accents courants sont retires                                        0.06s  
+  ✓ apostrophe droite et typographique sont retirees
+  ✓ tiret est retire
+  ✓ insensible a la casse
+  ✓ espaces multiples et bords sont neutralises
+  ✓ prenom et nom null ne plantent pas
+  ✓ terme de recherche normalise est une sous chaine de la colonne normalisee
+  ✓ lettres mathematiques italiques sont normalisees
+  ✓ lettres mathematiques grasses sont normalisees
+  ✓ lettres mathematiques script sont normalisees
+  ✓ lettres pleine largeur sont normalisees
+  ✓ ligature et u210e sont normalisees
+  ✓ terme ascii simple equivaut au meme terme stylise
+  ✓ nfkc ne change rien aux cas deja couverts
+  ✓ caracteres non translitterables restent vides sans erreur
+
+   PASS  Tests\Unit\Notifications\EnvoiMailResilientTest
+  ✓ les 5 notifications informatives vont sur la file mail information   0.59s  
+  ✓ les 2 notifications critiques vont sur la file mail critique         0.48s  
+  ✓ une notification informative perd le canal mail si desactivee        0.43s  
+  ✓ une notification informative garde les 2 canaux par defaut           0.53s  
+  ✓ les notifications critiques ignorent totalement le reglage           0.43s  
+  ✓ le canal mail recoit l etalement et la tolerance smtp                0.48s  
+  ✓ le canal database ne recoit aucun middleware                         0.46s  
+  ✓ retry until est fixe a six heures                                    0.49s  
+  ✓ le plancher de backoff est de 30 secondes                            0.58s  
+
+   PASS  Tests\Unit\Notifications\EtalementEnvoiMailTest
+  ✓ le premier job part immediatement sans relance                       0.54s  
+  ✓ un second job immediat est retarde de l intervalle exact             0.39s  
+  ✓ une relance du meme job relit son creneau sans en reserver un nouve… 0.35s  
+  ✓ la cadence est partagee entre plusieurs jobs consecutifs             0.36s  
+  ✓ l intervalle suit mail max per minute                                0.40s  
+
+   PASS  Tests\Unit\Notifications\ToleranceSmtpTemporaireTest
+  ✓ code 421 est traite comme temporaire et relance le job               1.09s  
+  ✓ code 550 est definitif et echoue immediatement sans relance          0.48s  
+  ✓ code inconnu est traite comme temporaire par prudence                0.51s  
+  ✓ le delai croit avec le numero de tentative                           0.61s  
+  ✓ le delai est plafonne                                                0.44s  
+  ✓ une exception non smtp n est pas interceptee                         0.55s  
+  ✓ un envoi reussi ne declenche ni relance ni echec                     0.43s  
+  ✓ le journal d une relance ne contient aucune donnee personnelle       0.94s  
+  ✓ le journal d un echec definitif ne contient aucune donnee personnel… 0.58s  
+
+   PASS  Tests\Unit\PeerFingerprintTest
+  ✓ chaine vide renvoie null                                             0.55s  
+  ✓ chaine blanche renvoie null                                          0.44s  
+  ✓ format production avec deux points et majuscules                     0.57s  
+  ✓ sans deux points deja minuscule                                      0.52s  
+  ✓ espaces de bord ignores                                              0.42s  
+  ✓ casse mixte                                                          0.48s  
+
+   PASS  Tests\Unit\Security\CmuHorsScoringTest
+  ✓ les fichiers de calcul existent bien                                 0.52s  
+  ✓ aucune mention de la cmu dans le calcul with data set "app/ domain/… 0.47s  
+  ✓ aucune mention de la cmu dans le calcul with data set "app/ domain/… 0.42s  
+  ✓ aucune mention de la cmu dans le calcul with data set "app/ domain/… 0.58s  
+  ✓ aucune mention de la cmu dans le calcul with data set "app/ domain/… 0.46s  
+
+   WARN  Tests\Unit\Security\ConfigDurcieTest
+  ✓ env production exemple est durci                                     0.02s  
+  ✓ cors n autorise pas toutes les origines                              0.01s  
+  ✓ bcrypt par defaut a 12 tours                                         0.01s  
+  - les env de prod sont gitignores → Racine du dépôt non disponible ic… 0.37s  
+  - php ne revele pas sa version → Racine du dépôt non disponible ici —… 0.02s  
+  - nginx ne revele pas sa version → Racine du dépôt non disponible ici… 0.02s  
+  - les six entetes de securite sont dans la conf prod → Racine du dépô… 0.02s  
+  - csp autorise le blob image et le worker pdf partout → Racine du dép… 0.02s  
+
+   PASS  Tests\Unit\Security\PasDeSqlBrutTest
+  ✓ aucune requete sql brute sous app                                    1.12s  
+  ✓ le scan voit bien des fichiers                                       0.16s  
+
+   PASS  Tests\Unit\ServiceEligibiliteTest
+  ✓ dossier eligible ne declenche aucun critere                          3.51s  
+  ✓ chaque critere est declenche individuellement with data set " s c.0… 0.58s  
+  ✓ chaque critere est declenche individuellement with data set " s c.0… 0.53s  
+  ✓ chaque critere est declenche individuellement with data set " s c.0… 0.60s  
+  ✓ chaque critere est declenche individuellement with data set " s e.0… 0.78s  
+  ✓ chaque critere est declenche individuellement with data set " s e.0… 0.60s  
+  ✓ chaque critere est declenche individuellement with data set "frança… 0.55s  
+  ✓ chaque critere est declenche individuellement with data set " d i.0… 0.64s  
+  ✓ chaque critere est declenche individuellement with data set " d i.0… 0.63s  
+  ✓ acces sites logique o r seul le double non bloque                    0.79s  
+  ✓ bornes d age a la date d ouverture de campagne                       0.92s  
+  ✓ plusieurs criteres tous traces                                       0.68s  
+  ✓ criteres evaluateur separes et non appeles ici                       0.62s  
+
+   PASS  Tests\Unit\ValidateurCompletudeTest
+  ✓ dossier complet ne renvoie aucune erreur                             1.15s  
+  ✓ dossier vierge liste tout ce qui manque                              0.58s  
+  ✓ lettre trop courte                                                   0.59s  
+  ✓ conditionnels sc05 non et se03 sans emploi                           0.51s  
+  ✓ experience sans justificatif                                         0.66s  
+  ✓ piece de dossier manquante                                           0.55s  
+  ✓ numero cmu manquant bloque la completude                             0.74s  
+  ✓ justificatif cmu manquant bloque la completude                       0.59s  
+  ✓ numero cmu et justificatif presents ne bloquent rien                 0.56s  
+  ✓ dossier complet sans residence ni lettre ne renvoie aucune erreur    0.90s  
+  ✓ piece retiree deja presente ne perturbe pas la completude            0.70s  
+
+[volume] 300 dossiers / 4 évaluateurs : 0.23 s, 316 requêtes SQL
+
+   PASS  Tests\Feature\Admin\AffectationAutomatiqueTest
+  ✓ l apercu annonce la repartition sans rien ecrire                     1.36s  
+  ✓ execution repartit equitablement et bascule en instruction           1.03s  
+  ✓ repartition deterministe par numero de dossier et ordre nom prenom   0.82s  
+  ✓ le vrai chemin soumission puis affectation automatique ouvre le dos… 3.35s  
+  ✓ deja affectes non eligibles et brouillons sont ignores               0.95s  
+  ✓ n est exactement le total de la liste pour les memes criteres        0.95s  
+  ✓ la charge existante est celle de la campagne concernee seulement     0.88s  
+  ✓ par defaut seuls les evaluateurs actifs recoivent                    0.65s  
+  ✓ restriction a une partie des evaluateurs                             0.75s  
+  ✓ evaluateur restreint inactif admin ou inconnu 422                    0.90s  
+  ✓ aucun evaluateur actif 422                                           0.59s  
+  ✓ nombre correspondants different 409 rien ecrit                       0.59s  
+  ✓ nombre affectables different 409 rien ecrit                          0.78s  
+  ✓ relancer ne double pas les affectations                              0.94s  
+  ✓ campagne publiee 409 campagne cloturee autorisee                     0.77s  
+  ✓ au dela du plafond 422 avec message d affiner                        0.92s  
+  ✓ critere hors liste blanche ou liste d identifiants 422               0.77s  
+  ✓ journal une ligne globale chiffree et une ligne par dossier          0.67s  
+  ✓ la reponse ne contient aucune donnee de candidat                     0.75s  
+  ✓ un refus n est jamais journalise dans les logs applicatifs           0.92s  
+  ✓ affectation automatique admin only                                   0.68s  
+  ✓ volume quelques centaines de dossiers en une transaction             1.16s  
+  ✓ cible explicite respectee le reste va aux moins charges dabord       0.92s  
+  ✓ toutes les cibles a zero laisse tout non affecte sans erreur         0.66s  
+  ✓ cibles explicites couvrant tout le monde laisse un reliquat non aff… 0.69s  
+  ✓ somme des cibles superieure aux affectables est refusee 422 rien ec… 0.61s  
+  ✓ cible visant un evaluateur hors de la restriction est refusee 422 r… 0.78s  
+  ✓ cible visant un evaluateur inconnu est refusee 422                   0.78s  
+  ✓ cibles doublon du meme evaluateur est refusee par validation         0.77s  
+  ✓ cible hors de zero a mille est refusee par validation                0.93s  
+  ✓ execution avec cibles sans repartition attendue est refusee par val… 0.61s  
+  ✓ execution refusee si un dossier de loperation a ete affecte entre a… 0.93s  
+  ✓ execution refusee si la repartition du reliquat a change entre aper… 0.89s  
+  ✓ journal avec cibles detaille les cibles et le non affecte            0.72s  
+  ✓ journal avec toutes cibles a zero affiche zero reparti               0.76s  
+  ✓ affectees compte les dossiers reellement attribues avec reliquat     0.93s  
+
+   PASS  Tests\Feature\Admin\AffectationTest
+  ✓ affectation en masse pose l evaluateur et bascule en instruction     0.90s  
+  ✓ une ligne d audit par candidature                                    1.08s  
+  ✓ atomicite une seule non affectable bloque tout le lot 422            0.78s  
+  ✓ reaffectation refusee utiliser la reattribution                      0.82s  
+  ✓ la cible doit etre un evaluateur pas un admin 422                    0.79s  
+  ✓ un evaluateur desactive ne peut pas recevoir d affectation 422       0.68s  
+  ✓ un dossier non eligible n est pas affectable et bloque tout le lot…  0.81s  
+  ✓ reaffectation refusee si le dossier en instruction est devenu non e… 0.96s  
+  ✓ le 4a fonctionne via le vrai endpoint d affectation                  0.93s  
+  ✓ l affectation ne revele pas l evaluateur au candidat                 0.86s  
+  ✓ campagne publiee 409 rien n est ecrit                                0.81s  
+  ✓ campagne cloturee reste autorisee                                    0.78s  
+  ✓ reaffectation refusee si la campagne a ete publiee entre temps       0.82s  
+  ✓ affectation admin only                                               0.89s  
+
+   PASS  Tests\Feature\Admin\AuditConsultationTest
+  ✓ admin consulte le journal avec les champs sensibles                  0.82s  
+  ✓ filtre par module                                                    0.67s  
+  ✓ filtre par action et par auteur                                      0.71s  
+  ✓ recherche bornee a action et objet jamais le contenu sensible        0.71s  
+  ✓ journal admin only 403 pour evaluateur et candidat                   0.56s  
+  ✓ le journal est en lecture seule                                      0.41s  
+
+   PASS  Tests\Feature\Admin\CampagneCreationTest
+  ✓ creation reussit toujours en brouillon meme si une autre campagne e… 1.11s  
+  ✓ le statut envoye par le client est ignore                            0.56s  
+  ✓ places totales est derive de la somme des quotas                     0.50s  
+  ✓ au moins une filiere requise 422                                     0.79s  
+  ✓ filiere inactive refusee 422                                         0.66s  
+  ✓ filiere dupliquee refusee 422                                        0.54s  
+  ✓ quota negatif refuse 422                                             0.61s  
+  ✓ date cloture avant ouverture refusee 422                             0.54s  
+  ✓ audit ecrit a la creation                                            0.65s  
+  ✓ creation admin only 403                                              0.68s  
+
+   PASS  Tests\Feature\Admin\CampagneEditionTest
+  ✓ edite le nom et les dates sur une campagne ouverte                   0.61s  
+  ✓ campagne cloturee dates verrouillees 409                             0.59s  
+  ✓ campagne cloturee nom reste editable                                 0.66s  
+  ✓ date cloture avant ouverture refusee 422                             0.77s  
+  ✓ audit ecrit seulement si quelque chose change                        0.63s  
+  ✓ edition admin only 403                                               0.79s  
+
+   PASS  Tests\Feature\Admin\CampagneQuotaTest
+  ✓ modifier un quota sans classement reussit sans perimer               0.76s  
+  ✓ idempotent memes valeurs aucun audit aucune peremption               0.67s  
+  ✓ modifier un quota apres classement marque perime sans recalculer     1.03s  
+  ✓ un recalcul explicite leve la peremption                             0.83s  
+  ✓ publier refuse si le classement est perime 422                       0.62s  
+  ✓ motifs restent editables meme si le classement est perime            0.65s  
+  ✓ publication deja faite bloque toute modification de quota 409 et re… 0.84s  
+  ✓ lot incomplet refuse 422                                             0.72s  
+  ✓ filiere etrangere a la campagne refusee 422                          0.88s  
+  ✓ quota negatif refuse 422                                             0.68s  
+  ✓ audit detaille liste chaque filiere modifiee en une ligne            0.73s  
+  ✓ modification quotas admin only 403                                   0.66s  
+
+   PASS  Tests\Feature\Admin\CampagnesListeTest
+  ✓ liste les campagnes                                                  0.60s  
+  ✓ liste blanche stricte champs de gestion seulement                    0.71s  
+  ✓ liste expose les filieres et quotas de chaque campagne               0.70s  
+  ✓ campagnes admin only 403                                             0.71s  
+
+   PASS  Tests\Feature\Admin\ClassementDecisionsTest
+  ✓ le calcul persiste les decisions et ecrit l audit                    0.73s  
+  ✓ un non eligible evalue recoit une decision non retenu explicite      0.71s  
+  ✓ un dossier sans entretien valide est exclu                           0.77s  
+  ✓ le calcul est idempotent et preserve les motifs                      0.66s  
+  ✓ une decision devenue non classable est supprimee au recalcul         0.85s  
+  ✓ le calcul est refuse si la campagne est publiee 409                  0.80s  
+  ✓ motifs impossible sans decision prealable 404                        0.66s  
+  ✓ g e t classement lit les decisions persistees                        0.58s  
+  ✓ isolation admin only                                                 0.70s  
+
+   PASS  Tests\Feature\Admin\CorrectionExceptionnelleTest
+  ✓ correction dossier rouvre le verrou et reproduit un snapshot         1.00s  
+  ✓ l audit capture l ancienne et la nouvelle valeur avec le motif       0.87s  
+  ✓ correction sans motif 422                                            0.84s  
+  ✓ correction relance l eligibilite et retrace les criteres             0.67s  
+  ✓ correction impossible apres publication 409                          1.01s  
+  ✓ correction dossier impossible si non verrouille 409                  0.98s  
+  ✓ correction entretien recalcule le snapshot                           0.89s  
+  ✓ correction entretien sans motif 422                                  0.92s  
+  ✓ correction entretien note hors bornes 422                            0.92s  
+  ✓ correction reservee a l administrateur                               0.87s  
+  ✓ la correction ne fuit pas vers le candidat                           0.79s  
+
+   PASS  Tests\Feature\Admin\EliminationManuelleTest
+  ✓ elimination force non eligible avec trace                            0.67s  
+  ✓ elimination sans motif 422                                           0.56s  
+  ✓ elimination bascule la decision existante en non retenu              0.70s  
+  ✓ pas de promotion automatique de la liste d attente                   0.82s  
+  ✓ apres publication indiscernable d un non retenu ordinaire            0.71s  
+  ✓ une candidature en brouillon ne peut pas etre eliminee 422           0.70s  
+  ✓ elimination reservee a l administrateur                              0.60s  
+
+   PASS  Tests\Feature\Admin\EvaluateursListeTest
+  ✓ liste les evaluateurs uniquement pas les administrateurs ni les can… 0.54s  
+  ✓ un evaluateur desactive n est plus propose                           0.39s  
+  ✓ liste blanche stricte aucun email aucune donnee de compte            0.55s  
+  ✓ evaluateurs admin only 403                                           0.38s  
+  ✓ tous inclut les desactives avec actif expose                         0.42s  
+  ✓ sans tous actif est toujours vrai                                    0.43s  
+
+   PASS  Tests\Feature\Admin\ExactitudeClassementTest
+  ✓ cas a departage par mixite                                           0.68s  
+  ✓ cas b departage par vulnerabilite                                    0.65s  
+  ✓ cas c departage par experience secteur                               0.72s  
+  ✓ cas d departage par motivation                                       0.75s  
+  ✓ cas e egalite totale departage final deterministe                    0.69s  
+  ✓ cas f coupe de quota et liste attente                                0.84s  
+  ✓ le quota vient de la base                                            0.67s  
+
+   PASS  Tests\Feature\Admin\GestionFiliereCampagneTest
+  ✓ desactiver une filiere refuse les nouvelles candidatures 422         0.79s  
+  ✓ reactiver une filiere rouvre les candidatures                        0.77s  
+  ✓ changement de statut filiere idempotent sans audit                   0.61s  
+  ✓ gestion filiere admin only                                           0.70s  
+  ✓ cloturer la campagne refuse les nouvelles candidatures 409           0.70s  
+  ✓ le candidat consulte toujours son dossier apres cloture de la campa… 0.58s  
+  ✓ ouvrir une campagne refuse si une autre est deja ouverte 409         0.60s  
+  ✓ ouvrir une campagne brouillon quand aucune autre ouverte             0.64s  
+  ✓ transition de statut non autorisee 422                               0.54s  
+
+   PASS  Tests\Feature\Admin\GestionMembresEquipeTest
+  ✓ liste les evaluateurs et les admins avec leur charge                 0.41s  
+  ✓ la liste ne contient jamais de hash ni de mot de passe               0.45s  
+  ✓ un candidat n apparait jamais dans la liste                          0.37s  
+  ✓ cree un evaluateur le mot de passe temporaire permet de se connecte… 1.00s  
+  ✓ cree un administrateur                                               0.36s  
+  ✓ refuse un role non autorise sans aucune ecriture with data set "can… 0.43s  
+  ✓ refuse un role non autorise sans aucune ecriture with data set "rôl… 0.48s  
+  ✓ refuse un role non autorise sans aucune ecriture with data set "vid… 0.42s  
+  ✓ mass assignment actif id is admin forges sont refuses                0.57s  
+  ✓ refuse un email deja pris                                            0.59s  
+  ✓ desactive un evaluateur qui perd l acces et trace l audit            0.80s  
+  ✓ reactive un evaluateur                                               0.51s  
+  ✓ g1 un admin ne peut pas se desactiver lui meme                       0.64s  
+  ✓ g2 impossible de desactiver le dernier administrateur actif          0.53s  
+  ✓ g2 un admin peut desactiver un autre admin tant qu il en reste un    0.48s  
+  ✓ reinitialise le mot de passe renvoie le nouveau jamais l ancien has… 0.48s  
+  ✓ la liste apres reinitialisation ne montre toujours pas le mot de pa… 0.48s  
+  ✓ un id de candidat dans l url repond 404                              0.74s  
+  ✓ un id inconnu repond 404                                             0.48s  
+  ✓ admin modifie prenom nom poste et trace l audit                      0.51s  
+  ✓ edition identite ne touche pas au statut actif                       0.41s  
+  ✓ edition identite partielle refusee les 3 champs sont lies            0.61s  
+  ✓ edition identite avec un champ interdit glisse dedans est refusee w… 0.57s  
+  ✓ edition identite avec un champ interdit glisse dedans est refusee w… 0.42s  
+  ✓ edition identite avec un champ interdit glisse dedans est refusee w… 0.40s  
+  ✓ edition identite avec un champ interdit glisse dedans est refusee w… 0.49s  
+  ✓ un evaluateur ne peut pas editer l identite meme la sienne           0.53s  
+  ✓ payload vide ni actif ni identite est refuse                         0.54s  
+  ✓ actif et identite dans le meme appel appliquent les deux             0.45s  
+  ✓ un id de candidat dans l url repond 404 pour l edition d identite    0.53s  
+
+   PASS  Tests\Feature\Admin\NonFuiteClassementTest
+  ✓ g e t candidature du candidat inchange apres calcul du classement    0.90s  
+  ✓ aucune reponse candidat ne contient de donnee de classement          0.83s  
+  ✓ le candidat et l evaluateur ne peuvent pas lire le classement        0.76s  
+
+   PASS  Tests\Feature\Admin\PublicationTest
+  ✓ publier sans classement calcule 422                                  0.95s  
+  ✓ publier ecrit la publication et l audit                              0.83s  
+  ✓ publication irreversible republier 409                               0.77s  
+  ✓ le classement n est plus recalculable apres publication              0.77s  
+  ✓ publier admin only                                                   0.75s  
+  ✓ get classement expose publiee le et publiee par apres publication l… 0.96s  
+  ✓ publier sans membre equipe 422                                       0.89s  
+
+   PASS  Tests\Feature\Admin\RapportsStatistiquesTest
+  ✓ admin seul accede evaluateur et candidat 403 invite 401              2.68s  
+  ✓ sous le seuil les repartitions sont masquees                         0.80s  
+  ✓ au dessus du seuil les repartitions apparaissent                     0.64s  
+  ✓ une ville sous le seuil est fondue dans autres villes                0.77s  
+  ✓ les variantes d abidjan sont regroupees sous un seul libelle         0.86s  
+  ✓ les variantes de l interieur sont regroupees sous le libelle canoni… 0.67s  
+  ✓ une ville non classee rejoint autres villes                          0.81s  
+  ✓ les kpis candidatures et eligibles sont inchanges par l harmonisati… 0.71s  
+  ✓ un taux est masque si son denominateur est sous le seuil             0.60s  
+  ✓ par filiere ne porte aucun croisement                                0.79s  
+  ✓ aucune donnee individuelle dans la reponse                           0.65s  
+  ✓ les brouillons sont hors perimetre                                   0.68s  
+  ✓ le filtre campagne restreint le perimetre                            0.90s  
+  ✓ le csv applique le meme masquage que l ecran                         0.73s  
+  ✓ le csv contient les valeurs reelles au dessus du seuil               0.65s  
+  ✓ le xlsx applique le meme masquage que l ecran                        1.03s  
+  ✓ le xlsx contient les valeurs reelles au dessus du seuil              1.06s  
+  ✓ le csv et le xlsx reflete le meme regroupement de villes que l ecra… 1.42s  
+
+   PASS  Tests\Feature\Admin\ReattributionTest
+  ✓ cible identique a l evaluateur actuel refusee sans reinitialiser le… 1.24s  
+  ✓ dossier non eligible refuse la reattribution et ne force jamais sou… 0.97s  
+  ✓ dossier non eligible refuse meme le retour au pool non affecte       0.83s  
+  ✓ dossier sans brouillon se reattribue sans effet de bord              0.92s  
+  ✓ retour au pool non affecte si non verrouille                         0.92s  
+  ✓ brouillon dossier commence est reinitialise sans etre copie dans l…  0.66s  
+  ✓ entretien brouillon planifie est supprime a la reattribution         0.87s  
+  ✓ entretien brouillon realise avec sous notes est supprime sans viola… 0.93s  
+  ✓ reinitialisation efface integralement tout ce que l evaluateur sort… 0.97s  
+  ✓ dossier verrouille entretien absent seul l entretien change de main  1.12s  
+  ✓ retour au pool refuse si dossier deja verrouille                     0.92s  
+  ✓ dossier et entretien valides refuse 422                              0.86s  
+  ✓ campagne publiee 409 rien n est ecrit                                0.73s  
+  ✓ dossier non affecte refuse 422                                       0.89s  
+  ✓ atomicite un seul refuse bloque tout le lot                          0.63s  
+  ✓ rejouer la meme reattribution est refusee mais laisse le meme etat…  0.64s  
+  ✓ au dela du plafond 422                                               0.99s  
+  ✓ evaluateur desactive refuse comme cible 422                          0.81s  
+  ✓ admin only                                                           1.21s  
+  ✓ une ligne d audit par dossier avec ancien et nouvel evaluateur       0.87s  
+
+   PASS  Tests\Feature\Admin\RechercheCandidaturesTest
+  ✓ recherche par numero dossier partiel jamais en prefixe               0.71s  
+  ✓ recherche par nom insensible a la casse et aux accents               0.67s  
+  ✓ recherche ordre inverse nom prenom                                   0.71s  
+  ✓ recherche insensible a lapostrophe                                   0.67s  
+  ✓ recherche insensible au tiret                                        0.67s  
+  ✓ pourcentage litteral ne renvoie pas tout                             0.74s  
+  ✓ recherche sans resultat                                              0.77s  
+  ✓ filtres combines recherche et eligibilite                            0.73s  
+  ✓ filtre decision sans decision                                        1.02s  
+  ✓ tri avec ex aequo aucun doublon                                      1.00s  
+  ✓ total par defaut egale candidature soumises                          0.75s  
+  ✓ recherche admin only                                                 0.80s  
+
+   PASS  Tests\Feature\Admin\RemplacementTest
+  ✓ remplacement promeut le premier de la liste d attente                1.29s  
+  ✓ le promu voit retenu et le sortant indisponible sans rien d autre    1.26s  
+  ✓ remplacement sans motif 422                                          0.83s  
+  ✓ remplacement avant publication 422                                   0.75s  
+  ✓ remplacement sur un candidat non retenu 422                          0.74s  
+  ✓ liste d attente vide remplacement trace sans promu                   1.29s  
+  ✓ remplacement sans membre equipe 422                                  0.90s  
+  ✓ remplacement reserve a l administrateur                              1.14s  
+
+   PASS  Tests\Feature\Admin\ResultatsPubliesNotificationTest
+  ✓ mail strictement identique pour les 4 decisions                      1.04s  
+  ✓ liste noire aucune decision ni score ni rang dans le mail            0.72s  
+  ✓ seuls les candidats avec decision sont notifies                      0.61s  
+  ✓ un seul mail par candidat meme avec plusieurs candidatures decidees  0.52s  
+  ✓ publication met en file un job independant par destinataire sans en… 1.33s  
+  ✓ echec d un job isole n empeche pas le traitement des autres          4.16s  
+
+   PASS  Tests\Feature\Admin\SupervisionCandidaturesTest
+  ✓ l admin voit la zone interne de chaque candidature                   0.67s  
+  ✓ filtres statut filiere et non affecte                                0.74s  
+  ✓ les brouillons sont exclus par defaut                                0.75s  
+  ✓ supervision admin only                                               0.88s  
+
+   PASS  Tests\Feature\Auth\InscriptionFermetureCampagneTest
+  ✓ bloquee quand aucune campagne ouverte et un cycle deja clos          1.74s  
+  ✓ autorisee avant toute premiere ouverture campagne en brouillon       0.65s  
+  ✓ autorisee quand une campagne est ouverte                             0.50s  
+  ✓ redevient possible apres reouverture exceptionnelle                  0.72s  
+
+   PASS  Tests\Feature\Auth\InscriptionTest
+  ✓ inscription cree le compte ouvre la session et renvoie 201 sans has… 0.61s  
+  ✓ email deja pris message explicite                                    0.55s  
+  ✓ mot de passe faible rejete with data set "trop court"                0.48s  
+  ✓ mot de passe faible rejete with data set "sans majuscule"            0.66s  
+  ✓ mot de passe faible rejete with data set "sans minuscule"            0.55s  
+  ✓ mot de passe faible rejete with data set "sans chiffre"              0.62s  
+  ✓ mot de passe compromis hibp est refuse                               0.58s  
+  ✓ confirmation mot de passe incoherente 422                            0.63s  
+  ✓ age hors tranche refuse sans creer de compte with data set "17 ans"  0.59s  
+  ✓ age hors tranche refuse sans creer de compte with data set "31 ans"  0.61s  
+  ✓ residence hors ci refuse                                             0.63s  
+  ✓ residence ci obligatoire                                             0.64s  
+  ✓ cgu obligatoires et horodatees                                       0.77s  
+  ✓ cgu refusees 422                                                     0.72s  
+  ✓ adr07 nationalite et diplome sont prohibes jamais persistes          0.76s  
+  ✓ role ne peut pas etre choisi                                         0.59s  
+  ✓ etat civil invalide ne cree rien                                     0.61s  
+  ✓ mail de bienvenue envoye et muet sur l eligibilite                   0.78s  
+  ✓ inscription rate limited par ip                                      0.90s  
+
+   PASS  Tests\Feature\Auth\MotDePasseOublieTest
+  ✓ reponse octet pour octet identique email existant ou inconnu         1.50s  
+  ✓ email existant recoit bien la notification email inconnu non         0.88s  
+  ✓ la notification est mise en file pas envoyee en sync                 1.05s  
+  ✓ deux demandes rapprochees meme email toujours 200 generique sans 2e… 0.85s  
+  ✓ email mal forme est une 422 de champ pas une fuite de compte         0.62s  
+  ✓ throttle ip 6 par minute                                             1.91s  
+  ✓ endpoint public aucune authentification requise                      0.80s  
+  ✓ le lien de l email n est pas html echappe                            0.52s  
+
+   PASS  Tests\Feature\Auth\ReinitialisationMotDePasseTest
+  ✓ reinitialisation reussie change le mot de passe et coupe les sessio… 0.51s  
+  ✓ le token est a usage unique                                          0.52s  
+  ✓ un token expire est refuse                                           0.83s  
+  ✓ token invalide et email inconnu rendent le meme message              0.96s  
+  ✓ mot de passe trop faible refuse en 422 de champ                      0.66s  
+  ✓ mot de passe compromis hibp est refuse                               0.91s  
+  ✓ throttle ip 6 par minute                                             0.93s  
+
+   PASS  Tests\Feature\AuthTest
+  ✓ csrf cookie endpoint is reachable                                    1.12s  
+  ✓ login succeeds and updates derniere connexion                        1.06s  
+  ✓ login response never exposes password hash                           0.90s  
+  ✓ login fails with wrong password                                      1.07s  
+  ✓ login fails with unknown email same message                          1.20s  
+  ✓ inactive account receives the generic failure not a disabled hint    1.01s  
+  ✓ login is rate limited                                                1.11s  
+  ✓ me requires authentication                                           1.06s  
+  ✓ me returns current user and profil without sensitive fields          1.11s  
+  ✓ logout invalidates the session                                       0.97s  
+  ✓ seeded demo accounts can log in                                      1.12s  
+
+   PASS  Tests\Feature\CampagneStatutTest
+  ✓ refuse sans authentification                                         1.16s  
+  ✓ vrai pour les trois roles quand une campagne est ouverte             1.21s  
+  ✓ faux quand aucune campagne nest ouverte                              1.00s  
+  ✓ faux quand la seule campagne est en brouillon                        0.95s  
+  ✓ liste blanche stricte un seul booleen                                1.16s  
+
+   PASS  Tests\Feature\Candidat\CandidatRechercheNormaliseeTest
+  ✓ le backfill remplit les lignes inserees hors du hook et les rend ch… 0.99s  
+  ✓ modifier prenom puis nom via le profil met a jour la colonne         0.93s  
+  ✓ le candidat du comptesdemoseeder est cherchable                      0.99s  
+  ✓ recherche normalisee est absente de toutes les reponses json         1.41s  
+  ✓ hidden exclut la colonne d une serialisation directe du modele       0.75s  
+  ✓ la colonne a un defaut et accepte un insert qui ne la mentionne pas  0.72s  
+  ✓ terme ascii retrouve un candidat enregistre en lettres stylisees     1.01s  
+  ✓ candidat avec normalisation vide reste trouvable par numero dossier  1.18s  
+  ✓ la migration de correctif unicode corrige une ligne restee vide      0.71s  
+
+   PASS  Tests\Feature\Candidat\CandidatureBrouillonTest
+  ✓ creation de candidature                                              1.21s  
+  ✓ une seule candidature par campagne                                   1.07s  
+  ✓ filiere hors campagne refusee                                        1.05s  
+  ✓ get candidature courante                                             1.02s  
+  ✓ get candidature courante 404 si aucune                               0.93s  
+  ✓ confirmer filiere est irreversible et idempotent                     1.00s  
+  ✓ resource candidat ne fuit aucun champ interne                        1.05s  
+
+   PASS  Tests\Feature\Candidat\CandidatureSoumiseNotificationTest
+  ✓ mail octet pour octet identique eligible vs non eligible             1.04s  
+  ✓ liste noire aucun terme de statut dans le mail                       1.19s  
+  ✓ notification est mise en file pas envoyee en sync                    1.29s  
+  ✓ aucun mail a la re soumission deja soumise                           0.88s  
+
+   PASS  Tests\Feature\Candidat\ChangementMotDePasseTest
+  ✓ mauvais mot de passe actuel refuse rien ne change                    0.64s  
+  ✓ changement reussi l ancien mot de passe ne fonctionne plus           0.74s  
+  ✓ invalide les autres sessions existantes                              0.69s  
+  ✓ nouveau mot de passe identique a l actuel refuse                     0.73s  
+  ✓ nouveau mot de passe trop faible refuse                              0.62s  
+  ✓ nouveau mot de passe compromis hibp est refuse                       0.61s  
+  ✓ confirmation qui ne correspond pas refusee                           0.64s  
+  ✓ requiert authentification                                            0.75s  
+  ✓ reserve au role candidat                                             0.64s  
+
+   PASS  Tests\Feature\Candidat\ClassementTest
+  ✓ classement prerempli a la creation                                   0.89s  
+  ✓ put classement reordonne                                             1.06s  
+  ✓ classement incomplet rejete                                          1.01s  
+  ✓ classement avec filiere inconnue rejete                              1.17s  
+  ✓ classement avec doublon rejete                                       1.30s  
+
+   PASS  Tests\Feature\Candidat\ClotureCampagneBlocageTest
+  ✓ soumission bloquee quand la campagne rattachee est cloturee          1.15s  
+  ✓ edition de brouillon bloquee sur toutes les routes garanties par le… 1.57s  
+  ✓ creation de candidature bloquee porte desormais le code dedie        1.78s  
+  ✓ dossier de la campagne a cloturee reste bloque meme si une campagne… 1.15s  
+  ✓ aucune trace de log pour un 409 campagne fermee                      1.28s  
+  ✓ consultation et profil restent accessibles apres cloture             1.18s  
+  ✓ tout redevient possible apres casa rouvrir campagne                  1.32s  
+
+   PASS  Tests\Feature\Candidat\ExperienceTest
+  ✓ crud experiences                                                     1.11s  
+  ✓ experience sans justificatif est acceptee en brouillon               1.20s  
+  ✓ domaine invalide rejete                                              1.02s  
+  ✓ duree manquante en creation rejetee                                  0.98s  
+
+   PASS  Tests\Feature\Candidat\InscriptionVersCandidatureTest
+  ✓ parcours complet inscription puis candidature sans seeder            1.08s  
+  ✓ candidature impossible sans inscription prealable                    0.65s  
+
+   PASS  Tests\Feature\Candidat\IsolationCandidatureTest
+  ✓ a ne peut pas lire la candidature de b                               0.54s  
+  ✓ a ne peut pas modifier les reponses de b                             0.77s  
+  ✓ a ne peut pas confirmer la filiere de b                              0.95s  
+  ✓ a ne peut pas supprimer une experience de b                          1.10s  
+  ✓ a ne peut pas modifier le classement de b                            0.86s  
+  ✓ get candidature courante de a ne renvoie jamais celle de b           0.92s  
+  ✓ experience d une autre candidature via sa propre candidature 404     0.73s  
+
+   PASS  Tests\Feature\Candidat\IsolationPieceTest
+  ✓ a ne telecharge pas la piece dossier de b                            1.56s  
+  ✓ a ne telecharge pas le justificatif experience de b                  2.05s  
+  ✓ a ne previsualise pas la piece dossier de b                          1.54s  
+  ✓ a ne previsualise pas le justificatif experience de b                2.37s  
+  ✓ a ne remplace pas une piece de b                                     2.11s  
+  ✓ a ne supprime pas une piece de b                                     2.19s  
+  ✓ a ne liste pas les pieces de b                                       1.80s  
+
+   PASS  Tests\Feature\Candidat\JustificatifExperienceTest
+  ✓ depot du justificatif d experience                                   2.04s  
+  ✓ remplacement du justificatif                                         1.28s  
+  ✓ suppression du justificatif                                          1.42s  
+  ✓ supprimer l experience supprime son justificatif                     1.69s  
+
+   PASS  Tests\Feature\Candidat\NotificationTest
+  ✓ liste les notifications du candidat connecte triees par date desc    1.29s  
+  ✓ uuid morphs relie reellement la notification a l utilisateur uuid    0.78s  
+  ✓ isolation un candidat ne voit pas les notifications d un autre       0.87s  
+  ✓ isolation marquer lue la notification d un autre 404                 0.80s  
+  ✓ role scope evaluateur et admin refuses 403                           0.96s  
+  ✓ marquer une notification lue                                         0.92s  
+  ✓ compteur et marquer tout lu                                          0.90s  
+  ✓ marquer tout lu est une seule requete pas une boucle                 0.79s  
+  ✓ notification sans compte du candidat absente du compteur negatif     0.74s  
+  ✓ indiscernabilite du contenu stocke pour resultats publies            0.61s  
+
+   PASS  Tests\Feature\Candidat\PieceDossierTest
+  ✓ depot d une piece de dossier                                         1.15s  
+  ✓ remplacement ne duplique pas                                         1.26s  
+  ✓ tous les types du referentiel sont acceptes                          1.31s  
+  ✓ type hors referentiel donne 404                                      1.03s  
+  ✓ type retire toujours deposable remplacable et supprimable            1.21s  
+  ✓ suppression d une piece                                              1.30s  
+  ✓ liste des pieces                                                     1.36s  
+  ✓ aucune reponse n expose chemin stockage                              1.08s  
+
+   PASS  Tests\Feature\Candidat\ProfilCandidatTest
+  ✓ get profil renvoie les 9 champs verts et rien d autre                0.74s  
+  ✓ patch profil modifie l etat civil et journalise                      0.55s  
+  ✓ patch sans changement effectif ne journalise pas                     0.64s  
+  ✓ un candidat ne touche que son propre profil                          0.66s  
+  ✓ residence ci non modifiable                                          0.54s  
+  ✓ email non modifiable via le profil                                   0.67s  
+  ✓ adr07 nationalite et diplome prohibes                                0.62s  
+  ✓ patch date naissance hors tranche refuse                             0.59s  
+  ✓ profil requiert authentification                                     0.45s  
+  ✓ profil reserve au role candidat                                      0.63s  
+  ✓ compte candidat sans profil 404                                      0.64s  
+  ✓ chacun des 5 champs identite refuse seul si dossier soumis           0.77s  
+  ✓ 5 champs identite refuses ensemble si dossier soumis                 0.87s  
+  ✓ telephone et ville toujours modifiables si dossier soumis            0.81s  
+  ✓ modifier le telephone sans numero cmu deja renseigne reussit         0.59s  
+  ✓ numero cmu toujours modifiable si dossier soumis                     0.73s  
+  ✓ identite reste modifiable avant soumission                           0.65s  
+  ✓ message explicite sur un champ identite verrouille                   0.62s  
+
+   PASS  Tests\Feature\Candidat\ReponsesFormulaireTest
+  ✓ maj partielle persiste et se relit                                   0.87s  
+  ✓ valeur hors domaine rejetee 422                                      0.53s  
+  ✓ champ note evaluateur interdit                                       0.55s  
+  ✓ champs nationalite diplome statut interdits                          0.63s  
+  ✓ lettre motivation bornee a 500                                       0.58s  
+  ✓ null explicite efface un champ                                       0.89s  
+
+   PASS  Tests\Feature\Candidat\ResultatApresPublicationTest
+  ✓ avant publication le candidat ne voit rien de sa decision            0.74s  
+  ✓ apres publication un retenu voit sa decision                         1.58s  
+  ✓ apres publication un liste attente voit sa decision                  0.93s  
+  ✓ apres publication le motif communicable est expose seulement s il e… 0.90s  
+  ✓ i n d i s c e r n a b i l i t e non retenu ordinaire vs non eligibl… 0.90s  
+  ✓ zero fuite des colonnes rouges apres publication                     0.80s  
+  ✓ cas limite candidature soumise sans decision apres publication       0.76s  
+  ✓ un brouillon reste brouillon meme apres publication                  0.75s  
+
+   PASS  Tests\Feature\Candidat\SecuriteUploadTest
+  ✓ executable deguise en pdf rejete                                     0.50s  
+  ✓ extension exe rejetee                                                0.94s  
+  ✓ pdf au contenu falsifie rejete                                       1.12s  
+  ✓ depassement de taille rejete                                         1.05s  
+  ✓ nom de fichier traversant neutralise                                 0.84s  
+  ✓ extension serveur derive du mime pas du nom                          1.02s  
+
+   PASS  Tests\Feature\Candidat\SoumissionAntiFuiteTest
+  ✓ reponses identiques eligible vs non eligible                         0.99s  
+  ✓ g e t candidature apres soumission identique pour les deux           1.11s  
+  ✓ edition fermee de facon identique dans les deux branches             0.82s  
+
+   PASS  Tests\Feature\Candidat\SoumissionTest
+  ✓ soumission d un dossier complet et eligible                          0.79s  
+  ✓ dossier incomplet renvoie 422 avec le detail                         0.62s  
+  ✓ re soumission bloquee 409                                            0.66s  
+  ✓ edition 3a 3b fermee apres soumission 409                            0.80s  
+  ✓ lecture reste ouverte et statut public bascule                       1.33s  
+  ✓ soumission de la candidature d un autre 404                          0.68s  
+  ✓ soumission sans numero cmu refusee 422                               0.69s  
+  ✓ soumission sans justificatif cmu refusee 422                         0.70s  
+  ✓ soumission avec numero et justificatif cmu reussit                   0.82s  
+  ✓ candidature deja soumise sans cmu reste valide aucune revalidation   0.74s  
+
+   PASS  Tests\Feature\Candidat\TelechargementPieceTest
+  ✓ le proprietaire telecharge sa piece                                  0.77s  
+  ✓ telechargement sans authentification 401                             0.82s  
+  ✓ download d un id inexistant 404                                      0.98s  
+  ✓ le proprietaire previsualise sa piece                                0.83s  
+  ✓ apercu sans authentification 401                                     0.86s  
+  ✓ apercu d un id inexistant 404                                        1.05s  
+
+   PASS  Tests\Feature\Console\CreateAdminTest
+  ✓ cree un administrateur complet avec audit                            1.16s  
+  ✓ refuse un email deja pris                                            0.60s  
+  ✓ refuse un mot de passe trop faible                                   0.48s  
+  ✓ refuse une confirmation qui ne correspond pas                        0.49s  
+  ✓ refuse un email invalide                                             0.47s  
+
+   PASS  Tests\Feature\Console\CreateMembreTest
+  ✓ cree un evaluateur par defaut avec audit                             0.70s  
+  ✓ cree un administrateur via l option role                             0.64s  
+  ✓ refuse un role non autorise sans aucune ecriture with data set "can… 0.50s  
+  ✓ refuse un role non autorise sans aucune ecriture with data set "rôl… 0.59s  
+  ✓ refuse un role non autorise sans aucune ecriture with data set "vid… 0.48s  
+  ✓ refuse un email deja pris                                            0.57s  
+  ✓ refuse un mot de passe trop faible                                   0.66s  
+  ✓ refuse un mot de passe compromis hibp                                0.54s  
+  ✓ refuse une confirmation qui ne correspond pas                        0.58s  
+  ✓ refuse un email invalide                                             0.59s  
+
+   PASS  Tests\Feature\Console\ExportAnalyseCommandTest
+  ✓ echoue sans operateur                                                0.74s  
+  ✓ echoue si l email ne correspond a aucun administrateur               0.92s  
+  ✓ echoue si l email correspond a un compte non administrateur          0.67s  
+  ✓ aucun fichier ni aucune livraison si une ville n est pas classee     0.72s  
+  ✓ la ville brute non classee n apparait pas dans journal audit         0.73s  
+  ✓ le blocage n affecte pas dry run non plus                            0.63s  
+  ✓ dry run n ecrit aucun fichier                                        0.66s  
+  ✓ dry run ecrit une entree journal audit allegee sans sha256           0.67s  
+  ✓ dry run affiche les colonnes et le controle de coherence sans valeu… 0.66s  
+  ✓ execution reelle ecrit un fichier chmod 600 hors zone publique       0.97s  
+  ✓ execution reelle ecrit une entree journal audit avec sha256          1.21s  
+  ✓ aucune donnee personnelle ni aucun score dans le fichier produit     1.58s  
+  ✓ par defaut les brouillons sont exclus                                2.13s  
+  ✓ option inclure brouillons retrouve l ancien perimetre                2.95s  
+  ✓ le masquage se calcule sur le perimetre filtre                       2.35s  
+  ✓ le perimetre est affiche dans la sortie                              2.08s  
+  ✓ synthese indique les brouillons exclus                               1.89s  
+  ✓ commune sous le seuil est masquee en autre commune                   2.20s  
+  ✓ commune au dessus du seuil est nommee                                1.79s  
+  ✓ ville interieur sous le seuil est masquee en autre ville             1.86s  
+  ✓ colonnes piece generees depuis type document en base                 1.02s  
+  ✓ nb pieces dossier distinct de nb justificatifs experience            1.47s  
+  ✓ tranche age utilise la date d ouverture de la campagne pas aujourd…  1.81s  
+  ✓ zone rare est fusionnee dans un groupe au dessus du seuil            3.40s  
+  ✓ sans zone rare interieur reste interieur                             7.57s  
+  ✓ cas limite fusion etendue a abidjan                                  5.00s  
+  ✓ controle de coherence detecte les incoherences zone residence ci     2.54s  
+  ✓ garde fuite supprime le fichier et sort en echec si un identifiant…  4.32s  
+  ✓ garde fuite conserve le fichier quand il n y a aucune fuite          5.20s  
+
+   PASS  Tests\Feature\Console\RenvoyerEchecsSmtpCommandTest
+  ✓ dry run affiche le compte sans rien renvoyer                         7.73s  
+  ✓ renvoie par lots sans doublon                                        6.58s  
+  ✓ sans echec ne fait rien                                              2.52s  
+  ✓ ignore un echec qui n est pas une notification mail                  1.46s  
+  ✓ les defauts de lot et pause respectent mail max per minute           6.50s  
+
+   PASS  Tests\Feature\Console\RouvrirCampagneCommandTest
+  ✓ succes nominal                                                       1.98s  
+  ✓ echec operateur absent                                               1.66s  
+  ✓ echec operateur inconnu                                              1.55s  
+  ✓ echec operateur non administrateur                                   1.87s  
+  ✓ echec raison vide                                                    1.69s  
+  ✓ echec nouvelle cloture absente                                       1.87s  
+  ✓ echec nouvelle cloture format invalide                               1.82s  
+  ✓ echec nouvelle cloture date inexistante                              1.32s  
+  ✓ echec nouvelle cloture pas future                                    1.54s  
+  ✓ echec campagne introuvable                                           1.44s  
+  ✓ echec uuid invalide                                                  1.55s  
+  ✓ echec campagne pas cloturee                                          1.55s  
+  ✓ echec resultats deja publies                                         1.18s  
+  ✓ echec autre campagne deja ouverte                                    0.76s  
+  ✓ confirmation refusee naboutit a rien                                 0.64s  
+  ✓ non regression apres reouverture                                     1.13s  
+
+   PASS  Tests\Feature\Console\SeedReferentielTest
+  ✓ amorce le referentiel sans les comptes demo                          0.90s  
+  ✓ est idempotent et prudent                                            0.86s  
+  ✓ filiere et campagne seeders sont rejouables sans dupliquer           0.71s  
+
+   PASS  Tests\Feature\Console\TestEmailCommandTest
+  ✓ envoi synchrone par defaut                                           0.81s  
+  ✓ option queue met l email dans la file                                0.64s  
+  ✓ un email invalide ne declenche aucun envoi                           0.64s  
+  ✓ avertit quand le transport est log                                   0.86s  
+  ✓ le contenu de l email ne fuit aucun secret                           0.83s  
+  ✓ les tables de file existent apres migrate                            0.61s  
+
+   PASS  Tests\Feature\Equipe\ChangementMotDePasseTest
+  ✓ mauvais mot de passe actuel refuse rien ne change with data set "év… 0.78s  
+  ✓ mauvais mot de passe actuel refuse rien ne change with data set "ad… 0.75s  
+  ✓ changement reussi l ancien mot de passe ne fonctionne plus with dat… 1.02s  
+  ✓ changement reussi l ancien mot de passe ne fonctionne plus with dat… 0.54s  
+  ✓ invalide les autres sessions existantes with data set "évaluateur"   0.47s  
+  ✓ invalide les autres sessions existantes with data set "administrate… 0.48s  
+  ✓ nouveau mot de passe trop faible refuse with data set "évaluateur"   0.48s  
+  ✓ nouveau mot de passe trop faible refuse with data set "administrate… 0.46s  
+  ✓ nouveau mot de passe compromis hibp est refuse with data set "évalu… 0.86s  
+  ✓ nouveau mot de passe compromis hibp est refuse with data set "admin… 0.63s  
+  ✓ requiert authentification                                            0.53s  
+  ✓ reserve a l equipe un candidat est refuse                            0.70s  
+
+   PASS  Tests\Feature\Evaluateur\ConsultationDossierTest
+  ✓ liste de mes dossiers affectes                                       1.36s  
+  ✓ la liste n inclut pas les dossiers d un autre evaluateur             0.60s  
+  ✓ fiche complete expose la zone interne du dossier                     0.73s  
+  ✓ fiche expose le numero cmu                                           0.59s  
+  ✓ fiche dossier ancien sans cmu ne declenche aucune erreur             0.83s  
+  ✓ fiche expose une piece retiree deja deposee                          0.71s  
+  ✓ filtre par statut interne                                            0.60s  
+  ✓ un candidat n atteint pas l espace evaluateur                        0.65s  
+
+   PASS  Tests\Feature\Evaluateur\EntretienPlanifieNotificationTest
+  ✓ mail envoye a la premiere planification                              0.81s  
+  ✓ replanification declenche entretien replanifie pas un 2e entretien…  1.13s  
+  ✓ aucun mail a la saisie de presence notes sans replanification        0.82s  
+  ✓ notification est mise en file pas envoyee en sync                    0.83s  
+
+   PASS  Tests\Feature\Evaluateur\EntretienReplanifieNotificationTest
+  ✓ mail envoye si la date change                                        0.94s  
+  ✓ mail envoye si seule l heure change                                  0.72s  
+  ✓ mail envoye si seul le lieu change                                   0.87s  
+  ✓ aucun mail si date heure lieu renvoyes identiques                    0.68s  
+  ✓ aucun mail sur presence observation notes seules                     0.78s  
+  ✓ notification est mise en file pas envoyee en sync                    0.94s  
+  ✓ canal database sans score ni barème                                  0.78s  
+
+   PASS  Tests\Feature\Evaluateur\ExactitudeScoreDossierTest
+  ✓ cas a profil fort                                                    0.56s  
+  ✓ cas b profil faible                                                  0.73s  
+  ✓ cas c limite langues prouve le reechelonnage 9 sur 10                0.59s  
+  ✓ cas d motivation m o04 a zero puis cinq etoiles                      0.68s  
+  ✓ cas e s c04 provient de la verification evaluateur                   2.23s  
+  ✓ le bareme vient de la base pas du code                               1.45s  
+
+   PASS  Tests\Feature\Evaluateur\ExactitudeScoreEntretienTest
+  ✓ cas a entretien fort                                                 0.99s  
+  ✓ cas b entretien faible                                               0.81s  
+  ✓ cas c candidat absent                                                0.64s  
+  ✓ cas e demi points                                                    1.23s  
+  ✓ une sous note stockee au dela du max est bornee au calcul            0.81s  
+  ✓ le bareme entretien vient de la base                                 0.82s  
+
+   PASS  Tests\Feature\Evaluateur\IsolationEvaluateurTest
+  ✓ a ne voit pas la fiche du dossier de b                               0.54s  
+  ✓ a ne verifie pas le dossier de b                                     0.63s  
+  ✓ admin voit tous les dossiers meme non affectes                       1.06s  
+  ✓ dossier inexistant 404                                               0.73s  
+
+   PASS  Tests\Feature\Evaluateur\NonFuiteVersCandidatTest
+  ✓ g e t candidature du candidat inchange apres verification non eligi… 0.78s  
+  ✓ g e t candidature du candidat inchange apres notation et verrouilla… 1.07s  
+  ✓ aucune reponse candidat ne contient de donnee de score               0.98s  
+  ✓ g e t candidature du candidat inchange apres validation d entretien  0.81s  
+  ✓ aucune reponse candidat ne contient de donnee d entretien            1.26s  
+  ✓ aucune reponse candidat ne contient de donnee de verification        0.92s  
+  ✓ le candidat ne peut pas appeler les routes evaluateur                0.83s  
+
+   PASS  Tests\Feature\Evaluateur\NotationDossierTest
+  ✓ apercu recalcule a la volee sans rien persister                      0.82s  
+  ✓ brouillon enregistre la note m o04 et le commentaire                 0.68s  
+  ✓ note m o04 hors bornes rejetee 422                                   1.18s  
+  ✓ validation impossible si verification 4a incomplete 422              0.78s  
+  ✓ validation impossible sans note m o04 422                            0.87s  
+  ✓ validation definitive fige le snapshot et verrouille                 0.88s  
+  ✓ le detail par rubrique est stocke avec 4 decimales                   0.62s  
+  ✓ un dossier non eligible peut quand meme etre note                    0.62s  
+  ✓ isolation evaluateur non affecte 404                                 0.57s  
+  ✓ admin peut noter un dossier non affecte a lui                        0.96s  
+  ✓ le candidat ne peut pas appeler les routes de notation               0.78s  
+
+   PASS  Tests\Feature\Evaluateur\NotationEntretienTest
+  ✓ entretien bloque tant que le dossier n est pas verrouille            0.74s  
+  ✓ g e t sans entretien renvoie null                                    0.83s  
+  ✓ planification cree l entretien au statut planifie                    0.83s  
+  ✓ premiere requete sans date heure lieu rejetee 422                    0.89s  
+  ✓ lieu invalide rejete 422                                             0.94s  
+  ✓ presence et sous notes passent le statut a realise                   1.00s  
+  ✓ sous notes refusees si presence non renseignee 422                   1.00s  
+  ✓ sous note au dela du max rejetee 422                                 0.74s  
+  ✓ candidat absent sous notes non saisissables 422                      0.77s  
+  ✓ validation impossible sans presence 422                              0.88s  
+  ✓ validation fige le snapshot et verrouille                            1.29s  
+  ✓ validation candidat absent fige un zero                              1.75s  
+  ✓ sous note non renseignee compte comme zero                           1.56s  
+  ✓ isolation evaluateur non affecte 404                                 1.12s  
+  ✓ admin peut conduire un entretien non affecte a lui                   2.76s  
+  ✓ le candidat ne peut pas appeler les routes entretien                 2.61s  
+
+   PASS  Tests\Feature\Evaluateur\TelechargementPieceEvaluateurTest
+  ✓ evaluateur affecte telecharge la piece                               1.50s  
+  ✓ evaluateur non affecte 404                                           2.17s  
+  ✓ admin telecharge n importe quelle piece                              1.59s  
+  ✓ la resource evaluateur ne montre pas le chemin de stockage           1.55s  
+  ✓ evaluateur affecte previsualise la piece                             1.83s  
+  ✓ evaluateur non affecte 404 sur l apercu                              1.09s  
+  ✓ admin previsualise n importe quelle piece                            1.24s  
+  ✓ apercu d un fichier absent du disque 404 message clair               1.32s  
+  ✓ fichier absent du disque ne cree aucune ligne d audit                1.74s  
+  ✓ l apercu cree une ligne d audit minimale                             1.30s  
+  ✓ deux apercus le meme jour ne produisent qu une seule ligne           1.17s  
+  ✓ le telechargement direct est journalise comme l apercu               1.31s  
+  ✓ apercu puis telechargement le meme jour ne produisent qu une seule…  1.15s  
+  ✓ deux pieces differentes du meme dossier le meme jour donnent deux l… 1.46s  
+  ✓ justificatif d experience journalise avec un libelle generique       1.21s  
+
+   PASS  Tests\Feature\Evaluateur\VerificationDossierTest
+  ✓ saisie de verification conforme confirme l eligibilite               1.35s  
+  ✓ diplome cepe declenche le critere s c04                              0.96s  
+  ✓ nationalite non confirmee declenche le critere                       1.16s  
+  ✓ re verification est idempotente                                      1.19s  
+  ✓ verification ne touche pas aux criteres de soumission                0.92s  
+  ✓ journal audit ecrit pour la verification                             1.07s  
+  ✓ valeur de diplome invalide rejetee 422                               1.25s  
+  ✓ verification impossible si dossier evalue 409                        0.73s  
+  ✓ verification par un evaluateur non affecte 404                       0.80s  
+  ✓ admin peut verifier un dossier non affecte a lui                     0.92s  
+
+   PASS  Tests\Feature\Evaluateur\VerrouillageEntretienTest
+  ✓ apres validation toute modification est refusee 409                  0.98s  
+  ✓ validation entretien refusee si le dossier a ete reattribue sous le… 0.69s  
+  ✓ entretien refuse proprement une double validation simultanee         1.32s  
+  ✓ apres validation le g e t renvoie le snapshot fige                   0.98s  
+  ✓ le score fige ne bouge pas quand une grille v2 est activee           1.06s  
+  ✓ la ligne de sous note reste intacte apres verrouillage               0.84s  
+
+   PASS  Tests\Feature\Evaluateur\VerrouillageEvaluationTest
+  ✓ apres validation toute modification est refusee 409                  0.75s  
+  ✓ apres validation le g e t renvoie le snapshot fige                   1.04s  
+  ✓ le score fige ne bouge pas quand une grille v2 est activee           0.97s  
+  ✓ validation refusee si le dossier a ete reattribue sous le verrou     0.74s  
+  ✓ validation refusee proprement si la ligne evaluation dossier existe… 0.75s  
+
+   PASS  Tests\Feature\ExampleTest
+  ✓ the application returns a successful response                        0.58s  
+
+   PASS  Tests\Feature\FilieresPubliquesTest
+  ✓ route publique accessible sans authentification                      0.68s  
+  ✓ liste blanche stricte des champs verts                               0.55s  
+  ✓ une filiere desactivee reste listee avec actif false                 0.54s  
+
+   PASS  Tests\Feature\Notifications\BasculeNotificationsInformativesTest
+  ✓ desactive aucun job mail n est cree pour une notification informati… 0.49s  
+  ✓ desactive le canal critique reste cree                               0.31s  
+  ✓ active par defaut les 2 canaux sont crees                            0.44s  
+
+   PASS  Tests\Feature\Notifications\PrioriteFilesMailTest
+  ✓ un critique arrive en dernier est envoye avant les informatifs plus… 3.60s  
+
+   PASS  Tests\Feature\Notifications\ResilienceSmtpTest
+  ✓ rejet 421 est retente puis reussit sans jamais echouer               6.83s  
+  ✓ rejet 550 echoue immediatement sans relance et n affecte pas le can… 3.61s  
+  ✓ rafale de 200 notifications sans aucun echec definitif              35.01s  
+
+   PASS  Tests\Feature\RoleAccessTest
+  ✓ role matrix with data set "candidat"                                 0.36s  
+  ✓ role matrix with data set "evaluateur"                               0.41s  
+  ✓ role matrix with data set "administrateur"                           0.64s  
+  ✓ ping routes require authentication                                   0.44s  
+
+   PASS  Tests\Feature\Security\EnsureUserActifTest
+  ✓ un compte actif conserve l acces                                     0.46s  
+  ✓ un compte desactive pendant la session perd l acces au prochain app… 0.40s  
+  ✓ le refus ne divulgue pas l ancien hash                               0.62s  
+  ✓ le middleware couvre tous les espaces pas seulement admin            0.40s  
+
+   PASS  Tests\Feature\Security\HibpMotDePasseTest
+  ✓ mot de passe connu compromis est refuse                              0.35s  
+  ✓ mot de passe non compromis est accepte                               0.41s  
+  ✓ service hibp injoignable le mot de passe passe quand meme            0.51s  
+  ✓ reponse 5xx de hibp le mot de passe passe quand meme                 0.54s  
+  ✓ le timeout hibp est resserre a 3 secondes                            0.51s  
+
+   PASS  Tests\Feature\Security\JournalAuditImmuableTest
+  ✓ insert est permis                                                    0.46s  
+  ✓ update d une ligne existante est rejete                              0.53s  
+  ✓ delete d une ligne existante est rejete                              0.40s  
+  ✓ truncate est rejete                                                  0.39s  
+  ✓ le modele eloquent ne peut pas reecrire une ligne                    0.83s  
+
+   PASS  Tests\Feature\Security\MassAssignmentTest
+  ✓ register refuse role injecte                                         0.99s  
+  ✓ register ignore actif et id injectes                                 0.62s  
+  ✓ creation candidature ignore les colonnes internes                    0.68s  
+  ✓ patch profil refuse email et residence                               0.53s  
+  ✓ patch profil ignore role et actif injectes                           0.74s  
+  ✓ admin membres refuse un role injecte hors liste                      0.41s  
+  ✓ admin membres refuse actif id et hash injectes                       0.72s  
+  ✓ admin membres patch refuse de changer le role                        0.48s  
+  ✓ verification ignore le verdict d eligibilite injecte                 0.79s  
+
+   PASS  Tests\Feature\Security\MatriceAutorisationTest
+  ✓ matrice role x route exhaustive                                      1.58s  
+  ✓ les familles de routes sont toutes representees                      0.37s  
+  ✓ les routes authentifiees sans role exigent une session               0.59s  
+  ✓ actes admin exceptionnels 403 avec ressource reelle                  0.79s  
+
+   PASS  Tests\Feature\Security\RateLimitingTest
+  ✓ route publique limitee a 600 par minute                              0.57s  
+  ✓ entete de limite publique                                            0.91s  
+  ✓ filet global authentifie annonce 120                                 1.04s  
+  ✓ depot de piece annonce la limite uploads                             0.86s  
+  ✓ creation de candidature limitee a 12 par minute                      0.76s  
+  ✓ un usage normal du wizard ne touche jamais la limite                 1.25s  
+  ✓ login reste limite independamment du filet global                    0.45s  
+  ✓ inscriptions groupe 40 par minute puis 429 puis reset minute suivan… 1.60s  
+  ✓ plafond journalier inscriptions bloque au dela du seuil              0.45s  
+  ✓ 60 connexions 60 comptes differents meme ip passent toutes           1.18s  
+  ✓ plafond ip login bloque au dela de sa valeur                         0.52s  
+  ✓ les seuils sont lus depuis config pas env directement                0.52s  
+
+   PASS  Tests\Feature\Security\TraductionValidationTest
+  ✓ mot de passe trop court est en francais lisible                      0.81s  
+  ✓ champs obligatoires manquants sont en francais lisible               0.49s  
+  ✓ valeur hors enumeration est en francais lisible                      0.45s  
+
+  Tests:    5 skipped, 922 passed (4178 assertions)
+  Duration: 827.92s
+

@@ -617,6 +617,36 @@ describe('CandidaturesSupervision — cibles par évaluateur (Lot 3, ADR-48)', (
     }))
   })
 
+  it('taper une cible pendant un aperçu encore en attente (réseau non instantané) ne perd aucun chiffre (correctif de revue)', async () => {
+    const resolveurs = []
+    mockListeLongue({ apercu: () => new Promise((resolve) => { resolveurs.push(resolve) }) })
+    renderScreen()
+    const user = userEvent.setup()
+    await passerEnModeTous(user)
+    await user.click(screen.getByRole('button', { name: /répartir automatiquement/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Répartir automatiquement' })
+    // L'aperçu d'ouverture est encore EN ATTENTE (réseau lent, jamais résolu
+    // ici) : le champ de cible ne doit PAS être désactivé pendant ce temps,
+    // sous peine de perdre des frappes/le focus en cours de saisie.
+    await waitFor(() => expect(resolveurs.length).toBeGreaterThanOrEqual(1))
+
+    const champCible = within(dialog).getByRole('spinbutton', { name: 'Cible pour Aya Bamba' })
+    expect(champCible).toBeEnabled()
+    await user.type(champCible, '10')
+    expect(champCible).toHaveValue(10)
+
+    // Chaque frappe a relancé un aperçu (toujours en attente) : les résoudre
+    // toutes avec le même résultat final — la dernière requête gagne (compteur
+    // de requête, correctif de revue précédent) — pour vérifier que « 10 » a
+    // bien été envoyé au serveur, pas seulement affiché localement.
+    resolveurs.forEach((resolve) => resolve({ data: APERCU_CIBLES }))
+    await within(dialog).findByText(/seront répartis/i)
+
+    expect(apiClient.post).toHaveBeenCalledWith('/admin/affectations/automatique/apercu', expect.objectContaining({
+      cibles: [{ evaluateur_id: 'eval-2', nombre: 10 }],
+    }))
+  })
+
   it('un reliquat non affecté (cibles couvrant tout le monde) affiche un avertissement non bloquant', async () => {
     mockListeLongue({ apercu: () => Promise.resolve({ data: { ...APERCU_CIBLES, non_affectes: 5 } }) })
     renderScreen()

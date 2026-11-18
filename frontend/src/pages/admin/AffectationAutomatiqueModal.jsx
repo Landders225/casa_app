@@ -135,7 +135,13 @@ export function AffectationAutomatiqueModal({ criteres, nombreCorrespondants, ev
             Les dossiers déjà affectés ne sont jamais réaffectés automatiquement.
           </p>
 
-          <fieldset disabled={occupe} style={{ border: 'none', padding: 0, margin: '0 0 var(--space-3)' }}>
+          {/* Correctif de revue : désactivé seulement pendant l'EXÉCUTION, pas
+              pendant le calcul de l'aperçu (`chargement`) — sinon une frappe
+              dans un champ de cible peut être coupée en cours (réseau non
+              instantané) par la désactivation qui suit le premier caractère.
+              La confirmation reste bloquée de toute façon tant que l'aperçu
+              n'est pas revenu (`!apercu` plus bas). */}
+          <fieldset disabled={execution} style={{ border: 'none', padding: 0, margin: '0 0 var(--space-3)' }}>
             <legend className="caption fw-semibold" style={{ marginBottom: 'var(--space-2)' }}>Évaluateurs concernés</legend>
             {evaluateurs.length === 0 ? <p className="text-muted caption">Aucun évaluateur actif.</p> : null}
             <div className="flex gap-3" style={{ flexWrap: 'wrap' }}>

@@ -1,0 +1,265 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/Users/isaacaka/Desktop/CCI/Projet Arbre de Vie/casa-app/frontend[39m
+
+ [32m✓[39m src/pages/evaluateur/__tests__/FicheCandidat.test.jsx [2m([22m[2m14 tests[22m[2m)[22m[33m 8883[2mms[22m[39m
+   [33m[2m✓[22m[39m FicheCandidat — la zone 🔴 est affichée LÉGITIMEMENT (inversion de posture)[2m > [22mstatut interne, réponses déclarées : tout est visible [33m 1419[2mms[22m[39m
+   [33m[2m✓[22m[39m FicheCandidat — la zone 🔴 est affichée LÉGITIMEMENT (inversion de posture)[2m > [22mLot 18, Étape 1 (point d) — dossier ANTÉRIEUR sans CMU : affiché « — », aucune erreur [33m 352[2mms[22m[39m
+   [33m[2m✓[22m[39m FicheCandidat — la zone 🔴 est affichée LÉGITIMEMENT (inversion de posture)[2m > [22mLot D — un dossier qui a DÉJÀ residence/lettre les affiche sous « Pièces conservées », sans les exiger [33m 523[2mms[22m[39m
+   [33m[2m✓[22m[39m FicheCandidat — la zone 🔴 est affichée LÉGITIMEMENT (inversion de posture)[2m > [22mLot D — aucune pièce retirée déposée : pas de section « Pièces conservées » [33m 778[2mms[22m[39m
+   [33m[2m✓[22m[39m FicheCandidat — vérification : reflet EN DIRECT de la Resource fraîche[2m > [22mdiplome=cepe -> le panneau Éligibilité change immédiatement, sans recalcul ni refetch [33m 1432[2mms[22m[39m
+   [33m[2m✓[22m[39m FicheCandidat — vérification : reflet EN DIRECT de la Resource fraîche[2m > [22mdossier non "en_instruction" -> formulaire non modifiable (miroir du 409 backend) [33m 594[2mms[22m[39m
+   [33m[2m✓[22m[39m FicheCandidat — élimination manuelle (Lot 8d-3, administrateur uniquement)[2m > [22madmin : motif obligatoire (bouton bloqué en dessous de 3 caractères), succès -> POST puis rechargement de la fiche [33m 1714[2mms[22m[39m
+   [33m[2m✓[22m[39m FicheCandidat — élimination manuelle (Lot 8d-3, administrateur uniquement)[2m > [22m422 (motif jugé insuffisant côté backend) -> message affiché verbatim, le modal reste ouvert [33m 1310[2mms[22m[39m
+ [32m✓[39m src/pages/auth/__tests__/NouveauMotDePasse.test.jsx [2m([22m[2m6 tests[22m[2m)[22m[33m 11054[2mms[22m[39m
+   [33m[2m✓[22m[39m NouveauMotDePasse (Lot 13, ADR-32)[2m > [22mlit token + email depuis la query string et les envoie [33m 3445[2mms[22m[39m
+   [33m[2m✓[22m[39m NouveauMotDePasse (Lot 13, ADR-32)[2m > [22msuccès -> redirige vers /connexion [33m 3123[2mms[22m[39m
+   [33m[2m✓[22m[39m NouveauMotDePasse (Lot 13, ADR-32)[2m > [22mlien invalide ou expiré (422) -> message affiché VERBATIM [33m 2653[2mms[22m[39m
+   [33m[2m✓[22m[39m NouveauMotDePasse (Lot 13, ADR-32)[2m > [22mmot de passe trop faible -> 422 de champ [33m 762[2mms[22m[39m
+   [33m[2m✓[22m[39m NouveauMotDePasse (Lot 13, ADR-32)[2m > [22mle bouton œil affiche le mot de passe saisi sans envoyer de requête [33m 961[2mms[22m[39m
+ [32m✓[39m src/pages/evaluateur/__tests__/EvaluationDossier.test.jsx [2m([22m[2m11 tests[22m[2m)[22m[33m 10394[2mms[22m[39m
+   [33m[2m✓[22m[39m EvaluationDossier — le score AFFICHÉ vient toujours de la réponse API[2m > [22ml'aperçu (total, max, détail par rubrique) est celui du GET, rien de calculé [33m 736[2mms[22m[39m
+   [33m[2m✓[22m[39m EvaluationDossier — le score AFFICHÉ vient toujours de la réponse API[2m > [22msaisie étoiles + commentaire -> PUT -> le nouvel aperçu renvoyé par le PUT est affiché [33m 3218[2mms[22m[39m
+   [33m[2m✓[22m[39m EvaluationDossier — verrouillage visuel RÉEL après validation (ADR-04)[2m > [22mvalider -> fieldset nativement désactivé, boutons remplacés par la bannière, snapshot affiché [33m 1032[2mms[22m[39m
+   [33m[2m✓[22m[39m EvaluationDossier — verrouillage visuel RÉEL après validation (ADR-04)[2m > [22m422 serveur à la validation (précondition rejouée) -> message affiché, écran reste déverrouillé [33m 495[2mms[22m[39m
+   [33m[2m✓[22m[39m EvaluationDossier — correction exceptionnelle (Lot 8d-3, administrateur uniquement)[2m > [22madmin + verrouillée -> bannière "vous rouvrez une évaluation validée", motif obligatoire, POST puis re-GET (dossier + évaluation) [33m 2394[2mms[22m[39m
+   [33m[2m✓[22m[39m EvaluationDossier — correction exceptionnelle (Lot 8d-3, administrateur uniquement)[2m > [22m409 (campagne déjà publiée) -> message backend affiché verbatim, le modal reste ouvert [33m 1797[2mms[22m[39m
+ [32m✓[39m src/pages/admin/__tests__/Quotas.test.jsx [2m([22m[2m9 tests[22m[2m)[22m[33m 11508[2mms[22m[39m
+   [33m[2m✓[22m[39m Quotas (Lot 17) — création + édition nom/dates + édition quotas[2m > [22maffiche la liste des campagnes avec les quotas par filière pré-remplis [33m 441[2mms[22m[39m
+   [33m[2m✓[22m[39m Quotas (Lot 17) — création + édition nom/dates + édition quotas[2m > [22mcrée une campagne (toujours en brouillon) -> POST /admin/campagnes, la nouvelle carte apparaît [33m 4604[2mms[22m[39m
+   [33m[2m✓[22m[39m Quotas (Lot 17) — création + édition nom/dates + édition quotas[2m > [22m422 à la création -> message + erreurs de champ affichés, le modal reste ouvert [33m 2403[2mms[22m[39m
+   [33m[2m✓[22m[39m Quotas (Lot 17) — création + édition nom/dates + édition quotas[2m > [22mmodifie le nom/les dates -> PUT /admin/campagnes/{id}, la carte se met à jour [33m 2054[2mms[22m[39m
+   [33m[2m✓[22m[39m Quotas (Lot 17) — création + édition nom/dates + édition quotas[2m > [22mcampagne clôturée : les champs date du modal sont désactivés, un avertissement est affiché [33m 684[2mms[22m[39m
+   [33m[2m✓[22m[39m Quotas (Lot 17) — création + édition nom/dates + édition quotas[2m > [22mquota sans classement calculé : enregistrement direct, sans confirmation [33m 448[2mms[22m[39m
+   [33m[2m✓[22m[39m Quotas (Lot 17) — création + édition nom/dates + édition quotas[2m > [22mquota AVEC classement déjà calculé : une confirmation explicite est requise avant le PUT [33m 587[2mms[22m[39m
+ [32m✓[39m src/components/account/__tests__/ChangementMotDePasseCard.test.jsx [2m([22m[2m5 tests[22m[2m)[22m[33m 13082[2mms[22m[39m
+   [33m[2m✓[22m[39m ChangementMotDePasseCard (Lot 13, partagé équipe au Lot 15a)[2m > [22menvoie current_password + password + password_confirmation à l’endpoint fourni [33m 4391[2mms[22m[39m
+   [33m[2m✓[22m[39m ChangementMotDePasseCard (Lot 13, partagé équipe au Lot 15a)[2m > [22mréutilisé côté équipe : envoie au bon endpoint /equipe/mot-de-passe [33m 3070[2mms[22m[39m
+   [33m[2m✓[22m[39m ChangementMotDePasseCard (Lot 13, partagé équipe au Lot 15a)[2m > [22mmot de passe actuel incorrect -> erreur de champ VERBATIM, rien n'est vidé côté succès [33m 2783[2mms[22m[39m
+   [33m[2m✓[22m[39m ChangementMotDePasseCard (Lot 13, partagé équipe au Lot 15a)[2m > [22mles 3 champs (actuel/nouveau/confirmation) ont chacun leur bouton œil, indépendants, sans soumettre [33m 1157[2mms[22m[39m
+   [33m[2m✓[22m[39m ChangementMotDePasseCard (Lot 13, partagé équipe au Lot 15a)[2m > [22mmentionne que les AUTRES sessions seront déconnectées [33m 1677[2mms[22m[39m
+ [32m✓[39m src/pages/public/__tests__/HomePage.test.jsx [2m([22m[2m23 tests[22m[2m)[22m[33m 13923[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22maffiche les filières de GET /api/filieres [33m 1364[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mune filière inactive affiche « Actuellement fermé » et n'est pas candidatable [33m 690[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22maffiche les critères pouvant entraîner une élimination [33m 331[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mgère l'échec de chargement des filières sans planter [33m 389[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot A — renommage « Projet CASA » → « Initiative CASA » + AICS + logos partenaires[2m > [22mle titre principal (eyebrow hero) porte la forme complète [33m 512[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot A — renommage « Projet CASA » → « Initiative CASA » + AICS + logos partenaires[2m > [22mnav et bouton renommés : « Le projet » / « Découvrir le projet » [33m 474[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot A — renommage « Projet CASA » → « Initiative CASA » + AICS + logos partenaires[2m > [22msection « Projet Initiative CASA » affiche la mention « Financé par l’AICS » [33m 326[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif) — « Se connecter » restauré + modale de choix au clic sur « Candidater »[2m > [22mcliquer sur « Candidater » (en-tête) ouvre la modale de choix au lieu de naviguer directement [33m 868[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif) — « Se connecter » restauré + modale de choix au clic sur « Candidater »[2m > [22m« Créer mon compte » dans la modale mène à l’inscription [33m 1057[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif) — « Se connecter » restauré + modale de choix au clic sur « Candidater »[2m > [22m« J’ai déjà un compte, me connecter » dans la modale mène à la connexion [33m 947[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif) — « Se connecter » restauré + modale de choix au clic sur « Candidater »[2m > [22mfermer la modale (X) ne redirige nulle part — reste sur l’accueil [33m 911[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif) — « Se connecter » restauré + modale de choix au clic sur « Candidater »[2m > [22mfermer la modale (Échap) ne redirige nulle part [33m 623[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif) — « Se connecter » restauré + modale de choix au clic sur « Candidater »[2m > [22mfermer la modale (clic extérieur) ne redirige nulle part [33m 737[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif) — « Se connecter » restauré + modale de choix au clic sur « Candidater »[2m > [22mle focus est piégé dans la modale (Tab depuis le dernier bouton revient au premier élément focusable) [33m 875[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif) — « Se connecter » restauré + modale de choix au clic sur « Candidater »[2m > [22mle bouton « J’ai déjà un compte » de la bande CTA finale reste intact et navigue directement, sans modale (chemin de reconnexion volontaire) [33m 407[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif 2) — TOUS les boutons « Candidater »/« Déposer ma candidature » de l’accueil ouvrent la modale[2m > [22mle hero « Candidater maintenant » ouvre la modale au lieu de naviguer directement [33m 533[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif 2) — TOUS les boutons « Candidater »/« Déposer ma candidature » de l’accueil ouvrent la modale[2m > [22mla bande CTA finale « Déposer ma candidature » ouvre la modale au lieu de naviguer directement [33m 423[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif 2) — TOUS les boutons « Candidater »/« Déposer ma candidature » de l’accueil ouvrent la modale[2m > [22mle « Candidater » de la section éligibilité (actif une fois la case cochée) ouvre la modale [33m 659[2mms[22m[39m
+   [33m[2m✓[22m[39m HomePage (accueil public)[2m > [22mLot B (correctif 2) — TOUS les boutons « Candidater »/« Déposer ma candidature » de l’accueil ouvrent la modale[2m > [22mdepuis n’importe lequel de ces boutons, « Créer mon compte » mène bien à l’inscription [33m 794[2mms[22m[39m
+ [32m✓[39m src/pages/admin/__tests__/Equipe.test.jsx [2m([22m[2m11 tests[22m[2m)[22m[33m 13505[2mms[22m[39m
+   [33m[2m✓[22m[39m Équipe — gestion des comptes (Lot 11b)[2m > [22mliste les membres avec leur charge, jamais de hash [33m 1013[2mms[22m[39m
+   [33m[2m✓[22m[39m Équipe — gestion des comptes (Lot 11b)[2m > [22mle formulaire de création ne propose que Évaluateur et Administrateur [33m 854[2mms[22m[39m
+   [33m[2m✓[22m[39m Équipe — gestion des comptes (Lot 11b)[2m > [22mcréation réussie → affiche le mot de passe temporaire une seule fois [33m 5192[2mms[22m[39m
+   [33m[2m✓[22m[39m Équipe — gestion des comptes (Lot 11b)[2m > [22m422 sur un rôle refusé → message verbatim, modal ouvert [33m 1996[2mms[22m[39m
+   [33m[2m✓[22m[39m Équipe — gestion des comptes (Lot 11b)[2m > [22mdésactiver un autre membre → confirmation → PATCH { actif:false } [33m 856[2mms[22m[39m
+   [33m[2m✓[22m[39m Équipe — gestion des comptes (Lot 11b)[2m > [22m422 G2 (dernier admin) → message verbatim sous la liste [33m 506[2mms[22m[39m
+   [33m[2m✓[22m[39m Équipe — gestion des comptes (Lot 11b)[2m > [22mréinitialiser → confirmation → nouveau mot de passe affiché [33m 356[2mms[22m[39m
+   [33m[2m✓[22m[39m Équipe — gestion des comptes (Lot 11b)[2m > [22m« Modifier » ouvre un modal pré-rempli avec l’identité actuelle [33m 330[2mms[22m[39m
+   [33m[2m✓[22m[39m Équipe — gestion des comptes (Lot 11b)[2m > [22msoumission → PATCH { prenom, nom, poste } SEUL (jamais actif dans le même appel) [33m 1693[2mms[22m[39m
+   [33m[2m✓[22m[39m Équipe — gestion des comptes (Lot 11b)[2m > [22m422 (champ manquant côté serveur) → erreur verbatim, modal reste ouvert [33m 590[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/__tests__/CandidatureWizard.test.jsx [2m([22m[2m9 tests[22m[2m)[22m[33m 10488[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatureWizard[2m > [22mdémarre à l’étape 1 quand il n’y a pas encore de candidature (404) [33m 599[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatureWizard[2m > [22m« Suivant » de l’étape 1 ATTEND le PATCH profil avant d’avancer, et ne l’ignore pas s’il échoue [33m 930[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatureWizard[2m > [22mun échec de sauvegarde du brouillon empêche d’avancer et affiche une alerte [33m 355[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatureWizard[2m > [22métape 2 : crée la candidature puis la confirme [33m 1336[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatureWizard[2m > [22métape 2 : campagne fermée (409 à la création) -> écran dédié, rien avalé en silence [33m 1277[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatureWizard[2m > [22métape 2 : sans confirmation cochée, « Suivant » est bloqué [33m 757[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatureWizard[2m > [22mreprise : une candidature brouillon existante est ré-hydratée [33m 490[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatureWizard[2m > [22métape expérience : renseigner domaine + durée matérialise la ligne côté serveur [33m 1353[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatureWizard[2m > [22msoumission 422 de complétude : liste les manques avec des boutons « Corriger » qui sautent à la bonne étape [33m 3385[2mms[22m[39m
+ [32m✓[39m src/pages/public/__tests__/InscriptionPage.test.jsx [2m([22m[2m9 tests[22m[2m)[22m[33m 17905[2mms[22m[39m
+   [33m[2m✓[22m[39m InscriptionPage[2m > [22mrend tous les champs de l'étape 1 [33m 829[2mms[22m[39m
+   [33m[2m✓[22m[39m InscriptionPage[2m > [22mbloque côté client si les deux mots de passe diffèrent (pas d'appel API) [33m 4488[2mms[22m[39m
+   [33m[2m✓[22m[39m InscriptionPage[2m > [22mappelle register() avec la charge attendue puis redirige vers le dashboard [33m 2762[2mms[22m[39m
+   [33m[2m✓[22m[39m InscriptionPage[2m > [22mmappe les erreurs 422 champ par champ [33m 2950[2mms[22m[39m
+   [33m[2m✓[22m[39m InscriptionPage[2m > [22maffiche le message global d'un 422 âge/résidence (sans `errors`) [33m 2844[2mms[22m[39m
+   [33m[2m✓[22m[39m InscriptionPage[2m > [22maffiche un message dédié sur 429 [33m 2793[2mms[22m[39m
+   [33m[2m✓[22m[39m InscriptionPage[2m > [22mles deux boutons œil (mot de passe + confirmation) basculent indépendamment [33m 1002[2mms[22m[39m
+ [32m✓[39m src/pages/evaluateur/__tests__/Entretien.test.jsx [2m([22m[2m16 tests[22m[2m)[22m[33m 18121[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — précondition : dossier verrouillé (Lot 4b)[2m > [22mdossier non verrouillé -> empty-state, aucun formulaire, aucun appel /entretien de saisie [33m 801[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — planification (crée l’entretien via le même PUT)[2m > [22mdate/heure/lieu -> PUT crée l’entretien, la notation apparaît après [33m 2980[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — notation : le score AFFICHÉ vient toujours de la réponse API[2m > [22mles sous-notes rendues bornent leurs sélecteurs sur `max` fourni par l'API (aucune constante locale) [33m 443[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — notation : le score AFFICHÉ vient toujours de la réponse API[2m > [22mprésence Présent + sous-notes saisies -> PUT avec `notes`, le nouvel aperçu est affiché [33m 1683[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — notation : le score AFFICHÉ vient toujours de la réponse API[2m > [22mprésence Absent -> sous-notes désactivées à 0, `notes` jamais envoyé (miroir du 422 backend) [33m 999[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — notation : le score AFFICHÉ vient toujours de la réponse API[2m > [22msous-note hors max rejetée par le backend -> 422 affiché tel quel [33m 1119[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — notation : le score AFFICHÉ vient toujours de la réponse API[2m > [22mprésence non renseignée -> "Valider" désactivé (précondition backend miroir) [33m 317[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — modifier la planification (Lot 15b)[2m > [22mle bouton apparaît tant que l’entretien n’est pas verrouillé [33m 343[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — modifier la planification (Lot 15b)[2m > [22maucun bouton une fois l’entretien verrouillé (même contrainte que le serveur, 409) [33m 341[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — modifier la planification (Lot 15b)[2m > [22mouvre le formulaire PRÉ-REMPLI avec les valeurs actuelles, PUT envoie les nouvelles, retour à la notation [33m 2133[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — modifier la planification (Lot 15b)[2m > [22m« Annuler » revient à la notation sans appeler le serveur [33m 518[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — verrouillage visuel RÉEL après validation (ADR-04)[2m > [22mvalider -> fieldset nativement désactivé, boutons remplacés par la bannière, snapshot affiché [33m 1214[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — correction exceptionnelle (Lot 8d-3, administrateur uniquement)[2m > [22madmin + verrouillé -> bannière "vous rouvrez un entretien validé", motif obligatoire, POST puis re-GET entretien [33m 2716[2mms[22m[39m
+   [33m[2m✓[22m[39m Entretien — correction exceptionnelle (Lot 8d-3, administrateur uniquement)[2m > [22m409 (campagne déjà publiée) -> message backend affiché verbatim, le modal reste ouvert [33m 2008[2mms[22m[39m
+ [32m✓[39m src/pages/admin/__tests__/Classement.test.jsx [2m([22m[2m18 tests[22m[2m)[22m[33m 18092[2mms[22m[39m
+   [33m[2m✓[22m[39m Classement — score final/rang/départage viennent TOUJOURS de la réponse API[2m > [22maffiche le classement de la filière active, tel que renvoyé par l'API [33m 700[2mms[22m[39m
+   [33m[2m✓[22m[39m Classement — score final/rang/départage viennent TOUJOURS de la réponse API[2m > [22mchanger de tab filière affiche les lignes déjà chargées, sans nouvel appel réseau [33m 443[2mms[22m[39m
+   [33m[2m✓[22m[39m Classement — calcul idempotent tant que non publié[2m > [22mnon calculé -> empty-state + bouton "Calculer" ; après calcul -> classement affiché, bouton devient "Recalculer" [33m 1031[2mms[22m[39m
+   [33m[2m✓[22m[39m Classement — distinction motif interne (🔴) / communicable (🟡)[2m > [22mle bouton Motif ouvre un modal aux DEUX libellés distincts, PUT envoie les deux champs [33m 3051[2mms[22m[39m
+   [33m[2m✓[22m[39m Classement — publication : friction délibérée + irréversibilité[2m > [22mpublier exige de taper le nom EXACT de la campagne — bouton désactivé sinon [33m 2326[2mms[22m[39m
+   [33m[2m✓[22m[39m Classement — publication : friction délibérée + irréversibilité[2m > [22mpublication confirmée -> POST publier -> re-GET classement -> état "déjà publié", actions retirées [33m 1543[2mms[22m[39m
+   [33m[2m✓[22m[39m Classement — publication : friction délibérée + irréversibilité[2m > [22m422 (aucune décision) au clic sur Publier -> message affiché verbatim [33m 1309[2mms[22m[39m
+   [33m[2m✓[22m[39m Classement — remplacement (Lot 8d-3, post-publication uniquement)[2m > [22mmotif obligatoire (bouton bloqué < 3 caractères), confirmation -> POST /remplacements -> résultat RÉEL affiché (pas l’aperçu) -> re-GET [33m 1673[2mms[22m[39m
+   [33m[2m✓[22m[39m Classement — remplacement (Lot 8d-3, post-publication uniquement)[2m > [22maucun promu (réponse POST promu:null) -> message "aucun candidat en liste d’attente à promouvoir" [33m 1652[2mms[22m[39m
+   [33m[2m✓[22m[39m Classement — remplacement (Lot 8d-3, post-publication uniquement)[2m > [22m422 backend (déjà indisponible / pas de publication) -> message affiché verbatim, le modal reste ouvert [33m 1466[2mms[22m[39m
+   [33m[2m✓[22m[39m Classement — remplacement (Lot 8d-3, post-publication uniquement)[2m > [22mRÈGLE REINE : le résultat affiché ne porte que des numéros de dossier — jamais un rang ou un score (rien à fuiter) [33m 1678[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/__tests__/Profil.test.jsx [2m([22m[2m11 tests[22m[2m)[22m[33m 5613[2mms[22m[39m
+   [33m[2m✓[22m[39m Profil — écran « Mon profil » (Lot 13)[2m > [22mrend les 8 champs éditables réconciliés sur le backend (Lot 18 : numero_cmu ajouté) [33m 450[2mms[22m[39m
+   [33m[2m✓[22m[39m Profil — écran « Mon profil » (Lot 13)[2m > [22menregistre uniquement les 8 champs éditables, jamais email/residence_ci [33m 2082[2mms[22m[39m
+   [33m[2m✓[22m[39m Profil — écran « Mon profil » (Lot 13)[2m > [22m422 (garde-fou d'âge) -> message serveur affiché tel quel [33m 310[2mms[22m[39m
+   [33m[2m✓[22m[39m Profil — écran « Mon profil » (Lot 13)[2m > [22mverrouillage identité post-soumission (Lot 15b)[2m > [22mle PATCH exclut les 5 champs verrouillés, même si un seul change (numero_cmu envoyé) [33m 1733[2mms[22m[39m
+ [32m✓[39m src/pages/admin/__tests__/Rapports.test.jsx [2m([22m[2m6 tests[22m[2m)[22m[33m 3904[2mms[22m[39m
+   [33m[2m✓[22m[39m Rapports & statistiques (Lot 11c)[2m > [22maffiche les agrégats renvoyés par l’API [33m 924[2mms[22m[39m
+   [33m[2m✓[22m[39m Rapports & statistiques (Lot 11c)[2m > [22mune répartition masquée (null) affiche « effectif insuffisant », pas un graphe [33m 427[2mms[22m[39m
+   [33m[2m✓[22m[39m Rapports & statistiques (Lot 11c)[2m > [22mchanger de campagne relance la requête avec ?campagne= [33m 955[2mms[22m[39m
+   [33m[2m✓[22m[39m Rapports & statistiques (Lot 11c)[2m > [22mle bouton Exporter (CSV) déclenche le téléchargement via getBlob [33m 536[2mms[22m[39m
+   [33m[2m✓[22m[39m Rapports & statistiques (Lot 11c)[2m > [22mle bouton Excel déclenche le téléchargement via getBlob (Lot 15c) [33m 869[2mms[22m[39m
+ [32m✓[39m src/pages/auth/__tests__/LoginPage.test.jsx [2m([22m[2m9 tests[22m[2m)[22m[33m 8358[2mms[22m[39m
+   [33m[2m✓[22m[39m LoginPage[2m > [22mrend le formulaire de connexion [33m 552[2mms[22m[39m
+   [33m[2m✓[22m[39m LoginPage[2m > [22mconnexion réussie -> redirige vers l’espace du rôle [33m 2744[2mms[22m[39m
+   [33m[2m✓[22m[39m LoginPage[2m > [22méchec 422 -> affiche le message générique du backend, pas de redirection [33m 1346[2mms[22m[39m
+   [33m[2m✓[22m[39m LoginPage[2m > [22m429 -> message « trop de tentatives » [33m 1751[2mms[22m[39m
+   [33m[2m✓[22m[39m LoginPage[2m > [22mle bouton œil bascule l’affichage sans déclencher la connexion [33m 1653[2mms[22m[39m
+ [32m✓[39m src/pages/admin/__tests__/Audit.test.jsx [2m([22m[2m5 tests[22m[2m)[22m[33m 3899[2mms[22m[39m
+   [33m[2m✓[22m[39m Audit — la zone 🔴 est affichée LÉGITIMEMENT (outil de supervision)[2m > [22maffiche ancienne_valeur/nouvelle_valeur/motif tels quels — c'est le travail de l'admin [33m 819[2mms[22m[39m
+   [33m[2m✓[22m[39m Audit — la recherche reste BORNÉE côté serveur, aucun filtre client sur le 🔴[2m > [22mtaper dans le champ recherche envoie ?recherche=, PAS de filtrage local des lignes reçues [33m 445[2mms[22m[39m
+   [33m[2m✓[22m[39m Audit — la recherche reste BORNÉE côté serveur, aucun filtre client sur le 🔴[2m > [22mle champ "auteur" est SÉPARÉ de la recherche — envoyé à ?auteur=, jamais fusionné [33m 1578[2mms[22m[39m
+   [33m[2m✓[22m[39m Audit — la recherche reste BORNÉE côté serveur, aucun filtre client sur le 🔴[2m > [22mfiltre module -> ?module=, filtre dates -> ?date_debut=/?date_fin= [33m 908[2mms[22m[39m
+ [32m✓[39m src/pages/admin/__tests__/Campagnes.test.jsx [2m([22m[2m4 tests[22m[2m)[22m[33m 2396[2mms[22m[39m
+   [33m[2m✓[22m[39m Campagnes — GET /admin/campagnes (nouvel endpoint) + transitions[2m > [22maffiche la liste avec le bon bouton selon le statut renvoyé par l’API [33m 827[2mms[22m[39m
+   [33m[2m✓[22m[39m Campagnes — GET /admin/campagnes (nouvel endpoint) + transitions[2m > [22mouvrir -> confirmation -> PATCH {statut:"ouverte"}, la ligne se met à jour depuis la réponse [33m 1047[2mms[22m[39m
+   [33m[2m✓[22m[39m Campagnes — GET /admin/campagnes (nouvel endpoint) + transitions[2m > [22m409 (une autre campagne déjà ouverte) -> message VERBATIM affiché [33m 336[2mms[22m[39m
+ [32m✓[39m src/pages/auth/__tests__/MotDePasseOublie.test.jsx [2m([22m[2m6 tests[22m[2m)[22m[33m 3501[2mms[22m[39m
+   [33m[2m✓[22m[39m MotDePasseOublie — anti-énumération (Lot 13, ADR-32)[2m > [22maffiche le formulaire [33m 395[2mms[22m[39m
+   [33m[2m✓[22m[39m MotDePasseOublie — anti-énumération (Lot 13, ADR-32)[2m > [22msoumission -> message générique affiché, quel que soit le retour serveur [33m 651[2mms[22m[39m
+   [33m[2m✓[22m[39m MotDePasseOublie — anti-énumération (Lot 13, ADR-32)[2m > [22mle formulaire disparaît après succès (pas de double-soumission) [33m 960[2mms[22m[39m
+   [33m[2m✓[22m[39m MotDePasseOublie — anti-énumération (Lot 13, ADR-32)[2m > [22me-mail mal formé -> 422 de champ affiché, PAS le message de succès [33m 679[2mms[22m[39m
+   [33m[2m✓[22m[39m MotDePasseOublie — anti-énumération (Lot 13, ADR-32)[2m > [22m429 -> message « trop de tentatives » [33m 685[2mms[22m[39m
+ [32m✓[39m src/pages/equipe/__tests__/MonCompte.test.jsx [2m([22m[2m4 tests[22m[2m)[22m[33m 5520[2mms[22m[39m
+   [33m[2m✓[22m[39m MonCompte — self-service équipe (Lot 15a)[2m > [22maffiche l’identité en LECTURE SEULE (évaluateur) [33m 395[2mms[22m[39m
+   [33m[2m✓[22m[39m MonCompte — self-service équipe (Lot 15a)[2m > [22maffiche l’identité en lecture seule (administrateur) — même écran partagé [33m 316[2mms[22m[39m
+   [33m[2m✓[22m[39m MonCompte — self-service équipe (Lot 15a)[2m > [22mrenvoie vers un administrateur pour corriger l’identité — aucun champ éditable ici [33m 372[2mms[22m[39m
+   [33m[2m✓[22m[39m MonCompte — self-service équipe (Lot 15a)[2m > [22mchange de mot de passe via PUT /equipe/mot-de-passe (pas /candidat/...) [33m 4432[2mms[22m[39m
+ [32m✓[39m src/components/ui/__tests__/ChampMotDePasse.test.jsx [2m([22m[2m6 tests[22m[2m)[22m[33m 2061[2mms[22m[39m
+   [33m[2m✓[22m[39m ChampMotDePasse — bascule afficher/masquer[2m > [22mmasqué par défaut (type="password"), le bouton annonce "Afficher" [33m 447[2mms[22m[39m
+   [33m[2m✓[22m[39m ChampMotDePasse — bascule afficher/masquer[2m > [22mun clic bascule vers type="text" et l'aria-label annonce "Masquer" [33m 753[2mms[22m[39m
+   [33m[2m✓[22m[39m ChampMotDePasse — bascule afficher/masquer[2m > [22mactivable au clavier (Entrée ET Espace), sans souris [33m 540[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/__tests__/MaCandidature.test.jsx [2m([22m[2m19 tests[22m[2m)[22m[33m 2806[2mms[22m[39m
+   [33m[2m✓[22m[39m MaCandidature — rendu par statut_public[2m > [22m404 -> « pas encore de dossier » + CTA wizard [33m 510[2mms[22m[39m
+   [33m[2m✓[22m[39m MaCandidature — résultat après publication (decision_publiee)[2m > [22mretenu -> félicitations + filière confirmée [33m 541[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/__tests__/Notifications.test.jsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1876[2mms[22m[39m
+   [33m[2m✓[22m[39m Notifications — historique in-app (Lot 12c)[2m > [22mliste les notifications reçues, avec titre/message/date [33m 620[2mms[22m[39m
+   [33m[2m✓[22m[39m Notifications — historique in-app (Lot 12c)[2m > [22mcliquer une ligne NON LUE la marque lue (PATCH), pas de re-clic sur une déjà lue [33m 363[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/__tests__/CandidatDashboard.test.jsx [2m([22m[2m7 tests[22m[2m)[22m[33m 4734[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatDashboard[2m > [22mGET /api/candidature 404 -> état d'accueil « compte créé » + CTA Commencer [33m 765[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatDashboard[2m > [22mbrouillon -> « Reprendre » vers le wizard [33m 907[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatDashboard[2m > [22men_cours_de_traitement -> statut + numéro + « Suivre ma candidature » vers le suivi [33m 1045[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatDashboard[2m > [22mdecision_publiee -> « Voir mon résultat » vers le suivi [33m 452[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatDashboard[2m > [22merreur serveur -> message d'erreur, pas de crash [33m 436[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidatDashboard[2m > [22mstepper : 4 étapes coarse, aucune étape interne, quel que soit le statut [33m 826[2mms[22m[39m
+ [32m✓[39m src/pages/evaluateur/__tests__/DossiersList.test.jsx [2m([22m[2m4 tests[22m[2m)[22m[33m 5755[2mms[22m[39m
+   [33m[2m✓[22m[39m DossiersList[2m > [22mn’affiche QUE les dossiers renvoyés par l’API — rien de plus, rien de moins [33m 1581[2mms[22m[39m
+   [33m[2m✓[22m[39m DossiersList[2m > [22m« Mes dossiers » pour un évaluateur, « Tous les dossiers » pour un admin (recouvrement) [33m 1733[2mms[22m[39m
+   [33m[2m✓[22m[39m DossiersList[2m > [22mchanger d’onglet relance la requête avec le bon filtre statut_interne [33m 2218[2mms[22m[39m
+[90mstderr[2m | src/components/pieces/__tests__/PiecePreviewModal.test.jsx[2m > [22m[2mPiecePreviewModal[2m > [22m[2mpage PDF dont le rendu échoue -> "Page illisible.", sans casser les autres pages
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\isaacaka\Desktop\CCI\Projet Arbre de Vie\casa-app\frontend\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\isaacaka\Desktop\CCI\Projet Arbre de Vie\casa-app\frontend\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\isaacaka\Desktop\CCI\Projet Arbre de Vie\casa-app\frontend\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at C:\Users\isaacaka\Desktop\CCI\Projet Arbre de Vie\casa-app\frontend\src\components\pieces\PiecePreviewModal.jsx:235:53 [90mundefined[39m
+
+ [32m✓[39m src/pages/admin/__tests__/Filieres.test.jsx [2m([22m[2m3 tests[22m[2m)[22m[33m 4709[2mms[22m[39m
+   [33m[2m✓[22m[39m Filieres — réutilise GET /api/filieres (public), toggle réel[2m > [22maffiche la liste depuis l'endpoint public, actif/inactif reflété [33m 2069[2mms[22m[39m
+   [33m[2m✓[22m[39m Filieres — réutilise GET /api/filieres (public), toggle réel[2m > [22mbascule le switch -> PATCH /admin/filieres/{id}, le badge se met à jour depuis la réponse [33m 2019[2mms[22m[39m
+   [33m[2m✓[22m[39m Filieres — réutilise GET /api/filieres (public), toggle réel[2m > [22maucun bouton d'édition (nom/description/quota) ni de création — hors backend (D-6a-2) [33m 615[2mms[22m[39m
+[90mstderr[2m | src/components/pieces/__tests__/PiecePreviewModal.test.jsx[2m > [22m[2mPiecePreviewModal[2m > [22m[2mdémontage pendant un rendu PDF en cours -> annule la tâche de rendu (tache.cancel)
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\isaacaka\Desktop\CCI\Projet Arbre de Vie\casa-app\frontend\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\isaacaka\Desktop\CCI\Projet Arbre de Vie\casa-app\frontend\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\isaacaka\Desktop\CCI\Projet Arbre de Vie\casa-app\frontend\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at C:\Users\isaacaka\Desktop\CCI\Projet Arbre de Vie\casa-app\frontend\src\components\pieces\PiecePreviewModal.jsx:235:53 [90mundefined[39m
+
+ [32m✓[39m src/pages/candidat/__tests__/Documents.test.jsx [2m([22m[2m9 tests[22m[2m)[22m[33m 5933[2mms[22m[39m
+   [33m[2m✓[22m[39m Documents — écran candidat (Lot 14)[2m > [22maucune candidature -> écran d’atterrissage, CTA vers le wizard [33m 2870[2mms[22m[39m
+   [33m[2m✓[22m[39m Documents — écran candidat (Lot 14)[2m > [22merreur serveur -> message d’erreur, pas de crash [33m 304[2mms[22m[39m
+   [33m[2m✓[22m[39m Documents — écran candidat (Lot 14)[2m > [22msoumis -> liste les 5 pièces obligatoires (déposé/manquant), compteur correct (Lot D : residence/lettre retirées) [33m 1131[2mms[22m[39m
+   [33m[2m✓[22m[39m Documents — écran candidat (Lot 14)[2m > [22mLot D — un dossier qui a DÉJÀ residence/lettre les affiche en lecture seule sous « Pièces conservées », sans les compter dans les 5 obligatoires [33m 635[2mms[22m[39m
+   [33m[2m✓[22m[39m Documents — écran candidat (Lot 14)[2m > [22mjustificatifs d’expérience : un par expérience, libellé domaine + durée [33m 312[2mms[22m[39m
+ [32m✓[39m src/components/pieces/__tests__/PiecePreviewModal.test.jsx [2m([22m[2m13 tests[22m[2m)[22m[33m 3069[2mms[22m[39m
+   [33m[2m✓[22m[39m PiecePreviewModal[2m > [22maffiche un état de chargement puis une image une fois le blob récupéré [33m 811[2mms[22m[39m
+   [33m[2m✓[22m[39m PiecePreviewModal[2m > [22mrévoque l’URL blob à la fermeture (démontage) [33m 341[2mms[22m[39m
+   [33m[2m✓[22m[39m PiecePreviewModal[2m > [22mpage PDF dont le rendu échoue -> "Page illisible.", sans casser les autres pages [33m 311[2mms[22m[39m
+ [32m✓[39m src/components/public/__tests__/ChoixCompteModal.test.jsx [2m([22m[2m6 tests[22m[2m)[22m[33m 2243[2mms[22m[39m
+   [33m[2m✓[22m[39m ChoixCompteModal (Lot B correctif)[2m > [22maria correct : role=dialog, aria-modal, labelledby/describedby pointent vers le titre et le corps [33m 1160[2mms[22m[39m
+   [33m[2m✓[22m[39m ChoixCompteModal (Lot B correctif)[2m > [22mle focus part sur la modale à l’ouverture [33m 320[2mms[22m[39m
+ [32m✓[39m src/components/form/__tests__/RankList.test.jsx [2m([22m[2m11 tests[22m[2m)[22m[33m 3104[2mms[22m[39m
+   [33m[2m✓[22m[39m RankList — sans lockedId : comportement inchangé[2m > [22mles flèches Monter/Descendre permutent deux voisins et renvoient les 5 ids [33m 1223[2mms[22m[39m
+   [33m[2m✓[22m[39m RankList — sans lockedId : comportement inchangé[2m > [22mle premier item n’a pas de "Monter", le dernier n’a pas de "Descendre" actif [33m 533[2mms[22m[39m
+   [33m[2m✓[22m[39m RankList — avec lockedId (Lot C) : la filière confirmée est figée[2m > [22ml’item figé n’a ni poignée de glisser-déposer, ni flèches, ni numéro de rang [33m 322[2mms[22m[39m
+ [32m✓[39m src/components/layout/__tests__/AppShell.test.jsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1096[2mms[22m[39m
+   [33m[2m✓[22m[39m AppShell — prop `space` (Lot 8c-1, recouvrement admin ⊇ évaluateur)[2m > [22msans `space` : la navigation suit le rôle (comportement inchangé) [33m 591[2mms[22m[39m
+ [32m✓[39m src/routing/__tests__/ProtectedRoute.test.jsx [2m([22m[2m15 tests[22m[2m)[22m[33m 786[2mms[22m[39m
+   [33m[2m✓[22m[39m ProtectedRoute[2m > [22mstatus loading -> affiche le chargement [33m 363[2mms[22m[39m
+ [32m✓[39m src/auth/__tests__/AuthContext.test.jsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1631[2mms[22m[39m
+   [33m[2m✓[22m[39m AuthContext[2m > [22mlogin réussi -> authenticated depuis la réponse UserResource [33m 633[2mms[22m[39m
+   [33m[2m✓[22m[39m AuthContext[2m > [22mlogin 422 -> reste guest (erreur propagée au formulaire) [33m 363[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/__tests__/useCampagneOuverte.test.js [2m([22m[2m4 tests[22m[2m)[22m[33m 463[2mms[22m[39m
+ [32m✓[39m src/pages/evaluateur/__tests__/noScoringFormula.test.js [2m([22m[2m27 tests[22m[2m)[22m[32m 145[2mms[22m[39m
+ [32m✓[39m src/pages/auth/__tests__/noDemoCreds.test.js [2m([22m[2m147 tests[22m[2m)[22m[33m 522[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/wizard/__tests__/formStructure.test.js [2m([22m[2m8 tests[22m[2m)[22m[33m 416[2mms[22m[39m
+   [33m[2m✓[22m[39m formStructure — non-fuite du barème[2m > [22maucune clé numérique de type "points" / "max" / "poids" [33m 324[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/apiClient.test.js [2m([22m[2m7 tests[22m[2m)[22m[33m 497[2mms[22m[39m
+ [32m✓[39m src/pages/admin/__tests__/AdminDashboard.test.jsx [2m([22m[2m2 tests[22m[2m)[22m[33m 2511[2mms[22m[39m
+   [33m[2m✓[22m[39m AdminDashboard — 4 KPI = meta.total de 4 appels filtrés, aucun calcul reconstitué[2m > [22maffiche les 4 KPI depuis meta.total, et la liste des campagnes depuis le nouvel endpoint [33m 2315[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/__tests__/useMaCandidature.test.js [2m([22m[2m3 tests[22m[2m)[22m[33m 1028[2mms[22m[39m
+   [33m[2m✓[22m[39m useMaCandidature[2m > [22m404 -> status "none" [33m 350[2mms[22m[39m
+   [33m[2m✓[22m[39m useMaCandidature[2m > [22m200 -> mappe les primitives d’affichage, et RIEN d’autre [33m 409[2mms[22m[39m
+ [32m✓[39m src/pages/admin/__tests__/noScoringFormula.test.js [2m([22m[2m43 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m src/pages/admin/__tests__/noBridge.test.js [2m([22m[2m42 tests[22m[2m)[22m[33m 315[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/__tests__/noBridge.test.js [2m([22m[2m27 tests[22m[2m)[22m[32m 64[2mms[22m[39m
+ [32m✓[39m src/pages/evaluateur/__tests__/noBridge.test.js [2m([22m[2m25 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/wizard/__tests__/completeness.test.js [2m([22m[2m22 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/__tests__/resultatMessages.test.js [2m([22m[2m13 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/pages/candidat/wizard/__tests__/useCandidatureForm.test.js [2m([22m[2m4 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+ [32m✓[39m src/pages/admin/__tests__/useAffectationAutomatique.test.js [2m([22m[2m2 tests[22m[2m)[22m[32m 214[2mms[22m[39m
+ [32m✓[39m src/pages/admin/__tests__/CandidaturesSupervision.test.jsx [2m([22m[2m26 tests[22m[2m)[22m[33m 43092[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — affichage[2m > [22maffiche les dossiers renvoyés par l'API, rien de plus [33m 1126[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — affichage[2m > [22mchanger un filtre relance la requête avec le bon paramètre [33m 631[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — affichage[2m > [22mchanger un filtre vide la sélection (aucune action groupée sur un dossier qui disparaît) [33m 1384[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — affectation en masse (atomique)[2m > [22msélection -> affecter -> succès -> POST correct, sélection vidée, liste rechargée [33m 1649[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — affectation en masse (atomique)[2m > [22m422 atomique -> message VERBATIM affiché, sélection PRÉSERVÉE (le modal reste ouvert) [33m 1342[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — Affecter/Réattribuer mutuellement exclusifs (correctif de revue)[2m > [22mdossier NON affecté sélectionné -> Affecter actif, Réattribuer désactivé [33m 410[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — Affecter/Réattribuer mutuellement exclusifs (correctif de revue)[2m > [22mdossier DÉJÀ affecté sélectionné -> Réattribuer actif, Affecter désactivé [33m 459[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — réattribution de dossiers déjà affectés (Lot 20b)[2m > [22msélection -> réattribuer -> bouton bloqué jusqu’à la case cochée -> POST correct, sélection vidée [33m 1879[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — réattribution de dossiers déjà affectés (Lot 20b)[2m > [22m« remettre dans le lot non affecté » envoie evaluateur_id: null [33m 1320[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — réattribution de dossiers déjà affectés (Lot 20b)[2m > [22m422 atomique (dossier déjà verrouillé) -> message VERBATIM affiché, le modal reste ouvert [33m 1132[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — élimination manuelle mono-cible (Lot 8d-3, D-6b-4)[2m > [22mmotif obligatoire (bouton bloqué), succès -> POST mono-cible puis liste rechargée [33m 3572[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — élimination manuelle mono-cible (Lot 8d-3, D-6b-4)[2m > [22m422 backend -> message affiché verbatim, le modal reste ouvert [33m 3372[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — sélection de tous les résultats (ADR-45)[2m > [22mla case d'en-tête coche la page, puis le bandeau propose les N résultats [33m 1631[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — sélection de tous les résultats (ADR-45)[2m > [22m« Tout désélectionner » quitte le mode et vide la sélection [33m 1280[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — sélection de tous les résultats (ADR-45)[2m > [22mchanger un filtre OU de page vide le mode « tous » (ADR-39 inchangé) [33m 2432[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — sélection de tous les résultats (ADR-45)[2m > [22maperçu (critères figés, aucun id) puis confirmation -> POST avec les nombres de l'aperçu, succès annoncé [33m 2309[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — sélection de tous les résultats (ADR-45)[2m > [22mdécocher un évaluateur relance l'aperçu avec la restriction [33m 1325[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — sélection de tous les résultats (ADR-45)[2m > [22m409 à la confirmation -> message verbatim, modal ouvert, confirmation bloquée jusqu’au recalcul [33m 1704[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — sélection de tous les résultats (ADR-45)[2m > [22mliste modifiée dès l'aperçu -> fermer recharge la liste et vide la sélection [33m 2275[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — cibles par évaluateur (Lot 3, ADR-48)[2m > [22msaisir une cible relance l’aperçu avec `cibles`, puis la confirmation renvoie `repartition_attendue`/`non_affectes_attendu` [33m 3578[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — cibles par évaluateur (Lot 3, ADR-48)[2m > [22mune somme de cibles dépassant les affectables bloque la confirmation, EN DIRECT, sans appel serveur supplémentaire [33m 4108[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — cibles par évaluateur (Lot 3, ADR-48)[2m > [22mdécocher un évaluateur cible retire sa cible et désactive son champ [33m 1386[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — cibles par évaluateur (Lot 3, ADR-48)[2m > [22mun reliquat non affecté (cibles couvrant tout le monde) affiche un avertissement non bloquant [33m 1423[2mms[22m[39m
+   [33m[2m✓[22m[39m CandidaturesSupervision — cibles par évaluateur (Lot 3, ADR-48)[2m > [22mun reliquat total (0 dossier réparti) désactive la confirmation [33m 997[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m47 passed[39m[22m[90m (47)[39m
+[2m      Tests [22m [1m[32m689 passed[39m[22m[90m (689)[39m
+[2m   Start at [22m 10:44:39
+[2m   Duration [22m 70.81s[2m (transform 26.53s, setup 41.64s, collect 88.49s, tests 269.46s, environment 235.46s, prepare 34.97s)[22m
+
