@@ -448,6 +448,12 @@ class RetablissementEligibiliteTest extends TestCase
         $candidatures = [];
         foreach ($fixtures as $f) {
             $candidat = $this->creerCandidat($f['email'], ['prenom' => $f['prenom'], 'nom' => $f['nom'], 'cni' => $f['cni']]);
+            // Preuve que `creerCandidat` applique bien le `profil` demandé (et
+            // ne retombe pas sur ses valeurs par défaut 'Test'/'Candidat') —
+            // sinon le test de non-fuite ci-dessous passerait à vide.
+            $this->assertSame($f['prenom'], $candidat->candidat->prenom);
+            $this->assertSame($f['nom'], $candidat->candidat->nom);
+            $this->assertSame($f['cni'], $candidat->candidat->cni);
             $c = $this->candidatureAffectee($candidat, $this->evaluateur);
             $this->actingAs($this->admin)->postJson("/api/admin/candidatures/{$c->id}/elimination", [
                 'motif' => 'Test — pièce suspecte.',
