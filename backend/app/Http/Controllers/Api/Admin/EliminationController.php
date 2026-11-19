@@ -30,8 +30,14 @@ use Illuminate\Support\Facades\DB;
  *  - après publication, le candidat voit `non_retenu` générique — INDISCERNABLE
  *    d'un non-retenu ordinaire (règle reine, D-5b-1).
  *  - `journal_audit` : `ancienne_valeur` → `nouvelle_valeur` + `motif`.
+ *  - Lot 4 (ADR-49) : si le dossier avait été rétabli par
+ *    `RetablissementEligibiliteController`, `eligibilite_retablie` repasse à
+ *    `false` (+ `_le`/`_par` à `null`) — SEUL acte qui renverse un
+ *    rétablissement, quel que soit l'état de publication.
  *
- * Irréversible (une erreur se rattrape par un nouvel acte tracé, jamais un undo).
+ * Pas un undo au sens strict : une élimination après rétablissement est un
+ * nouvel acte tracé, pas l'effacement du précédent (les deux lignes d'audit
+ * subsistent).
  */
 class EliminationController extends Controller
 {
@@ -49,7 +55,15 @@ class EliminationController extends Controller
         $decisionAvant = $decision?->decision;
 
         DB::transaction(function () use ($request, $candidature, $motif, $decision, $eligibiliteAvant, $decisionAvant) {
-            $candidature->forceFill(['statut_eligibilite_interne' => 'non_eligible'])->saveQuietly();
+            // Lot 4 (ADR-49) : renverse un rétablissement éventuel — SEUL acte
+            // qui le fait, inconditionnellement (avant ou après publication,
+            // comme le reste de cette route).
+            $candidature->forceFill([
+                'statut_eligibilite_interne' => 'non_eligible',
+                'eligibilite_retablie' => false,
+                'eligibilite_retablie_le' => null,
+                'eligibilite_retablie_par' => null,
+            ])->saveQuietly();
 
             CritereEliminatoireDeclenche::create([
                 'candidature_id' => $candidature->id,

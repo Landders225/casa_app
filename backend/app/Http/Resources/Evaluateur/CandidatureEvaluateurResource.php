@@ -88,8 +88,14 @@ class CandidatureEvaluateurResource extends JsonResource
                     ? new VerificationDossierResource($this->verification)
                     : null,
             ),
-            'criteres_eliminatoires' => CritereEliminatoireResource::collection(
-                $this->whenLoaded('criteresEliminatoires'),
+            // Lot 4 (ADR-49) : n'a plus de sens une fois le dossier rétabli
+            // (`eligible`) — des lignes historiques peuvent subsister en base
+            // (conservées pour l'audit), mais les montrer sur un dossier
+            // redevenu éligible serait contradictoire pour l'évaluateur.
+            'criteres_eliminatoires' => $this->when(
+                $this->statut_eligibilite_interne === 'non_eligible',
+                fn () => CritereEliminatoireResource::collection($this->whenLoaded('criteresEliminatoires')),
+                [],
             ),
 
             'evaluation' => $this->whenLoaded('evaluationDossier', fn () => $this->evaluationDossier ? [

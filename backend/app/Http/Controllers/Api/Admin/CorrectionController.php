@@ -145,7 +145,12 @@ class CorrectionController extends Controller
                     'declenche_le' => $maintenant,
                 ], $criteres));
             }
-            $eligibiliteApres = $criteres === [] ? 'eligible' : 'non_eligible';
+            // Lot 4 (ADR-49) : même garde qu'au Lot 4a (VerificationController) —
+            // un rétablissement administratif reste prioritaire même après une
+            // relance complète de l'éligibilité.
+            $eligibiliteApres = $candidature->eligibilite_retablie
+                ? 'eligible'
+                : ($criteres === [] ? 'eligible' : 'non_eligible');
             $candidature->forceFill(['statut_eligibilite_interne' => $eligibiliteApres])->saveQuietly();
 
             if ($eligibiliteAvant !== $eligibiliteApres) {

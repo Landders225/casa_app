@@ -76,8 +76,13 @@ class VerificationController extends Controller
             }
 
             // c. verdict d'éligibilité : reste au moins un critère (toute origine) ?
+            // Lot 4 (ADR-49) : un rétablissement administratif est PRIORITAIRE
+            // sur ce recalcul — les critères restent tracés ci-dessus (rien
+            // caché), mais le verdict final ne bascule plus tout seul.
             $resteUnCritere = $candidature->criteresEliminatoires()->exists();
-            $eligibiliteApres = $resteUnCritere ? 'non_eligible' : 'eligible';
+            $eligibiliteApres = $candidature->eligibilite_retablie
+                ? 'eligible'
+                : ($resteUnCritere ? 'non_eligible' : 'eligible');
 
             // statut_interne INCHANGÉ ('en_instruction') — cf. Q2.
             $candidature->forceFill(['statut_eligibilite_interne' => $eligibiliteApres])->saveQuietly();

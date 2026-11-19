@@ -32,6 +32,12 @@ class CandidatureAdminResource extends JsonResource
             'numero_dossier' => $this->numero_dossier,
             'statut_interne' => $this->statut_interne,
             'statut_eligibilite_interne' => $this->statut_eligibilite_interne,
+            // Lot 4 (ADR-49) : aide au choix avant rétablissement + badge
+            // visible uniquement ici (jamais côté évaluateur/candidat).
+            'eligibilite_retablie' => (bool) $this->eligibilite_retablie,
+            'criteres_eliminatoires' => CritereEliminatoireResource::collection(
+                $this->whenLoaded('criteresEliminatoires'),
+            ),
             'date_soumission' => $this->date_soumission?->toIso8601String(),
             'dossier_verrouille' => (bool) $this->dossier_verrouille,
 

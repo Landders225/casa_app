@@ -7,6 +7,7 @@ use App\Models\CritereEliminatoireDeclenche;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Tests\Feature\Evaluateur\CreeContexteEvaluation;
 use Tests\TestCase;
 
 /**
@@ -20,7 +21,9 @@ use Tests\TestCase;
  */
 class SoumissionAntiFuiteTest extends TestCase
 {
-    use CreeContexteCandidature;
+    // Lot 4 (ADR-49) : `CreeContexteEvaluation` (inclut `CreeContexteCandidature`)
+    // apporte `creerAdmin`, nécessaire au nouveau test de rétablissement ci-dessous.
+    use CreeContexteEvaluation;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -108,6 +111,35 @@ class SoumissionAntiFuiteTest extends TestCase
         $this->assertSame(array_keys($ga), array_keys($gb));
         $this->assertArrayNotHasKey('statut_interne', $ga);
         $this->assertArrayNotHasKey('statut_eligibilite_interne', $ga);
+    }
+
+    /**
+     * Lot 4 (ADR-49) — un rétablissement d'éligibilité est un acte 100 %
+     * interne (🔴) : `StatutPublicResolver` renvoie toujours
+     * `'en_cours_de_traitement'` avant publication, quel que soit
+     * `statut_eligibilite_interne`. Cette épingle transforme cette garantie
+     * architecturale en non-régression exécutable.
+     */
+    public function test_retablissement_eligibilite_ne_change_rien_pour_le_candidat(): void
+    {
+        $bob = $this->creerCandidat('bob-retabli@casa-demo.ci');
+        $cb = $this->candidatureComplete($bob, ['di01_disponible_lun_ven' => 'non']);
+        $this->actingAs($bob)->postJson("/api/candidatures/{$cb->id}/soumettre")->assertOk();
+
+        $avant = $this->actingAs($bob)->getJson('/api/candidature');
+
+        $admin = $this->creerAdmin('admin-lot4@casa-demo.ci');
+        $this->actingAs($admin)->postJson('/api/admin/candidatures/eligibilite/retablir', [
+            'candidature_ids' => [$cb->id],
+            'motif' => 'Attestation complémentaire reçue.',
+        ])->assertOk();
+        $this->assertSame('eligible', $cb->fresh()->statut_eligibilite_interne);
+
+        $apres = $this->actingAs($bob)->getJson('/api/candidature');
+
+        $this->assertSame($avant->status(), $apres->status());
+        $this->assertSame($avant->json('data'), $apres->json('data'));
+        $this->assertSame('en_cours_de_traitement', $apres->json('data.statut_public'));
     }
 
     public function test_edition_fermee_de_facon_identique_dans_les_deux_branches(): void

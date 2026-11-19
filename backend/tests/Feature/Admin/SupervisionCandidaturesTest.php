@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Campagne;
+use App\Models\CritereEliminatoireDeclenche;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -45,6 +46,35 @@ class SupervisionCandidaturesTest extends TestCase
             ->assertJsonPath('data.0.evaluateur.prenom', 'Eval')
             ->assertJsonPath('data.0.score_dossier', '60.0')
             ->assertJsonPath('data.0.score_entretien', '30.0');
+    }
+
+    /** Lot 4 (ADR-49) — aide au choix avant rétablissement + badge, admin only. */
+    public function test_l_admin_voit_les_criteres_declenches_et_le_badge_de_retablissement(): void
+    {
+        $c = $this->candidatureEvaluee($this->campagne, $this->evaluateur, 'cuisine', 55.0, 28.0, [
+            'eligibilite' => 'non_eligible',
+        ]);
+        CritereEliminatoireDeclenche::create([
+            'candidature_id' => $c->id,
+            'code_critere' => 'decision_administrative',
+            'detail' => 'Pièce suspecte.',
+            'origine' => 'decision_administrative',
+            'declenche_le' => now(),
+        ]);
+
+        $this->actingAs($this->admin)->postJson('/api/admin/candidatures')
+            ->assertOk()
+            ->assertJsonPath('data.0.eligibilite_retablie', false)
+            ->assertJsonPath('data.0.criteres_eliminatoires.0.code_critere', 'decision_administrative');
+
+        $this->actingAs($this->admin)->postJson('/api/admin/candidatures/eligibilite/retablir', [
+            'candidature_ids' => [$c->id],
+            'motif' => 'Vérification faite, dossier conforme.',
+        ])->assertOk();
+
+        $this->actingAs($this->admin)->postJson('/api/admin/candidatures')
+            ->assertOk()
+            ->assertJsonPath('data.0.eligibilite_retablie', true);
     }
 
     public function test_filtres_statut_filiere_et_non_affecte(): void

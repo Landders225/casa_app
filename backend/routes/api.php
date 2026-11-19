@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\Admin\PublicationController;
 use App\Http\Controllers\Api\Admin\RapportController;
 use App\Http\Controllers\Api\Admin\ReattributionController;
 use App\Http\Controllers\Api\Admin\RemplacementController;
+use App\Http\Controllers\Api\Admin\RetablissementEligibiliteController;
 use App\Http\Controllers\Api\Auth\MotDePasseController as AuthMotDePasseController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CampagneStatutController;
@@ -203,6 +204,9 @@ Route::middleware(['auth:sanctum', 'actif', 'throttle:casa-api'])->group(functio
         Route::post('/remplacements', [RemplacementController::class, 'store']);
         // Élimination manuelle : force `non_eligible` + motif (fraude, pièce non conforme).
         Route::post('/candidatures/{candidature}/elimination', [EliminationController::class, 'store']);
+        // Rétablissement d'éligibilité (Lot 4, ADR-49) : l'inverse de l'élimination
+        // manuelle ou d'un rejet automatique — en masse bornée, motif obligatoire.
+        Route::post('/candidatures/eligibilite/retablir', [RetablissementEligibiliteController::class, 'store']);
     });
 
     /*

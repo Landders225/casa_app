@@ -14,10 +14,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  *
  * ⚠️ Colonnes 🔴 (jamais sérialisées vers un rôle candidat, cf.
  * dictionnaire-donnees.md + ADR-03) : `statut_interne`,
- * `statut_eligibilite_interne`, `dossier_verrouille*`, `evaluateur_id`,
- * `commentaire_evaluateur`, `date_evaluation`. Le seul composant autorisé à
- * lire `statut_interne` pour construire une réponse candidat est
- * App\Services\StatutPublicResolver.
+ * `statut_eligibilite_interne`, `eligibilite_retablie*` (Lot 4, ADR-49),
+ * `dossier_verrouille*`, `evaluateur_id`, `commentaire_evaluateur`,
+ * `date_evaluation`. Le seul composant autorisé à lire `statut_interne` pour
+ * construire une réponse candidat est App\Services\StatutPublicResolver.
  */
 class Candidature extends Model
 {
@@ -50,6 +50,8 @@ class Candidature extends Model
         return [
             'cqp_confirme' => 'boolean',
             'dossier_verrouille' => 'boolean',
+            'eligibilite_retablie' => 'boolean',
+            'eligibilite_retablie_le' => 'datetime',
             'date_soumission' => 'datetime',
             'date_evaluation' => 'date',
         ];

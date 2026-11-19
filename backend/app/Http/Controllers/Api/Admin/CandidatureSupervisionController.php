@@ -43,7 +43,7 @@ class CandidatureSupervisionController extends Controller
             // de doublon, nécessaire uniquement pour pouvoir trier par score.
             ->leftJoin('evaluation_dossier', 'evaluation_dossier.candidature_id', '=', 'candidature.id')
             ->leftJoin('entretien', 'entretien.candidature_id', '=', 'candidature.id')
-            ->with(['candidat', 'filiere', 'evaluateur', 'evaluationDossier', 'entretien', 'decisionCandidature']);
+            ->with(['candidat', 'filiere', 'evaluateur', 'evaluationDossier', 'entretien', 'decisionCandidature', 'criteresEliminatoires']);
 
         if (! $request->boolean('inclure_brouillons')) {
             $query->where('candidature.statut_interne', '!=', 'brouillon');

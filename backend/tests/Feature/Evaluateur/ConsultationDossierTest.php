@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Evaluateur;
 
+use App\Models\CritereEliminatoireDeclenche;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -61,6 +62,30 @@ class ConsultationDossierTest extends TestCase
                 'reponses', 'experiences', 'pieces_dossier', 'verification', 'criteres_eliminatoires', 'evaluateur',
             ]])
             ->assertJsonPath('data.verification', null)
+            ->assertJsonPath('data.criteres_eliminatoires', []);
+    }
+
+    /**
+     * Lot 4 (ADR-49) — un critère historique peut subsister en base après un
+     * rétablissement d'éligibilité (conservé pour l'audit, jamais supprimé).
+     * Une fois le dossier `eligible`, l'afficher à l'évaluateur serait
+     * contradictoire : la Resource le masque, même si la ligne existe.
+     */
+    public function test_fiche_masque_les_criteres_historiques_d_un_dossier_redevenu_eligible(): void
+    {
+        $c = $this->candidatureAffectee($this->candidat, $this->evaluateur);
+        CritereEliminatoireDeclenche::create([
+            'candidature_id' => $c->id,
+            'code_critere' => 'decision_administrative',
+            'detail' => 'Historique — dossier depuis rétabli.',
+            'origine' => 'decision_administrative',
+            'declenche_le' => now(),
+        ]);
+        // Le verdict, lui, est bien 'eligible' (c'est le cas d'un dossier rétabli).
+        $this->assertSame('eligible', $c->statut_eligibilite_interne);
+
+        $this->actingAs($this->evaluateur)->getJson("/api/evaluateur/candidatures/{$c->id}")
+            ->assertOk()
             ->assertJsonPath('data.criteres_eliminatoires', []);
     }
 
