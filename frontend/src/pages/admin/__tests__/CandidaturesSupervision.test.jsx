@@ -28,6 +28,8 @@ function candidature(over = {}) {
     numero_dossier: 'CASA-2026-000001',
     statut_interne: 'soumis',
     statut_eligibilite_interne: 'non_verifie',
+    eligibilite_retablie: false,
+    criteres_eliminatoires: [],
     date_soumission: '2026-06-01T00:00:00Z',
     dossier_verrouille: false,
     candidat: { prenom: 'Awa', nom: 'Konan', ville_residence: 'Abidjan - Cocody' },
@@ -671,5 +673,192 @@ describe('CandidaturesSupervision — cibles par évaluateur (Lot 3, ADR-48)', (
     const dialog = screen.getByRole('dialog', { name: 'Répartir automatiquement' })
 
     expect(await within(dialog).findByRole('button', { name: 'Répartir 0 dossier' })).toBeDisabled()
+  })
+})
+
+/**
+ * Rétablissement d'éligibilité (Lot 4, ADR-49) — sélection SÉPARÉE de
+ * `selected` (Affecter/Réattribuer), conservée entre pages, motif obligatoire
+ * + case « J'ai compris » (extension `MotifConfirmDialog`), aide au choix
+ * (critères déclenchés + badge « Éligibilité rétablie »).
+ */
+describe('CandidaturesSupervision — rétablissement d’éligibilité (Lot 4, ADR-49)', () => {
+  function nonEligible(over = {}) {
+    return candidature({
+      statut_eligibilite_interne: 'non_eligible',
+      criteres_eliminatoires: [{ code_critere: 'DI.01', detail: 'x', origine: 'soumission_candidat', declenche_le: null }],
+      ...over,
+    })
+  }
+
+  it('affiche les critères déclenchés et le badge « Éligibilité rétablie » (aide au choix, admin only)', async () => {
+    mockCandidatures({
+      candidatures: [nonEligible({ eligibilite_retablie: true })],
+    })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    expect(screen.getByText('DI.01')).toBeInTheDocument()
+    expect(screen.getByText('Éligibilité rétablie')).toBeInTheDocument()
+  })
+
+  it('case désactivée sur un dossier déjà éligible, activée sur un dossier non éligible', async () => {
+    mockCandidatures({ candidatures: [candidature({ statut_eligibilite_interne: 'eligible' })] })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    expect(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i })).toBeDisabled()
+  })
+
+  it('sélection -> rendre éligible -> case "J\'ai compris" obligatoire -> POST correct, sélection vidée, liste rechargée', async () => {
+    mockCandidatures({ candidatures: [nonEligible()] })
+    const appelsCandidaturesAvant = () => apiClient.post.mock.calls.filter(([p]) => p === '/admin/candidatures').length
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+    const listeAvant = appelsCandidaturesAvant()
+
+    apiClient.post.mockResolvedValueOnce({ data: { retablies: 1 } })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i }))
+    await user.click(screen.getByRole('button', { name: /rendre éligible \(1\)/i }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Rendre éligible ?' })
+    const confirmBtn = within(dialog).getByRole('button', { name: 'Rendre éligible' })
+    await user.type(within(dialog).getByLabelText(/motif/i), 'Attestation complémentaire reçue.')
+    expect(confirmBtn).toBeDisabled()
+    await user.click(within(dialog).getByRole('checkbox', { name: /j'ai compris/i }))
+    expect(confirmBtn).toBeEnabled()
+    await user.click(confirmBtn)
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith(
+      '/admin/candidatures/eligibilite/retablir',
+      { candidature_ids: ['c-1'], motif: 'Attestation complémentaire reçue.' },
+    ))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /rendre éligible \(/i })).not.toBeInTheDocument()
+    await waitFor(() => expect(appelsCandidaturesAvant()).toBeGreaterThan(listeAvant))
+  })
+
+  it('422 atomique -> message VERBATIM affiché, modal ouvert, sélection PRÉSERVÉE', async () => {
+    mockCandidatures({ candidatures: [nonEligible()] })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    apiClient.post.mockRejectedValueOnce(
+      new ApiError('validation', {
+        status: 422,
+        errors: { candidature_ids: ["N'est pas non éligible — rien à rétablir : CASA-2026-000001. Aucun rétablissement effectué."] },
+      }),
+    )
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i }))
+    await user.click(screen.getByRole('button', { name: /rendre éligible \(1\)/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Rendre éligible ?' })
+    await user.type(within(dialog).getByLabelText(/motif/i), 'Motif suffisant pour le test.')
+    await user.click(within(dialog).getByRole('checkbox', { name: /j'ai compris/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Rendre éligible' }))
+
+    const alerte = await screen.findByText(/aucun rétablissement effectué/i)
+    expect(alerte).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Rendre éligible ?' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i })).toBeChecked()
+  })
+
+  it('reste affiché mais désactivé (avec info-bulle) quand selectionTous devient actif après une coche', async () => {
+    mockCandidatures({
+      candidatures: [nonEligible(), candidature({ id: 'c-2', numero_dossier: 'CASA-2026-000002' })],
+      meta: { current_page: 1, last_page: 1, total: 2 },
+    })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i }))
+    const bouton = await screen.findByRole('button', { name: /rendre éligible \(1\)/i })
+    expect(bouton).toBeEnabled()
+
+    // Mode « tous les N résultats » : indépendant de `selectionRetablissement`,
+    // mais le bouton « Rendre éligible » doit se désactiver dès qu'il est actif.
+    await user.click(screen.getByRole('checkbox', { name: 'Tout sélectionner' }))
+    await user.click(screen.getByRole('button', { name: /sélectionner les 2 dossiers correspondant/i }))
+
+    const boutonApres = screen.getByRole('button', { name: /rendre éligible \(1\)/i })
+    expect(boutonApres).toBeDisabled()
+    expect(boutonApres).toHaveAttribute('title', expect.stringMatching(/un par un/i))
+  })
+
+  it('sélection conservée entre pages (contrairement à `selected`) ; une case changée de filtre la vide', async () => {
+    const page1 = [nonEligible({ id: 'c-1', numero_dossier: 'CASA-2026-000001' })]
+    const page2 = [nonEligible({ id: 'c-2', numero_dossier: 'CASA-2026-000002' })]
+    apiClient.post.mockImplementation((path, body) => {
+      if (path === '/admin/candidatures') {
+        const page = body?.page ?? 1
+        return Promise.resolve({
+          data: page === 2 ? page2 : page1,
+          meta: { current_page: page, last_page: 2, total: 2 },
+        })
+      }
+      return Promise.resolve({ data: [] })
+    })
+    apiClient.get.mockImplementation((path) => {
+      if (path === '/admin/evaluateurs') return Promise.resolve({ data: EVALUATEURS })
+      if (path === '/admin/evaluateurs?tous=1') return Promise.resolve({ data: EVALUATEURS_TOUS })
+      if (path === '/admin/campagnes') return Promise.resolve({ data: CAMPAGNES })
+      if (path === '/filieres') return Promise.resolve({ data: FILIERES })
+      return Promise.resolve({ data: [] })
+    })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i }))
+    expect(await screen.findByRole('button', { name: /rendre éligible \(1\)/i })).toBeInTheDocument()
+
+    // Changement de PAGE : la sélection de rétablissement SURVIT (contrairement
+    // à `selected`, qui serait vidée par l'effet existant).
+    await user.click(screen.getByRole('button', { name: /page suivante/i }))
+    await screen.findByText('CASA-2026-000002')
+    expect(screen.getByRole('button', { name: /rendre éligible \(1\)/i })).toBeInTheDocument()
+
+    // Changement de FILTRE : la sélection de rétablissement est vidée.
+    await user.selectOptions(screen.getByDisplayValue('Tous les statuts'), 'en_instruction')
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /rendre éligible \(/i })).not.toBeInTheDocument()
+    })
+  })
+
+  it('non-régression : cocher pour rétablissement ne touche pas à la sélection Affecter/Réattribuer, et inversement', async () => {
+    mockCandidatures({ candidatures: [nonEligible({ evaluateur: null })] })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i }))
+    expect(await screen.findByRole('button', { name: /rendre éligible \(1\)/i })).toBeInTheDocument()
+    // La sélection normale (Affecter/Réattribuer) reste VIDE : aucun des deux
+    // boutons n'apparaît.
+    expect(screen.queryByRole('button', { name: /affecter \(/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /réattribuer \(/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('checkbox', { name: /sélectionner casa-2026-000001/i }))
+    expect(await screen.findByRole('button', { name: /affecter \(1\)/i })).toBeInTheDocument()
+    // La sélection de rétablissement, elle, reste intacte (sélection séparée).
+    expect(screen.getByRole('button', { name: /rendre éligible \(1\)/i })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i })).toBeChecked()
+  })
+
+  it('le texte du bouton Éliminer ne prétend plus que l’action est irréversible', async () => {
+    mockCandidatures()
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Éliminer' }))
+    const dialog = screen.getByRole('dialog', { name: 'Éliminer ce dossier ?' })
+
+    expect(within(dialog).queryByText(/est irréversible/i)).not.toBeInTheDocument()
+    expect(within(dialog).getByText(/rétablissement d'éligibilité/i)).toBeInTheDocument()
   })
 })

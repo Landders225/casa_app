@@ -11,10 +11,16 @@ import { Alert } from '../../components/ui/Alert.jsx'
  * Motif borné à `min:3` (miroir des `Request` Lot 6b) — le bouton de
  * confirmation reste désactivé tant que ce plancher n'est pas atteint ; le
  * 422 backend reste le dernier rempart si la course arrive quand même.
+ *
+ * `ackLabel` (Lot 4, ADR-49) : prop optionnelle — si fournie, ajoute une case
+ * « J'ai compris » (même patron que `ReattributionModal`) dont le libellé est
+ * ce texte ; la confirmation exige alors motif ET case cochée. Absente par
+ * défaut : les usages existants (remplacement, élimination) sont inchangés.
  */
-export function MotifConfirmDialog({ title, message, extra, confirmLabel = 'Confirmer', loading, error, onConfirm, onCancel }) {
+export function MotifConfirmDialog({ title, message, extra, ackLabel, confirmLabel = 'Confirmer', loading, error, onConfirm, onCancel }) {
   const [motif, setMotif] = useState('')
-  const pret = motif.trim().length >= 3
+  const [compris, setCompris] = useState(false)
+  const pret = motif.trim().length >= 3 && (!ackLabel || compris)
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={title}>
@@ -42,6 +48,17 @@ export function MotifConfirmDialog({ title, message, extra, confirmLabel = 'Conf
               maxLength={2000}
             />
           </div>
+          {ackLabel ? (
+            <label className="flex items-center gap-2 caption" style={{ marginTop: 'var(--space-3)' }}>
+              <input
+                type="checkbox"
+                checked={compris}
+                onChange={(e) => setCompris(e.target.checked)}
+                disabled={loading}
+              />
+              {ackLabel}
+            </label>
+          ) : null}
         </div>
         <div className="modal-footer">
           <button type="button" className="btn btn-outline" onClick={onCancel} disabled={loading}>

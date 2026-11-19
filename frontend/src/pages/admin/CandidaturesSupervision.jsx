@@ -17,6 +17,7 @@ import { criteresSupervision, useCandidaturesAdmin } from './useCandidaturesAdmi
 import { useElimination } from './useElimination.js'
 import { useEvaluateurs } from './useEvaluateurs.js'
 import { useReattribution } from './useReattribution.js'
+import { calculerRetablissementDesactive, useRetablissementEligibilite } from './useRetablissementEligibilite.js'
 
 const STATUTS = ['soumis', 'en_instruction', 'evalue', 'non_eligible']
 const ELIGIBILITES = ['non_verifie', 'eligible', 'non_eligible']
@@ -61,6 +62,15 @@ export function CandidaturesSupervision() {
   const [showAuto, setShowAuto] = useState(false)
   const [messageSucces, setMessageSucces] = useState(null)
   const [eliminationCible, setEliminationCible] = useState(null)
+  // Lot 4 (ADR-49) : sélection SÉPARÉE de `selected` (Affecter/Réattribuer,
+  // inchangés) — conservée entre pages (pas de `page` dans l'effet de reset
+  // ci-dessous), contrairement à `selected`. Map id -> { eligible } : un
+  // instantané de l'éligibilité AU MOMENT de la coche, pas une relecture
+  // d'`items` (qui ne contient que la page courante) — nécessaire pour
+  // détecter un dossier devenu entre-temps déjà éligible même après avoir
+  // changé de page.
+  const [selectionRetablissement, setSelectionRetablissement] = useState(() => new Map())
+  const [showRetablissement, setShowRetablissement] = useState(false)
   const debounceRechercheRef = useRef(null)
 
   const { status, items, meta, reload } = useCandidaturesAdmin({
@@ -84,6 +94,7 @@ export function CandidaturesSupervision() {
   const { assign, assigning, error: assignError, resetError } = useAffectation()
   const { reattribuer, reattributing, error: reattributionError, resetError: resetReattributionError } = useReattribution()
   const { eliminer, eliminating, error: eliminationError, resetError: resetEliminationError } = useElimination()
+  const { retablir, retablissant, error: retablissementError, resetError: resetRetablissementError } = useRetablissementEligibilite()
 
   useEffect(() => {
     apiClient.get('/filieres').then((res) => setFilieres(res.data ?? [])).catch(() => {})
@@ -100,6 +111,14 @@ export function CandidaturesSupervision() {
     setSelected(new Set())
     setSelectionTous(null)
   }, [recherche, statutInterne, filiere, evaluateurFiltre, campagneFiltre, eligibiliteFiltre, decisionFiltre, triColonne, triDirection, page])
+
+  // Lot 4 (ADR-49) : sélection de rétablissement vidée au changement de
+  // recherche/filtre/tri (le jeu de résultats change) — SURTOUT PAS à la
+  // page, qui est précisément ce que cette sélection doit survivre.
+  useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect
+    setSelectionRetablissement(new Map())
+  }, [recherche, statutInterne, filiere, evaluateurFiltre, campagneFiltre, eligibiliteFiltre, decisionFiltre, triColonne, triDirection])
 
   // Recherche appliquée ~400 ms après la dernière frappe (pas une requête par
   // lettre) — ou immédiatement sur Entrée (`onRechercheKeyDown`).
@@ -170,6 +189,19 @@ export function CandidaturesSupervision() {
   const selectionItems = items.filter((c) => selected.has(c.id))
   const selectionContientDejaAffecte = selectionItems.some((c) => c.evaluateur)
   const selectionContientNonAffecte = selectionItems.some((c) => !c.evaluateur)
+
+  // Lot 4 (ADR-49) : sélection SÉPARÉE, voir le commentaire du state ci-dessus.
+  const toggleRetablissement = (c) => setSelectionRetablissement((prev) => {
+    const next = new Map(prev)
+    if (next.has(c.id)) next.delete(c.id)
+    else next.set(c.id, { eligible: c.statut_eligibilite_interne !== 'non_eligible' })
+    return next
+  })
+  const { desactive: retablissementDesactive, titre: titreRetablissementDesactive } = calculerRetablissementDesactive({
+    selectionTousActif: Boolean(selectionTous),
+    contientDejaEligible: [...selectionRetablissement.values()].some((snap) => snap.eligible),
+    taille: selectionRetablissement.size,
+  })
   const selectionnerTous = () => {
     setMessageSucces(null)
     setSelectionTous({
@@ -230,6 +262,18 @@ export function CandidaturesSupervision() {
     }
   }
 
+  const confirmRetablissement = async (motif) => {
+    try {
+      await retablir([...selectionRetablissement.keys()], motif)
+      setShowRetablissement(false)
+      setSelectionRetablissement(new Map())
+      reload()
+    } catch {
+      // Même logique qu'`confirmAssign`/`confirmReattribution` : message
+      // atomique affiché tel quel, sélection conservée pour ajuster.
+    }
+  }
+
   const confirmElimination = async (motif) => {
     try {
       await eliminer(eliminationCible.id, motif)
@@ -266,34 +310,47 @@ export function CandidaturesSupervision() {
           <h2>Candidatures</h2>
           <p className="text-muted">Supervision de l'ensemble des dossiers reçus, toutes filières confondues.</p>
         </div>
-        {selectionTous ? (
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          {selectionTous ? (
             <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowAuto(true)}>
               <i className="fa-solid fa-shuffle" aria-hidden="true" /> Répartir automatiquement ({selectionTous.nombre})
             </button>
-          </div>
-        ) : selected.size > 0 ? (
-          <div className="flex gap-2">
+          ) : selected.size > 0 ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={selectionContientDejaAffecte}
+                title={selectionContientDejaAffecte ? 'Au moins un dossier sélectionné est déjà affecté — utilisez Réattribuer.' : undefined}
+                onClick={() => { resetError(); setShowAssign(true) }}
+              >
+                <i className="fa-solid fa-user-plus" aria-hidden="true" /> Affecter ({selected.size})
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={selectionContientNonAffecte}
+                title={selectionContientNonAffecte ? "Au moins un dossier sélectionné n'est pas encore affecté — utilisez Affecter." : undefined}
+                onClick={() => { resetReattributionError(); setShowReattribution(true) }}
+              >
+                <i className="fa-solid fa-right-left" aria-hidden="true" /> Réattribuer ({selected.size})
+              </button>
+            </>
+          ) : null}
+          {/* Lot 4 (ADR-49) : sélection SÉPARÉE de `selected` ci-dessus — ce
+              bouton apparaît/disparaît indépendamment des deux autres. */}
+          {selectionRetablissement.size > 0 ? (
             <button
               type="button"
               className="btn btn-outline btn-sm"
-              disabled={selectionContientDejaAffecte}
-              title={selectionContientDejaAffecte ? 'Au moins un dossier sélectionné est déjà affecté — utilisez Réattribuer.' : undefined}
-              onClick={() => { resetError(); setShowAssign(true) }}
+              disabled={retablissementDesactive}
+              title={titreRetablissementDesactive}
+              onClick={() => { resetRetablissementError(); setShowRetablissement(true) }}
             >
-              <i className="fa-solid fa-user-plus" aria-hidden="true" /> Affecter ({selected.size})
+              <i className="fa-solid fa-rotate-left" aria-hidden="true" /> Rendre éligible ({selectionRetablissement.size})
             </button>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              disabled={selectionContientNonAffecte}
-              title={selectionContientNonAffecte ? "Au moins un dossier sélectionné n'est pas encore affecté — utilisez Affecter." : undefined}
-              onClick={() => { resetReattributionError(); setShowReattribution(true) }}
-            >
-              <i className="fa-solid fa-right-left" aria-hidden="true" /> Réattribuer ({selected.size})
-            </button>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       <div className="flex gap-3" style={{ marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
@@ -421,6 +478,7 @@ export function CandidaturesSupervision() {
                   <th>Filière</th>
                   <th>Statut</th>
                   <th>Éligibilité</th>
+                  <th>Rendre éligible</th>
                   <th>Évaluateur</th>
                   {enTeteTriable('score_dossier', 'Score dossier')}
                   {enTeteTriable('score_entretien', 'Score entretien')}
@@ -457,7 +515,35 @@ export function CandidaturesSupervision() {
                       </td>
                       <td>{c.filiere?.nom}</td>
                       <td><span className={`badge ${statutInfo.badge}`}>{statutInfo.label}</span></td>
-                      <td><span className={`badge ${eligInfo.badge}`}>{eligInfo.label}</span></td>
+                      <td>
+                        <span className={`badge ${eligInfo.badge}`}>{eligInfo.label}</span>
+                        {/* Lot 4 (ADR-49) : aide au choix (critères déclenchés) + badge
+                            de rétablissement — admin only (CandidatureAdminResource seul
+                            à les exposer, jamais côté évaluateur/candidat). */}
+                        {c.statut_eligibilite_interne === 'non_eligible' && c.criteres_eliminatoires?.length > 0 ? (
+                          <div className="caption text-muted" style={{ marginTop: 2 }}>
+                            {c.criteres_eliminatoires.map((crit) => crit.code_critere).join(', ')}
+                          </div>
+                        ) : null}
+                        {c.eligibilite_retablie ? (
+                          <div style={{ marginTop: 2 }}>
+                            <span className="badge badge-info">Éligibilité rétablie</span>
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>
+                        <input
+                          type="checkbox"
+                          // Libellé délibérément distinct de « Sélectionner {n°} »
+                          // (case Affecter/Réattribuer) : sélection SÉPARÉE (ADR-49),
+                          // et une requête `/sélectionner {n°}/i` ne doit matcher
+                          // qu'une seule case.
+                          aria-label={`Rétablir l'éligibilité de ${c.numero_dossier}`}
+                          checked={selectionRetablissement.has(c.id)}
+                          disabled={c.statut_eligibilite_interne !== 'non_eligible'}
+                          onChange={() => toggleRetablissement(c)}
+                        />
+                      </td>
                       <td>{c.evaluateur ? `${c.evaluateur.prenom} ${c.evaluateur.nom}` : <span className="caption">Non affecté</span>}</td>
                       <td className="caption">{c.score_dossier ?? '—'}</td>
                       <td className="caption">{c.score_entretien ?? '—'}</td>
@@ -533,12 +619,28 @@ export function CandidaturesSupervision() {
       {eliminationCible ? (
         <MotifConfirmDialog
           title="Éliminer ce dossier ?"
-          message={`${eliminationCible.candidat?.prenom} ${eliminationCible.candidat?.nom} (${eliminationCible.numero_dossier}) sera marqué non éligible. Cette action est irréversible.`}
+          // Lot 4 (ADR-49) : reformulé — ce n'est plus vrai depuis le
+          // rétablissement d'éligibilité (un acte distinct, également tracé,
+          // pas un undo direct).
+          message={`${eliminationCible.candidat?.prenom} ${eliminationCible.candidat?.nom} (${eliminationCible.numero_dossier}) sera marqué non éligible. Cette action peut être rapportée plus tard par un rétablissement d'éligibilité (un acte distinct, également tracé), jamais annulée directement.`}
           confirmLabel="Éliminer"
           loading={eliminating}
           error={eliminationError}
           onCancel={() => setEliminationCible(null)}
           onConfirm={confirmElimination}
+        />
+      ) : null}
+
+      {showRetablissement ? (
+        <MotifConfirmDialog
+          title="Rendre éligible ?"
+          message={`${selectionRetablissement.size} dossier${selectionRetablissement.size > 1 ? 's' : ''} sélectionné${selectionRetablissement.size > 1 ? 's' : ''} ${selectionRetablissement.size > 1 ? 'seront rendus' : 'sera rendu'} éligible${selectionRetablissement.size > 1 ? 's' : ''}. Cette action contourne les critères d'éligibilité automatiques (âge, diplôme, résidence…) et reste tracée (audit).`}
+          ackLabel="J'ai compris : ce rétablissement contourne les critères d'éligibilité automatiques et sera tracé."
+          confirmLabel="Rendre éligible"
+          loading={retablissant}
+          error={retablissementError}
+          onCancel={() => setShowRetablissement(false)}
+          onConfirm={confirmRetablissement}
         />
       ) : null}
     </AppShell>
