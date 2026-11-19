@@ -295,4 +295,181 @@ class RetablissementEligibiliteTest extends TestCase
         $this->retablir([$candidature->id])->assertOk();
         $this->assertTrue($candidature->fresh()->eligibilite_retablie);
     }
+
+    // --- Preuve de bout en bout (revue Étape A, point 1). ---
+
+    /**
+     * Dossier rejeté à la soumission → rétabli → (a) affectable via
+     * l'affectation MANUELLE réelle, (b) compté dans l'aperçu de l'affectation
+     * AUTOMATIQUE (nombre_affectables +1, ignores.non_eligibles -1), (c)
+     * l'évaluateur affecté ouvre la fiche et enregistre sa vérification (200).
+     */
+    public function test_e2e_dossier_rejete_a_la_soumission_retabli_devient_affectable_et_verifiable(): void
+    {
+        $candidature = $this->candidatureRejeteeALaSoumission();
+        $this->assertSame('non_eligible', $candidature->statut_interne);
+
+        // Un second dossier TOUJOURS affectable (filler) : sans lui, l'aperçu
+        // « AVANT » n'aurait RIEN à affecter (422 `rien_a_affecter`, comportement
+        // normal de ServiceAffectationAutomatique) — il ne servirait donc à rien
+        // pour démontrer le delta nombre_affectables/ignores.non_eligibles.
+        $filler = Candidature::create([
+            'candidat_id' => $this->creerCandidat('filler-lot4@casa-demo.ci')->candidat->id,
+            'campagne_id' => $this->campagne->id,
+            'filiere_id' => $this->idFiliere('cuisine'),
+            'numero_dossier' => 'CASA-FILLER-000001',
+            'cqp_confirme' => true,
+        ]);
+        $filler->forceFill([
+            'statut_interne' => 'soumis',
+            'statut_eligibilite_interne' => 'eligible',
+            'date_soumission' => now(),
+        ])->saveQuietly();
+
+        $corps = ['criteres' => ['campagne' => $this->campagne->id], 'nombre_correspondants' => 2];
+
+        // AVANT rétablissement : les 2 dossiers correspondent (non-brouillon),
+        // mais seul le filler est affectable — le rejeté est ignoré (non éligible).
+        $avant = $this->actingAs($this->admin)
+            ->postJson('/api/admin/affectations/automatique/apercu', $corps)
+            ->assertOk();
+        $this->assertSame(1, $avant->json('data.nombre_affectables'));
+        $this->assertSame(1, $avant->json('data.ignores.non_eligibles'));
+
+        $this->retablir([$candidature->id], 'Attestation complémentaire reçue.')->assertOk();
+        $this->assertSame('soumis', $candidature->fresh()->statut_interne);
+        $this->assertSame('eligible', $candidature->fresh()->statut_eligibilite_interne);
+
+        // APRÈS rétablissement : même nombre de correspondants (2), mais les
+        // 2 sont désormais affectables — exactement le delta +1/-1 demandé.
+        $apres = $this->actingAs($this->admin)
+            ->postJson('/api/admin/affectations/automatique/apercu', $corps)
+            ->assertOk();
+        $this->assertSame(2, $apres->json('data.nombre_affectables'));
+        $this->assertSame(0, $apres->json('data.ignores.non_eligibles'));
+
+        // (a) Affectation MANUELLE réelle.
+        $this->actingAs($this->admin)->postJson('/api/admin/affectations', [
+            'evaluateur_id' => $this->evaluateur->membreEquipe->id,
+            'candidature_ids' => [$candidature->id],
+        ])->assertOk();
+
+        $fraiche = $candidature->fresh();
+        $this->assertSame('en_instruction', $fraiche->statut_interne);
+        $this->assertSame($this->evaluateur->membreEquipe->id, $fraiche->evaluateur_id);
+
+        // (c) L'évaluateur ouvre la fiche...
+        $this->actingAs($this->evaluateur)->getJson("/api/evaluateur/candidatures/{$candidature->id}")
+            ->assertOk()
+            ->assertJsonPath('data.statut_eligibilite_interne', 'eligible');
+
+        // ...et enregistre sa vérification.
+        $this->actingAs($this->evaluateur)
+            ->putJson("/api/evaluateur/candidatures/{$candidature->id}/verification", [
+                'nationalite_confirmee' => true,
+                'diplome_verifie' => 'bac',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.statut_eligibilite_interne', 'eligible');
+    }
+
+    // --- Atomicité d'un lot mixte (revue Étape A, point 2). ---
+
+    public function test_lot_mixte_non_eligible_et_deja_eligible_422_rien_ecrit(): void
+    {
+        // Ordre important (fragilité de fixture, pas produit) : `candidatureEvaluee`
+        // numérote avec un compteur local qui ignore la base, alors que le VRAI
+        // générateur (`GenerateurNumeroDossier`, utilisé par `candidatureElimineeEnInstruction`
+        // via /api/candidatures) interroge toujours le numéro MAX existant — donc
+        // seul CET ordre évite une collision sur `numero_dossier`.
+        $dejaEligible = $this->candidatureEvaluee($this->campagne, $this->evaluateur, 'cuisine', 60.0, 30.0);
+        $nonEligible = $this->candidatureElimineeEnInstruction();
+
+        $this->retablir([$nonEligible->id, $dejaEligible->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('candidature_ids');
+
+        $fraiche = $nonEligible->fresh();
+        $this->assertSame('non_eligible', $fraiche->statut_eligibilite_interne);
+        $this->assertFalse($fraiche->eligibilite_retablie);
+        $this->assertSame(0, JournalAudit::where('action', "Rétablissement d'éligibilité")->count());
+        $this->assertFalse($this->campagne->fresh()->classement_perime);
+    }
+
+    // --- Brouillon (revue Étape A, point 3 — message corrigé). ---
+
+    public function test_brouillon_422_avec_un_message_qui_ne_pretend_pas_qu_il_est_deja_eligible(): void
+    {
+        $candidat = $this->creerCandidat('brouillon-lot4@casa-demo.ci');
+        $id = $this->actingAs($candidat)
+            ->postJson('/api/candidatures', ['filiere_id' => $this->idFiliere('cuisine')])
+            ->json('data.id');
+        $brouillon = Candidature::findOrFail($id);
+        $this->assertSame('non_verifie', $brouillon->statut_eligibilite_interne);
+
+        $reponse = $this->retablir([$brouillon->id])->assertStatus(422)->assertJsonValidationErrors('candidature_ids');
+
+        $message = $reponse->json('errors.candidature_ids.0');
+        $this->assertStringNotContainsString('Déjà éligible', $message);
+        $this->assertStringContainsStringIgnoringCase("n'est pas non éligible", $message);
+    }
+
+    // --- Validations manquantes (revue Étape A, point 4). ---
+
+    public function test_uuid_inconnu_422(): void
+    {
+        $candidature = $this->candidatureElimineeEnInstruction();
+
+        $reponse = $this->retablir([$candidature->id, (string) Str::uuid()])->assertStatus(422);
+        $this->assertTrue(
+            collect(array_keys($reponse->json('errors')))->contains(fn ($cle) => str_starts_with($cle, 'candidature_ids')),
+        );
+    }
+
+    public function test_ids_en_double_422(): void
+    {
+        $candidature = $this->candidatureElimineeEnInstruction();
+
+        $reponse = $this->retablir([$candidature->id, $candidature->id])->assertStatus(422);
+        $this->assertTrue(
+            collect(array_keys($reponse->json('errors')))->contains(fn ($cle) => str_starts_with($cle, 'candidature_ids')),
+        );
+        $this->assertSame('non_eligible', $candidature->fresh()->statut_eligibilite_interne);
+    }
+
+    public function test_succes_sur_plusieurs_dossiers_une_ligne_d_audit_chacun_sans_donnee_personnelle(): void
+    {
+        $fixtures = [
+            ['email' => 'aminata-pii@casa-demo.ci', 'prenom' => 'Aminata', 'nom' => 'Kone', 'cni' => 'CI999000001'],
+            ['email' => 'boubacar-pii@casa-demo.ci', 'prenom' => 'Boubacar', 'nom' => 'Traore', 'cni' => 'CI999000002'],
+            ['email' => 'coralie-pii@casa-demo.ci', 'prenom' => 'Coralie', 'nom' => 'Diabate', 'cni' => 'CI999000003'],
+        ];
+
+        $candidatures = [];
+        foreach ($fixtures as $f) {
+            $candidat = $this->creerCandidat($f['email'], ['prenom' => $f['prenom'], 'nom' => $f['nom'], 'cni' => $f['cni']]);
+            $c = $this->candidatureAffectee($candidat, $this->evaluateur);
+            $this->actingAs($this->admin)->postJson("/api/admin/candidatures/{$c->id}/elimination", [
+                'motif' => 'Test — pièce suspecte.',
+            ])->assertOk();
+            $candidatures[] = $c->fresh();
+        }
+
+        $ids = array_map(fn (Candidature $c) => $c->id, $candidatures);
+        $this->retablir($ids)->assertOk()->assertJsonPath('data.retablies', 3);
+
+        $lignes = JournalAudit::where('action', "Rétablissement d'éligibilité")->get();
+        $this->assertCount(3, $lignes);
+
+        foreach ($lignes as $ligne) {
+            foreach ($fixtures as $f) {
+                foreach ([$f['email'], $f['prenom'], $f['nom'], $f['cni']] as $motInterdit) {
+                    $this->assertStringNotContainsString($motInterdit, (string) $ligne->objet);
+                    $this->assertStringNotContainsString($motInterdit, (string) $ligne->ancienne_valeur);
+                    $this->assertStringNotContainsString($motInterdit, (string) $ligne->nouvelle_valeur);
+                    $this->assertStringNotContainsString($motInterdit, (string) $ligne->motif);
+                }
+            }
+        }
+    }
 }

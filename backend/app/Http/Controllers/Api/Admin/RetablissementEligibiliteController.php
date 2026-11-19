@@ -98,17 +98,29 @@ class RetablissementEligibiliteController extends Controller
             "Les résultats d'une campagne concernée sont déjà publiés : aucun rétablissement d'éligibilité n'est possible sur ces dossiers.",
         );
 
-        $dejaEligibles = $candidatures->filter(fn (Candidature $c) => $c->statut_eligibilite_interne !== 'non_eligible');
+        // Correctif de revue : "Déjà éligible(s)" était FAUX pour un brouillon
+        // (`statut_eligibilite_interne = 'non_verifie'`, jamais calculé — pas
+        // "déjà éligible"). Un seul motif, vrai dans les deux cas : ni l'un ni
+        // l'autre n'a besoin d'un rétablissement.
+        $pasNonEligibles = $candidatures->filter(fn (Candidature $c) => $c->statut_eligibilite_interne !== 'non_eligible');
+        // Défensif : sous les contraintes réelles (CHECK Postgres, 5 valeurs),
+        // SEUL `brouillon` peut échouer `StatutsRestaurables::autorise()` — et
+        // un brouillon est TOUJOURS déjà capté par `$pasNonEligibles` ci-dessus
+        // (`statut_eligibilite_interne` y reste `non_verifie`, jamais
+        // `non_eligible`). Cette branche ne peut donc pas se déclencher seule
+        // aujourd'hui ; elle reste en défense contre un `statut_interne` futur
+        // qui serait, lui, atteignable avec `non_eligible` sans figurer dans
+        // la liste blanche (cf. `StatutsRestaurablesTest`).
         $statutNonRestaurable = $candidatures->filter(fn (Candidature $c) => ! StatutsRestaurables::autorise($c->statut_interne));
 
-        if ($dejaEligibles->isEmpty() && $statutNonRestaurable->isEmpty()) {
+        if ($pasNonEligibles->isEmpty() && $statutNonRestaurable->isEmpty()) {
             return;
         }
 
         $motifs = [];
-        if ($dejaEligibles->isNotEmpty()) {
-            $motifs[] = 'Déjà éligible(s) — rien à rétablir : '
-                .$dejaEligibles->pluck('numero_dossier')->join(', ').'.';
+        if ($pasNonEligibles->isNotEmpty()) {
+            $motifs[] = "N'est pas non éligible — rien à rétablir : "
+                .$pasNonEligibles->pluck('numero_dossier')->join(', ').'.';
         }
         if ($statutNonRestaurable->isNotEmpty()) {
             $motifs[] = 'Statut de dossier non éligible à un rétablissement : '
