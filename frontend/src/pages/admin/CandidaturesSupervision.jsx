@@ -63,12 +63,16 @@ export function CandidaturesSupervision() {
   const [messageSucces, setMessageSucces] = useState(null)
   const [eliminationCible, setEliminationCible] = useState(null)
   // Lot 4 (ADR-49) : sélection SÉPARÉE de `selected` (Affecter/Réattribuer,
-  // inchangés) — conservée entre pages (pas de `page` dans l'effet de reset
-  // ci-dessous), contrairement à `selected`. Map id -> { eligible } : un
-  // instantané de l'éligibilité AU MOMENT de la coche, pas une relecture
-  // d'`items` (qui ne contient que la page courante) — nécessaire pour
-  // détecter un dossier devenu entre-temps déjà éligible même après avoir
-  // changé de page.
+  // inchangés) — EXPLICITE par id, jamais vidée implicitement par un
+  // changement de recherche/filtre/tri/page (correctif de revue : vider à
+  // chaque recherche cassait le travail sur une liste). Ne se vide que sur
+  // succès ou via « Vider la sélection » dans la modale, qui affiche toujours
+  // la liste complète des numéros choisis — le risque d'« oubli » qui
+  // justifiait l'ancien vidage automatique disparaît avec cette visibilité.
+  // Map id -> { eligible, numeroDossier } : un instantané pris AU MOMENT de
+  // la coche (pas une relecture d'`items`, qui ne contient que la page
+  // courante) — nécessaire pour afficher le numéro et détecter un dossier
+  // devenu entre-temps déjà éligible, même après avoir changé de page.
   const [selectionRetablissement, setSelectionRetablissement] = useState(() => new Map())
   const [showRetablissement, setShowRetablissement] = useState(false)
   const debounceRechercheRef = useRef(null)
@@ -111,14 +115,6 @@ export function CandidaturesSupervision() {
     setSelected(new Set())
     setSelectionTous(null)
   }, [recherche, statutInterne, filiere, evaluateurFiltre, campagneFiltre, eligibiliteFiltre, decisionFiltre, triColonne, triDirection, page])
-
-  // Lot 4 (ADR-49) : sélection de rétablissement vidée au changement de
-  // recherche/filtre/tri (le jeu de résultats change) — SURTOUT PAS à la
-  // page, qui est précisément ce que cette sélection doit survivre.
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect
-    setSelectionRetablissement(new Map())
-  }, [recherche, statutInterne, filiere, evaluateurFiltre, campagneFiltre, eligibiliteFiltre, decisionFiltre, triColonne, triDirection])
 
   // Recherche appliquée ~400 ms après la dernière frappe (pas une requête par
   // lettre) — ou immédiatement sur Entrée (`onRechercheKeyDown`).
@@ -194,9 +190,10 @@ export function CandidaturesSupervision() {
   const toggleRetablissement = (c) => setSelectionRetablissement((prev) => {
     const next = new Map(prev)
     if (next.has(c.id)) next.delete(c.id)
-    else next.set(c.id, { eligible: c.statut_eligibilite_interne !== 'non_eligible' })
+    else next.set(c.id, { eligible: c.statut_eligibilite_interne !== 'non_eligible', numeroDossier: c.numero_dossier })
     return next
   })
+  const viderSelectionRetablissement = () => setSelectionRetablissement(new Map())
   const { desactive: retablissementDesactive, titre: titreRetablissementDesactive } = calculerRetablissementDesactive({
     selectionTousActif: Boolean(selectionTous),
     contientDejaEligible: [...selectionRetablissement.values()].some((snap) => snap.eligible),
@@ -266,7 +263,7 @@ export function CandidaturesSupervision() {
     try {
       await retablir([...selectionRetablissement.keys()], motif)
       setShowRetablissement(false)
-      setSelectionRetablissement(new Map())
+      viderSelectionRetablissement()
       reload()
     } catch {
       // Même logique qu'`confirmAssign`/`confirmReattribution` : message
@@ -532,17 +529,21 @@ export function CandidaturesSupervision() {
                         ) : null}
                       </td>
                       <td>
-                        <input
-                          type="checkbox"
-                          // Libellé délibérément distinct de « Sélectionner {n°} »
-                          // (case Affecter/Réattribuer) : sélection SÉPARÉE (ADR-49),
-                          // et une requête `/sélectionner {n°}/i` ne doit matcher
-                          // qu'une seule case.
-                          aria-label={`Rétablir l'éligibilité de ${c.numero_dossier}`}
-                          checked={selectionRetablissement.has(c.id)}
-                          disabled={c.statut_eligibilite_interne !== 'non_eligible'}
-                          onChange={() => toggleRetablissement(c)}
-                        />
+                        {/* Lot 4 (ADR-49, correctif de revue) : rien du tout sur
+                            un dossier déjà éligible — pas même une case désactivée,
+                            cette colonne n'a de sens que pour un dossier non éligible. */}
+                        {c.statut_eligibilite_interne === 'non_eligible' ? (
+                          <input
+                            type="checkbox"
+                            // Libellé délibérément distinct de « Sélectionner {n°} »
+                            // (case Affecter/Réattribuer) : sélection SÉPARÉE (ADR-49),
+                            // et une requête `/sélectionner {n°}/i` ne doit matcher
+                            // qu'une seule case.
+                            aria-label={`Rétablir l'éligibilité de ${c.numero_dossier}`}
+                            checked={selectionRetablissement.has(c.id)}
+                            onChange={() => toggleRetablissement(c)}
+                          />
+                        ) : null}
                       </td>
                       <td>{c.evaluateur ? `${c.evaluateur.prenom} ${c.evaluateur.nom}` : <span className="caption">Non affecté</span>}</td>
                       <td className="caption">{c.score_dossier ?? '—'}</td>
@@ -635,6 +636,33 @@ export function CandidaturesSupervision() {
         <MotifConfirmDialog
           title="Rendre éligible ?"
           message={`${selectionRetablissement.size} dossier${selectionRetablissement.size > 1 ? 's' : ''} sélectionné${selectionRetablissement.size > 1 ? 's' : ''} ${selectionRetablissement.size > 1 ? 'seront rendus' : 'sera rendu'} éligible${selectionRetablissement.size > 1 ? 's' : ''}. Cette action contourne les critères d'éligibilité automatiques (âge, diplôme, résidence…) et reste tracée (audit).`}
+          // Lot 4 (ADR-49, correctif de revue) : la liste des numéros choisis
+          // (jamais un nom) + « Vider la sélection » — la sélection n'étant
+          // plus vidée implicitement par un changement de filtre/page, c'est
+          // désormais le seul moyen (hors succès) de repartir de zéro.
+          extra={
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              <div className="flex items-center justify-between" style={{ marginBottom: 'var(--space-2)' }}>
+                <span className="caption fw-semibold">Dossiers sélectionnés</span>
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm"
+                  onClick={() => { viderSelectionRetablissement(); setShowRetablissement(false) }}
+                >
+                  Vider la sélection
+                </button>
+              </div>
+              <ul
+                aria-label="Numéros de dossier sélectionnés"
+                className="caption"
+                style={{ maxHeight: 160, overflowY: 'auto', listStyle: 'none', padding: 0, margin: 0 }}
+              >
+                {[...selectionRetablissement.values()].map((snap) => (
+                  <li key={snap.numeroDossier}>{snap.numeroDossier}</li>
+                ))}
+              </ul>
+            </div>
+          }
           ackLabel="J'ai compris : ce rétablissement contourne les critères d'éligibilité automatiques et sera tracé."
           confirmLabel="Rendre éligible"
           loading={retablissant}

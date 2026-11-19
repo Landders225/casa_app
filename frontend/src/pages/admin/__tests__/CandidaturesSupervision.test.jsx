@@ -702,12 +702,20 @@ describe('CandidaturesSupervision — rétablissement d’éligibilité (Lot 4, 
     expect(screen.getByText('Éligibilité rétablie')).toBeInTheDocument()
   })
 
-  it('case désactivée sur un dossier déjà éligible, activée sur un dossier non éligible', async () => {
+  it("aucune case sur un dossier déjà éligible (rien, pas même désactivée) ; présente sur un dossier non éligible", async () => {
     mockCandidatures({ candidatures: [candidature({ statut_eligibilite_interne: 'eligible' })] })
     renderScreen()
     await screen.findByText('CASA-2026-000001')
 
-    expect(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i })).toBeDisabled()
+    expect(screen.queryByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i })).not.toBeInTheDocument()
+  })
+
+  it('présente et activée sur un dossier non éligible', async () => {
+    mockCandidatures({ candidatures: [nonEligible()] })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    expect(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i })).toBeEnabled()
   })
 
   it('sélection -> rendre éligible -> case "J\'ai compris" obligatoire -> POST correct, sélection vidée, liste rechargée', async () => {
@@ -789,7 +797,32 @@ describe('CandidaturesSupervision — rétablissement d’éligibilité (Lot 4, 
     expect(boutonApres).toHaveAttribute('title', expect.stringMatching(/un par un/i))
   })
 
-  it('sélection conservée entre pages (contrairement à `selected`) ; une case changée de filtre la vide', async () => {
+  it('la modale affiche exactement les numéros cochés ; « Vider la sélection » remet à zéro', async () => {
+    mockCandidatures({
+      candidatures: [
+        nonEligible({ id: 'c-1', numero_dossier: 'CASA-2026-000001' }),
+        nonEligible({ id: 'c-2', numero_dossier: 'CASA-2026-000002' }),
+      ],
+      meta: { current_page: 1, last_page: 1, total: 2 },
+    })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i }))
+    await user.click(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000002/i }))
+    await user.click(screen.getByRole('button', { name: /rendre éligible \(2\)/i }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Rendre éligible ?' })
+    expect(within(dialog).getByText('CASA-2026-000001')).toBeInTheDocument()
+    expect(within(dialog).getByText('CASA-2026-000002')).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Vider la sélection' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /rendre éligible \(/i })).not.toBeInTheDocument()
+  })
+
+  it('sélection conservée ENTRE PAGES (correctif de revue, plus de vidage implicite) : cocher en page 1 puis en page 2 -> POST contient les DEUX ids', async () => {
     const page1 = [nonEligible({ id: 'c-1', numero_dossier: 'CASA-2026-000001' })]
     const page2 = [nonEligible({ id: 'c-2', numero_dossier: 'CASA-2026-000002' })]
     apiClient.post.mockImplementation((path, body) => {
@@ -800,6 +833,7 @@ describe('CandidaturesSupervision — rétablissement d’éligibilité (Lot 4, 
           meta: { current_page: page, last_page: 2, total: 2 },
         })
       }
+      if (path === '/admin/candidatures/eligibilite/retablir') return Promise.resolve({ data: { retablies: 2 } })
       return Promise.resolve({ data: [] })
     })
     apiClient.get.mockImplementation((path) => {
@@ -811,22 +845,79 @@ describe('CandidaturesSupervision — rétablissement d’éligibilité (Lot 4, 
     })
     renderScreen()
     await screen.findByText('CASA-2026-000001')
+    // Laisse le timer de debounce de recherche (toujours armé au montage,
+    // même sans frappe — `useEffect` dépend de `rechercheSaisie`, qui vaut
+    // '' dès le premier rendu) se déclencher sans effet AVANT ce test
+    // multi-étapes : sous charge (suite complète), ce test peut dépasser les
+    // 400 ms et sinon risquer un retour silencieux à la page 1 (`resetPage()`
+    // via `setRecherche('')`) en plein milieu — flaky observé en pratique.
+    await new Promise((resolve) => setTimeout(resolve, 450))
 
     const user = userEvent.setup()
     await user.click(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i }))
-    expect(await screen.findByRole('button', { name: /rendre éligible \(1\)/i })).toBeInTheDocument()
 
-    // Changement de PAGE : la sélection de rétablissement SURVIT (contrairement
-    // à `selected`, qui serait vidée par l'effet existant).
     await user.click(screen.getByRole('button', { name: /page suivante/i }))
     await screen.findByText('CASA-2026-000002')
-    expect(screen.getByRole('button', { name: /rendre éligible \(1\)/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000002/i }))
+    expect(await screen.findByRole('button', { name: /rendre éligible \(2\)/i })).toBeInTheDocument()
 
-    // Changement de FILTRE : la sélection de rétablissement est vidée.
-    await user.selectOptions(screen.getByDisplayValue('Tous les statuts'), 'en_instruction')
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /rendre éligible \(/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /rendre éligible \(2\)/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Rendre éligible ?' })
+    await user.type(within(dialog).getByLabelText(/motif/i), 'Vérifié sur pièce.')
+    await user.click(within(dialog).getByRole('checkbox', { name: /j'ai compris/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Rendre éligible' }))
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith(
+      '/admin/candidatures/eligibilite/retablir',
+      { candidature_ids: ['c-1', 'c-2'], motif: 'Vérifié sur pièce.' },
+    ))
+  })
+
+  it('sélection conservée au changement de FILTRE (correctif de revue) : cocher, changer de filtre, cocher un autre -> POST contient les DEUX ids', async () => {
+    const resultatInitial = [nonEligible({ id: 'c-1', numero_dossier: 'CASA-2026-000001' })]
+    const resultatFiltre = [nonEligible({ id: 'c-2', numero_dossier: 'CASA-2026-000002' })]
+    apiClient.post.mockImplementation((path, body) => {
+      if (path === '/admin/candidatures') {
+        return Promise.resolve({
+          data: body?.statut_interne === 'en_instruction' ? resultatFiltre : resultatInitial,
+          meta: { current_page: 1, last_page: 1, total: 1 },
+        })
+      }
+      if (path === '/admin/candidatures/eligibilite/retablir') return Promise.resolve({ data: { retablies: 2 } })
+      return Promise.resolve({ data: [] })
     })
+    apiClient.get.mockImplementation((path) => {
+      if (path === '/admin/evaluateurs') return Promise.resolve({ data: EVALUATEURS })
+      if (path === '/admin/evaluateurs?tous=1') return Promise.resolve({ data: EVALUATEURS_TOUS })
+      if (path === '/admin/campagnes') return Promise.resolve({ data: CAMPAGNES })
+      if (path === '/filieres') return Promise.resolve({ data: FILIERES })
+      return Promise.resolve({ data: [] })
+    })
+    renderScreen()
+    await screen.findByText('CASA-2026-000001')
+    // Même garde que le test « ENTRE PAGES » ci-dessus (timer de debounce de
+    // recherche toujours armé au montage) — sans elle, ce test multi-étapes
+    // est flaky sous charge (suite complète).
+    await new Promise((resolve) => setTimeout(resolve, 450))
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000001/i }))
+
+    await user.selectOptions(screen.getByDisplayValue('Tous les statuts'), 'en_instruction')
+    await screen.findByText('CASA-2026-000002')
+    await user.click(screen.getByRole('checkbox', { name: /rétablir l'éligibilité de casa-2026-000002/i }))
+    expect(await screen.findByRole('button', { name: /rendre éligible \(2\)/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /rendre éligible \(2\)/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Rendre éligible ?' })
+    await user.type(within(dialog).getByLabelText(/motif/i), 'Vérifié.')
+    await user.click(within(dialog).getByRole('checkbox', { name: /j'ai compris/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Rendre éligible' }))
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith(
+      '/admin/candidatures/eligibilite/retablir',
+      { candidature_ids: ['c-1', 'c-2'], motif: 'Vérifié.' },
+    ))
   })
 
   it('non-régression : cocher pour rétablissement ne touche pas à la sélection Affecter/Réattribuer, et inversement', async () => {
